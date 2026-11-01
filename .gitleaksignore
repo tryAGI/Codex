@@ -1,0 +1,2 @@
+# Reviewed false positive: SHA-256 of an upstream openai/codex source file (provenance fingerprint), not a credential.
+src/libs/tryAGI.Codex/ProtocolBaseline.json:generic-api-key:69
