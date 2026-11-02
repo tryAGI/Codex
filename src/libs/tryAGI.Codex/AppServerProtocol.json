@@ -1,5 +1,5 @@
 {
-  "version": "0.165.0",
+  "version": "0.166.0",
   "clientRequests": [
     "account/bedrock/checkGovCloudRequirements",
     "account/bedrock/discover",
@@ -7,6 +7,7 @@
     "account/gatewayOAuth/cancel",
     "account/gatewayOAuth/login",
     "account/gatewayOAuth/read",
+    "account/gcp/setup",
     "account/login/cancel",
     "account/login/start",
     "account/logout",
@@ -16,6 +17,8 @@
     "account/sendAddCreditsNudgeEmail",
     "account/usage/read",
     "account/workspaceMessages/read",
+    "accountSession/list",
+    "accountSession/switch",
     "app/installed",
     "app/list",
     "app/read",
