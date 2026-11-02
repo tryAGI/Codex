@@ -18,7 +18,20 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
     steps:
+      # GitHub Free does not pass organization secrets to private repositories,
+      # so this workflow stays idle until the repository is public.
+      - name: Check for PERSONAL_TOKEN
+        id: token
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::warning::PERSONAL_TOKEN is not available to this repository; skipping the App Server drift check."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.token.outputs.available == 'true'
         uses: actions/checkout@v6
         with:
           # A pull request opened with GITHUB_TOKEN does not trigger the Test workflow
@@ -27,15 +40,18 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node
+        if: steps.token.outputs.available == 'true'
         uses: actions/setup-node@v5
         with:
           node-version: 22
 
       - name: Install the latest stable Codex CLI
+        if: steps.token.outputs.available == 'true'
         run: npm install --global @openai/codex@latest
 
       - name: Detect a new version
         id: detect
+        if: steps.token.outputs.available == 'true'
         run: |
           set -euo pipefail
           output="$(codex --version)"
