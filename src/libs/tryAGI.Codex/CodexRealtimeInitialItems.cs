@@ -6,7 +6,7 @@ namespace tryAGI.Codex;
 
 /// <summary>Immutable, value-comparable settings collection; identical imports do not restart live voice.</summary>
 [JsonConverter(typeof(CodexRealtimeInitialItems.Converter))]
-public sealed class CodexRealtimeInitialItems : IReadOnlyList<CodexRealtimeInitialItem>, IEquatable<CodexRealtimeInitialItems>
+internal sealed class CodexRealtimeInitialItems : IReadOnlyList<CodexRealtimeInitialItem>, IEquatable<CodexRealtimeInitialItems>
 {
     private readonly CodexRealtimeInitialItem[] items;
     public CodexRealtimeInitialItems(IEnumerable<CodexRealtimeInitialItem> items)

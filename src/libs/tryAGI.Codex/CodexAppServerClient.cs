@@ -230,9 +230,7 @@ public sealed class CodexAppServerClient : IAsyncDisposable
         {
             return;
         }
-#pragma warning disable CA1031 // A failing host handler must still answer, or the server waits forever.
-        catch (Exception ex)
-#pragma warning restore CA1031
+        catch (Exception ex) // A failing host handler must still answer, or the server waits forever.
         {
             response = SerializeResponse(request.Id, null, new CodexAppServerException(CodexAppServerException.ServerErrorCode, ex.Message));
         }

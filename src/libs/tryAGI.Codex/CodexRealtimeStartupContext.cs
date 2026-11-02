@@ -5,7 +5,7 @@ namespace tryAGI.Codex;
 
 /// <summary>Bounded background context matching the sections and budgets of pinned Rust realtime_context.rs.
 /// Sources are supplied by the host: a backend must never describe its container as the owner's workspace.</summary>
-public static class CodexRealtimeStartupContext
+internal static class CodexRealtimeStartupContext
 {
     public const int MaximumInitialItems = 128;
     public const int MaximumInitialTokens = 8192;

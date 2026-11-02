@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 namespace tryAGI.Codex;
 
 /// <summary>Retain text, identities and provenance without duplicating inference image pixels.</summary>
-public static class CodexThreadImageProjection
+internal static class CodexThreadImageProjection
 {
     // One-to-one history projection: preserve ordering, provenance and tool receipts,
     // while pixel payloads live only in the active inference request.

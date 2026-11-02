@@ -28,7 +28,9 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     private ResponseAdmission? pendingResponseAdmission;
     private readonly HashSet<string> pendingFunctions = new(StringComparer.Ordinal);
     private readonly HashSet<string> toolOutputs = new(StringComparer.Ordinal);
+    /// <summary>Protocol of this connection: <c>v3</c>, <c>v2</c> or <c>v1</c>.</summary>
     public string Protocol => protocol;
+    /// <summary>Which model the provider reported for this session.</summary>
     public CodexRealtimeModelIdentity ModelIdentity { get; } = new();
     /// <summary>Host speech permission. Re-enabling never replays a request queued before suppression.</summary>
     public void SetResponseRequestsAllowed(bool allowed)
@@ -110,8 +112,12 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     }
 
     /// <summary>Bounded transport metadata; never retains the peer's arbitrary close description.</summary>
+    /// <param name="End">Which side ended the transport.</param>
+    /// <param name="CloseCode">WebSocket close code, if any.</param>
+    /// <param name="ErrorType">Type of the transport error, if any.</param>
     public sealed record TransportClosure(string End, int? CloseCode, string? ErrorType);
     private TransportClosure? closure;
+    /// <summary>How the transport ended, once it has.</summary>
     public TransportClosure? Closure => Volatile.Read(ref closure);
 
     private async Task<ValueWebSocketReceiveResult> ReceiveObservedAsync(Memory<byte> buffer, CancellationToken ct)
@@ -186,6 +192,11 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         finally { Interlocked.Exchange(ref reading, 0); }
     }
 
+    /// <summary>Adds text to the session context, for example a delegation result.</summary>
+    /// <param name="text">Context text.</param>
+    /// <param name="delegationId">The delegation this text answers, if any.</param>
+    /// <param name="channel"><c>speakable</c> to let the model speak about it, or another channel.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
     public Task AppendContextAsync(string text, string? delegationId = null, string? channel = "speakable", CancellationToken cancellationToken = default) =>
         AppendContextCoreAsync(text, delegationId, channel, cancellationToken, null);
 
@@ -235,6 +246,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         return protocol == "v2" ? AppendGaUserAsync(text, cancellationToken) : AppendContextAsync(text, channel: "speakable", cancellationToken: cancellationToken);
     }
 
+    /// <summary>Asks the provider to end the session gracefully.</summary>
     public async Task CloseSessionAsync(CancellationToken cancellationToken = default)
     {
         await writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -245,6 +257,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         }
         finally { writeGate.Release(); }
     }
+    /// <summary>Sends new session settings. Keep reading events to see whether they were accepted.</summary>
     public Task UpdateSessionAsync(CodexRealtimeSessionOptions options, CancellationToken cancellationToken = default) =>
         SendAsync(protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(options) : CodexRealtimeProtocol.SessionUpdate(options), cancellationToken);
     /// <summary>Native V3 PCM audio transport for direct WebSocket sessions. Do not duplicate
@@ -356,6 +369,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         return true;
     }
 
+    /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0) return ValueTask.CompletedTask;

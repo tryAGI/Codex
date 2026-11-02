@@ -3,6 +3,11 @@ using System.Text;
 
 namespace tryAGI.Codex;
 
+/// <summary>State of one file system watch.</summary>
+/// <param name="ConnectionId">Connection that owns the watch.</param>
+/// <param name="WatchId">Watch ID.</param>
+/// <param name="OsWatcherActive">The operating system watcher is running.</param>
+/// <param name="ErrorType">Type of the last watcher error, if any.</param>
 public sealed record CodexFileSystemWatchStatus(string ConnectionId, string WatchId, bool OsWatcherActive, string? ErrorType);
 
 internal sealed class CodexFileSystemWatches(

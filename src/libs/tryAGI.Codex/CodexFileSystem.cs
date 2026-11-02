@@ -8,11 +8,15 @@ namespace tryAGI.Codex;
 /// This executor is never implicitly registered as a model tool.</summary>
 public sealed class CodexFileSystem : IAsyncDisposable
 {
+    /// <summary>Largest file <c>fs/readFile</c> returns.</summary>
     public const long MaximumReadBytes = 512L * 1024 * 1024;
     private readonly Func<CodexFileSystemAccess, CancellationToken, ValueTask> authorize;
     private readonly CodexFileSystemWatches watches;
     private int disposed;
 
+    /// <summary>Creates a file system handler.</summary>
+    /// <param name="authorize">Checks every request against the host's root and policy; throw to deny.</param>
+    /// <param name="sendNotification">Delivers <c>fs/changed</c> notifications to a connection.</param>
     public CodexFileSystem(Func<CodexFileSystemAccess, CancellationToken, ValueTask> authorize,
         Func<string, CodexFsChanged, CancellationToken, ValueTask> sendNotification)
     {
@@ -20,9 +24,16 @@ public sealed class CodexFileSystem : IAsyncDisposable
         watches = new(sendNotification ?? throw new ArgumentNullException(nameof(sendNotification)));
     }
 
+    /// <summary>Returns <see langword="true"/> for the <c>fs/*</c> methods this handler serves.</summary>
     public static bool Handles(string method) => method is "fs/readFile" or "fs/writeFile" or "fs/createDirectory"
         or "fs/getMetadata" or "fs/readDirectory" or "fs/remove" or "fs/copy" or "fs/watch" or "fs/unwatch";
 
+    /// <summary>Serves one <c>fs/*</c> request.</summary>
+    /// <param name="connectionId">Connection that sent the request; watches belong to it.</param>
+    /// <param name="method">The <c>fs/*</c> method.</param>
+    /// <param name="parameters">Request parameters.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <exception cref="CodexFileSystemException">The request is invalid, denied or failed.</exception>
     public async Task<JsonElement> HandleAsync(string connectionId, string method, JsonElement parameters,
         CancellationToken cancellationToken = default)
     {
@@ -166,9 +177,12 @@ public sealed class CodexFileSystem : IAsyncDisposable
         { throw new CodexFileSystemException(-32603, "Local filesystem operation failed.", error); }
     }
 
+    /// <summary>Stops every watch owned by a closed connection.</summary>
     public Task ConnectionClosedAsync(string connectionId) => watches.ConnectionClosedAsync(connectionId);
+    /// <summary>Returns the state of all active watches.</summary>
     public Task<CodexFileSystemWatchStatus[]> WatchStatusAsync(CancellationToken cancellationToken = default) =>
         watches.StatusAsync(cancellationToken);
+    /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
         Interlocked.Exchange(ref disposed, 1);

@@ -4,26 +4,47 @@ using System.Text.Json;
 namespace tryAGI.Codex;
 
 /// <summary>Metadata only. Request-relative timings share one monotonic clock; no prompts, arguments or credentials.</summary>
+/// <param name="Phase">Phase of the request, for example <c>first_byte</c> or <c>completed</c>.</param>
+/// <param name="RequestId">Local request ID.</param>
+/// <param name="ElapsedMilliseconds">Milliseconds since the request started.</param>
 public sealed record CodexResponseDiagnostic(string Phase, string RequestId, double ElapsedMilliseconds)
 {
     internal long StartedTimestamp { get; init; }
+    /// <summary>Duration of the tool call this phase reports.</summary>
     public double? ToolDurationMilliseconds { get; init; }
+    /// <summary>The tool ran concurrently with others.</summary>
     public bool? ParallelDispatch { get; init; }
+    /// <summary>Namespace of the tool.</summary>
     public string? ToolNamespace { get; init; }
+    /// <summary>1-based request number within the run.</summary>
     public int RequestNumber { get; init; } = 1;
+    /// <summary>Input items sent.</summary>
     public int InputItems { get; init; }
+    /// <summary>Tools advertised.</summary>
     public int ToolCount { get; init; }
+    /// <summary>Request body size.</summary>
     public long? RequestBytes { get; init; }
+    /// <summary>Provider response ID.</summary>
     public string? ResponseId { get; init; }
+    /// <summary>Type of the output item this phase reports.</summary>
     public string? OutputKind { get; init; }
+    /// <summary>Index of that output item.</summary>
     public int? OutputIndex { get; init; }
+    /// <summary>Call ID of the tool call.</summary>
     public string? FunctionId { get; init; }
+    /// <summary>Name of the tool.</summary>
     public string? ToolName { get; init; }
+    /// <summary>Length of the tool arguments.</summary>
     public long? ArgumentCharacters { get; init; }
+    /// <summary>Input tokens reported by the provider.</summary>
     public long? InputTokens { get; init; }
+    /// <summary>Cached input tokens reported by the provider.</summary>
     public long? CachedInputTokens { get; init; }
+    /// <summary>Output tokens reported by the provider.</summary>
     public long? OutputTokens { get; init; }
+    /// <summary>Reasoning tokens reported by the provider.</summary>
     public long? ReasoningTokens { get; init; }
+    /// <summary>Correlation identity sent with the request.</summary>
     public CodexResponsesIdentity? Identity { get; init; }
 }
 

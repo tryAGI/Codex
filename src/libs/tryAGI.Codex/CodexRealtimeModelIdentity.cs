@@ -5,6 +5,13 @@ namespace tryAGI.Codex;
 /// <summary>Connection-local provider identity evidence. A reported alias never proves a hidden snapshot or billing entitlement.</summary>
 public sealed class CodexRealtimeModelIdentity
 {
+    /// <summary>What is known about the session model.</summary>
+    /// <param name="RequestedModel">Model the session asked for.</param>
+    /// <param name="ProviderReportedModel">Model the provider reported, if any.</param>
+    /// <param name="ConfirmedModel">The requested model, when the provider reported the same name.</param>
+    /// <param name="Verification"><c>provider_alias_confirmed</c>, <c>provider_model_mismatch</c> or <c>provider_model_unreported</c>.</param>
+    /// <param name="SourceEvent">Event the report came from.</param>
+    /// <param name="Scope">What the verification covers.</param>
     public sealed record Snapshot(string RequestedModel, string? ProviderReportedModel, string? ConfirmedModel,
         string Verification, string? SourceEvent,
         string Scope = "current_sideband_connection; provider_alias_only; snapshot_and_billing_unverified");
@@ -29,6 +36,7 @@ public sealed class CodexRealtimeModelIdentity
             Volatile.Write(ref observation, new(model, eventType));
     }
 
+    /// <summary>Compares the provider's last report with the requested model.</summary>
     public Snapshot Read(string requestedModel)
     {
         var observed = Volatile.Read(ref observation);

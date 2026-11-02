@@ -3,12 +3,12 @@ using System.Text.Json.Nodes;
 
 namespace tryAGI.Codex;
 
-public sealed record CodexCustomToolProbeResult(string Model, string ReasoningEffort,
+internal sealed record CodexCustomToolProbeResult(string Model, string ReasoningEffort,
     bool InputMatched, bool ResultMatched, int Requests, int ToolCalls, int EffectsExecuted = 0);
 
 /// <summary>Explicit two-request synthetic custom-tool canary. It never reads host
 /// context, edits files, launches commands or sends playback. The caller owns cost admission.</summary>
-public static class CodexCustomToolProbe
+internal static class CodexCustomToolProbe
 {
     public static async Task<CodexCustomToolProbeResult> RunAsync(CodexClient client, string model, string effort,
         CancellationToken cancellationToken = default, Action<CodexResponseDiagnostic>? observeDiagnostics = null)

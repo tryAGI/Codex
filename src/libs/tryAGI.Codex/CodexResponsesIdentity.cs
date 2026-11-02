@@ -4,11 +4,18 @@ namespace tryAGI.Codex;
 
 /// <summary>Caller-owned Responses correlation, not proof of provider billing or storage.
 /// Mirrors pinned Rust flat client_metadata and HTTP compatibility headers.</summary>
+/// <param name="SessionId">Caller session ID.</param>
+/// <param name="ThreadId">Caller thread ID.</param>
+/// <param name="TurnId">Caller turn ID.</param>
 public sealed record CodexResponsesIdentity(string SessionId, string ThreadId, string TurnId)
 {
+    /// <summary>Thread that spawned this one, for subagents.</summary>
     public string? ParentThreadId { get; init; }
+    /// <summary>Turn that spawned this one, for subagents.</summary>
     public string? ParentTurnId { get; init; }
+    /// <summary>First turn of the chain.</summary>
     public string? RootTurnId { get; init; }
+    /// <summary>Subagent name.</summary>
     public string? Subagent { get; init; }
 
     internal void Validate()

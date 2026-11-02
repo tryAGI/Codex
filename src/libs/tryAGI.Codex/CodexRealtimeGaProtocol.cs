@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 namespace tryAGI.Codex;
 
 /// <summary>Public GA Realtime wire protocol. Raw events and session fields remain available alongside typed helpers.</summary>
-public static class CodexRealtimeGaProtocol
+internal static class CodexRealtimeGaProtocol
 {
     public static IReadOnlyList<string> Voices { get; } = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"];
     public static JsonObject Session(CodexRealtimeSessionOptions options)

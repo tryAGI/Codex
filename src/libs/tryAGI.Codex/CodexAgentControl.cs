@@ -29,8 +29,13 @@ public sealed class CodexAgentControl : IDisposable
     private CodexResponseOptions? next;
     private bool closed, interrupted, disposed;
     private int tools, queuedBytes, cancelers;
+    /// <summary>Cancelled when the turn is interrupted and no tool is still running.</summary>
     public CancellationToken Token => lifetime.Token;
 
+    /// <summary>Queues extra user input for the running turn; it is sent with the next model request.</summary>
+    /// <param name="items">Input items, at most 128.</param>
+    /// <param name="clientUserMessageId">Client ID of the message, for deduplication.</param>
+    /// <exception cref="InvalidOperationException">The turn no longer accepts input.</exception>
     public void Steer(IReadOnlyList<JsonElement> items, string? clientUserMessageId = null)
     {
         if (items.Count == 0 || items.Count > 128) throw new ArgumentException("Steering requires bounded nonempty input.");
@@ -45,6 +50,10 @@ public sealed class CodexAgentControl : IDisposable
         }
     }
 
+    /// <summary>Changes the options used by the turn's next model requests.</summary>
+    /// <param name="update">Produces the new options from the current ones.</param>
+    /// <param name="initial">Options to start from when no update was made yet.</param>
+    /// <returns><see langword="false"/> when the turn has already ended or been interrupted.</returns>
     public bool Update(Func<CodexResponseOptions, CodexResponseOptions> update, CodexResponseOptions initial)
     {
         lock (gate)
@@ -82,6 +91,7 @@ public sealed class CodexAgentControl : IDisposable
 
     internal void Seal() { lock (gate) closed = true; }
 
+    /// <summary>Stops the turn: no new tool starts, and the current request is cancelled once running tools finish.</summary>
     public void Interrupt()
     {
         bool cancel;
@@ -117,6 +127,7 @@ public sealed class CodexAgentControl : IDisposable
             if (release) lifetime.Dispose();
         }
     }
+    /// <inheritdoc />
     public void Dispose()
     {
         bool release;

@@ -6,14 +6,23 @@ namespace tryAGI.Codex;
 
 /// <summary>A host-captured original file; null contents explicitly mean an absent path.
 /// Permissions are host metadata, never a model-selected mode.</summary>
+/// <param name="Path">Workspace-relative path.</param>
+/// <param name="Contents">Original bytes, or <see langword="null"/> when the path is absent.</param>
+/// <param name="Permissions">Unix permission bits, if captured.</param>
 public sealed record CodexWorkspaceFile(string Path, ReadOnlyMemory<byte>? Contents, int? Permissions = null);
 
+/// <summary>Options of <see cref="CodexWorkspacePatch.Plan"/>.</summary>
 public sealed record CodexWorkspacePatchOptions
 {
+    /// <summary>Treat paths that differ only in case as different files.</summary>
     public bool CaseSensitivePaths { get; init; } = true;
+    /// <summary>How line endings are reconstructed.</summary>
     public CodexPatchUpdateMode UpdateMode { get; init; } = CodexPatchUpdateMode.PreserveLineEndings;
+    /// <summary>Required <c>*** Environment ID:</c> value, if any.</summary>
     public string? EnvironmentId { get; init; }
+    /// <summary>Most files the patch may touch.</summary>
     public int MaximumFiles { get; init; } = 48;
+    /// <summary>Most bytes across all original and resulting files.</summary>
     public int MaximumTotalBytes { get; init; } = 16 * 1024 * 1024;
 }
 
@@ -24,15 +33,24 @@ public sealed class CodexWorkspaceChange
     private readonly byte[]? contents;
     internal CodexWorkspaceChange(string path, string? before, byte[]? after, int? permissions)
     { Path = path; BeforeSha256 = before; contents = after?.ToArray(); Permissions = permissions; }
+    /// <summary>Workspace-relative path.</summary>
     public string Path { get; }
+    /// <summary>SHA-256 of the original bytes, or <see langword="null"/> when absent.</summary>
     public string? BeforeSha256 { get; }
+    /// <summary>SHA-256 of the result, or <see langword="null"/> when deleted.</summary>
     public string? AfterSha256 => contents is null ? null : CodexWorkspacePatch.Hash(contents);
     // Copy on access: neither the source capture nor an exposed result can mutate the plan.
+    /// <summary>A copy of the resulting bytes, or <see langword="null"/> when deleted.</summary>
     public ReadOnlyMemory<byte>? AfterContents => contents is null ? (ReadOnlyMemory<byte>?)null : new ReadOnlyMemory<byte>(contents.ToArray());
+    /// <summary>Unix permission bits of the result.</summary>
     public int? Permissions { get; }
+    /// <summary><c>create</c>, <c>update</c> or <c>delete</c>.</summary>
     public string Operation => BeforeSha256 is null ? "create" : contents is null ? "delete" : "update";
 }
 
+/// <summary>The net result of a patch.</summary>
+/// <param name="Changes">Net file changes.</param>
+/// <param name="Preconditions">Original SHA-256 of every touched path (<see langword="null"/> for absent); recheck all of them before writing.</param>
 public sealed record CodexWorkspacePatchPlan(IReadOnlyList<CodexWorkspaceChange> Changes,
     IReadOnlyDictionary<string, string?> Preconditions);
 
@@ -52,6 +70,7 @@ public static class CodexWorkspacePatch
         internal int? CurrentPermissions { get; set; } = permissions;
     }
 
+    /// <summary>Returns every path a patch touches, including move destinations, so the host can capture them.</summary>
     public static IReadOnlyList<string> Paths(CodexPatchDocument document, bool caseSensitive = true)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -64,6 +83,12 @@ public static class CodexWorkspacePatch
         return Array.AsReadOnly(paths.Order(StringComparer.Ordinal).ToArray());
     }
 
+    /// <summary>Evaluates a patch against captured originals without touching the file system.</summary>
+    /// <param name="patch">Patch text.</param>
+    /// <param name="originals">Captured state of every path from <see cref="Paths"/>.</param>
+    /// <param name="options">Limits and line-ending mode.</param>
+    /// <param name="cancellationToken">Cancels planning.</param>
+    /// <exception cref="CodexPatchException">The patch is malformed or does not apply.</exception>
     public static CodexWorkspacePatchPlan Plan(string patch, IReadOnlyList<CodexWorkspaceFile> originals,
         CodexWorkspacePatchOptions? options = null, CancellationToken cancellationToken = default)
     {

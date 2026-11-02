@@ -4,23 +4,48 @@ using System.Text.Json.Nodes;
 
 namespace tryAGI.Codex;
 
+/// <summary>A turn the RPC host asks the embedding host to execute.</summary>
+/// <param name="Thread">The thread with the new turn recorded.</param>
+/// <param name="TurnId">Turn ID.</param>
+/// <param name="OwnerId">Owner recorded for the turn.</param>
+/// <param name="Options">Resolved model options.</param>
+/// <param name="Input">Input items.</param>
+/// <param name="Control">Steers or interrupts the turn.</param>
+/// <param name="ValidatedItem">Records each validated output item.</param>
 public sealed record CodexThreadRun(CodexThreadDocument Thread, Guid TurnId, string OwnerId,
     CodexResponseOptions Options, IReadOnlyList<JsonElement> Input, CodexAgentControl Control,
     Func<JsonElement, CancellationToken, Task> ValidatedItem)
 {
+    /// <summary>Forwards provider events as App Server notifications.</summary>
     public Func<CodexResponseEvent, CancellationToken, Task>? ObserveProvider { get; init; }
+    /// <summary>Executes the built-in <c>update_plan</c> tool.</summary>
     public Func<string, CancellationToken, Task<CodexToolOutput>>? ExecutePlan { get; init; }
+    /// <summary>Publishes the turn diff after a patch was applied.</summary>
     public Func<CodexWorkspacePatchResult, Task>? AppliedPatch { get; init; }
 }
 
+/// <summary>A thread RPC request failed; <see cref="Code"/> is the JSON-RPC error code to return.</summary>
+/// <param name="code">JSON-RPC error code.</param>
+/// <param name="message">Error message.</param>
 public sealed class CodexThreadRpcException(int code, string message) : Exception(message)
 {
+    /// <summary>JSON-RPC error code.</summary>
     public int Code { get; } = code;
 }
 
 /// <summary>Account-bound native Thread/Turn RPC host. The embedding host supplies authenticated
 /// storage, resolved defaults, budgeted execution and notifications. Unsupported host capabilities
 /// are rejected before writes; optional Rust surfaces are never silently acknowledged.</summary>
+/// <param name="store">Thread journal.</param>
+/// <param name="list">Lists the account's threads for <c>thread/list</c>.</param>
+/// <param name="defaults">Default settings for new threads.</param>
+/// <param name="execute">Runs a turn and returns the final thread document.</param>
+/// <param name="notify">Sends an App Server notification.</param>
+/// <param name="validateOptions">Rejects resolved options the host does not allow.</param>
+/// <param name="validateInput">Rejects input the host does not allow.</param>
+/// <param name="maximumConcurrentTurns">Most turns running at once.</param>
+/// <param name="tools">Tools advertised to every turn.</param>
+/// <param name="configurationSource">Resolves configuration layers, for example <see cref="CodexFileConfigurationSource.LoadAsync"/>.</param>
 public sealed partial class CodexThreadRpc(
     CodexThreadStore store,
     Func<CancellationToken, Task<IReadOnlyList<CodexThreadDocument>>> list,
@@ -37,10 +62,16 @@ public sealed partial class CodexThreadRpc(
     private readonly ConcurrentDictionary<Guid, Running> active = new();
     private readonly SemaphoreSlim admission = new(1, 1);
     private bool stopping;
+    /// <summary>Returns <see langword="true"/> for the thread and turn methods this host serves.</summary>
     public static bool Handles(string method) => method is "thread/start" or "thread/resume" or "thread/fork"
         or "thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list"
         or "turn/start" or "turn/steer" or "turn/interrupt" or "turn/settings/update";
 
+    /// <summary>Serves one App Server thread or turn request.</summary>
+    /// <param name="method">Method, for example <c>thread/start</c> or <c>turn/start</c>.</param>
+    /// <param name="parameters">Request parameters.</param>
+    /// <param name="ct">Cancels the request; a started turn keeps running.</param>
+    /// <exception cref="CodexThreadRpcException">The request failed.</exception>
     public async Task<JsonElement> InvokeAsync(string method, JsonElement? parameters, CancellationToken ct = default)
     {
         if (Volatile.Read(ref stopping) && method is not ("thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list"))
@@ -73,6 +104,7 @@ public sealed partial class CodexThreadRpc(
         catch (InvalidOperationException error) { throw new CodexThreadRpcException(-32000, error.Message); }
     }
 
+    /// <summary>Stops accepting turns and interrupts the running ones.</summary>
     public async Task StopAsync(CancellationToken ct = default)
     {
         Running[] pending;

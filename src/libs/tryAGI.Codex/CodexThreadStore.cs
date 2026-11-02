@@ -9,6 +9,7 @@ namespace tryAGI.Codex;
 /// authorization belong to the host; expected revisions fence all persisted transitions.</summary>
 public sealed class CodexThreadStore
 {
+    /// <summary>Largest serialized thread document.</summary>
     public const int MaximumDocumentBytes = 16_777_216;
     private const int MaximumTurns = 4096;
     private const int MaximumItems = 32768;
@@ -18,11 +19,16 @@ public sealed class CodexThreadStore
     private readonly object ephemeralGate = new();
     private readonly Dictionary<Guid, JsonElement> ephemeral = [];
 
+    /// <summary>Threads kept only in memory (started with <c>ephemeral</c>).</summary>
     public IReadOnlyList<CodexThreadDocument> EphemeralThreads
     {
         get { lock (ephemeralGate) return ephemeral.Values.Select(Decode).ToArray(); }
     }
 
+    /// <summary>Creates a store for one account.</summary>
+    /// <param name="storage">Durable storage.</param>
+    /// <param name="accountId">Account that owns every thread in this store.</param>
+    /// <param name="timeProvider">Clock for timestamps.</param>
     public CodexThreadStore(ICodexThreadStorage storage, string accountId, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(storage);
@@ -41,6 +47,8 @@ public sealed class CodexThreadStore
         return await PublishAsync(null, next, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Reads a thread.</summary>
+    /// <exception cref="KeyNotFoundException">The thread does not exist.</exception>
     public async Task<CodexThreadDocument> ReadAsync(Guid threadId, CancellationToken cancellationToken = default)
     {
         Id(threadId);
@@ -54,6 +62,7 @@ public sealed class CodexThreadStore
         return value;
     }
 
+    /// <summary>Records a new turn. Fails when another turn is in progress.</summary>
     public Task<CodexThreadDocument> StartTurnAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, IReadOnlyList<JsonElement> input, Guid? rootTurnId = null, CancellationToken cancellationToken = default,
         string?[]? clientUserMessageIds = null, string? turnTrigger = null)
@@ -67,6 +76,7 @@ public sealed class CodexThreadStore
             return document with { Turns = [.. document.Turns, turn] };
         }, cancellationToken);
 
+    /// <summary>Records client message IDs for the turn's user inputs. Existing IDs cannot be rewritten.</summary>
     public Task<CodexThreadDocument> RecordInputClientsAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string?[] clients, CancellationToken cancellationToken = default)
         => ChangeTurnAsync(threadId, expectedRevision, turnId, ownerId, turn =>
@@ -77,6 +87,7 @@ public sealed class CodexThreadStore
             return turn with { ClientUserMessageIds = clients.ToArray() };
         }, cancellationToken);
 
+    /// <summary>Appends steering input to a running turn.</summary>
     public Task<CodexThreadDocument> AppendInputAsync(Guid threadId, long expectedRevision, Guid expectedTurnId,
         string ownerId, IReadOnlyList<JsonElement> input, CancellationToken cancellationToken = default)
         => ChangeTurnAsync(threadId, expectedRevision, expectedTurnId, ownerId,
@@ -129,6 +140,7 @@ public sealed class CodexThreadStore
         return new(true, await PublishAsync(before.Revision, next, cancellationToken).ConfigureAwait(false));
     }
 
+    /// <summary>Records the outcome of a dispatch: <c>succeeded</c>, <c>failed</c> or <c>unknown</c>.</summary>
     public Task<CodexThreadDocument> SettleAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string callId, string outcome, JsonElement? result = null, CancellationToken cancellationToken = default)
         => ChangeAsync(threadId, expectedRevision, document =>
@@ -144,6 +156,7 @@ public sealed class CodexThreadStore
                 ? d with { State = outcome, Result = result?.Clone() } : d).ToArray() });
         }, cancellationToken);
 
+    /// <summary>Completes a turn with its final status and output items.</summary>
     public Task<CodexThreadDocument> CompleteAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string status, IReadOnlyList<JsonElement> output, CancellationToken cancellationToken = default)
         => ChangeTurnAsync(threadId, expectedRevision, turnId, ownerId, turn =>
@@ -240,14 +253,17 @@ public sealed class CodexThreadStore
             throw new CodexThreadConflictException();
         return next;
     }
+    /// <summary>Serializes a thread document, enforcing <see cref="MaximumDocumentBytes"/>.</summary>
     public static JsonElement Encode(CodexThreadDocument value)
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value, CodexThreadJson.Default.CodexThreadDocument);
         if (bytes.Length > MaximumDocumentBytes) throw new InvalidDataException("Native thread journal is full; source must be archived before continuing.");
         using var parsed = JsonDocument.Parse(bytes); return parsed.RootElement.Clone();
     }
+    /// <summary>Parses and validates a stored document without writing it.</summary>
     public CodexThreadDocument ValidateSnapshot(JsonElement body) => Decode(body);
 
+    /// <summary>Returns every tool call ID ever admitted on the thread.</summary>
     public static IReadOnlyCollection<string> DispatchedToolCallIds(CodexThreadDocument document)
         => document.Turns.SelectMany(t => t.Dispatches).Where(d => d.Kind == "tool").Select(d => d.CallId).ToArray();
 

@@ -5,18 +5,52 @@ using System.Text.Json.Nodes;
 
 namespace tryAGI.Codex;
 
+/// <summary>Account-wide token statistics reported by the ChatGPT profile. Missing values are unknown, not zero.</summary>
+/// <param name="ObservedAt">When the statistics were read.</param>
+/// <param name="LifetimeTokens">Tokens used over the account's lifetime.</param>
+/// <param name="PeakDailyTokens">Most tokens used in one day.</param>
+/// <param name="LongestRunningTurnSeconds">Duration of the longest turn.</param>
+/// <param name="CurrentStreakDays">Consecutive days of use up to today.</param>
+/// <param name="LongestStreakDays">Longest run of consecutive days of use.</param>
+/// <param name="DailyUsageBuckets">Per-day token counts, if reported.</param>
 public sealed record CodexAccountTokenActivity(DateTimeOffset ObservedAt, long? LifetimeTokens,
     long? PeakDailyTokens, long? LongestRunningTurnSeconds, long? CurrentStreakDays,
     long? LongestStreakDays, IReadOnlyList<CodexDailyTokenActivity>? DailyUsageBuckets);
+
+/// <summary>Tokens used on one day.</summary>
+/// <param name="StartDate">Day start as reported by the provider.</param>
+/// <param name="Tokens">Tokens used that day.</param>
 public sealed record CodexDailyTokenActivity(string StartDate, long Tokens);
 
 /// <summary>Provider estimates in integer millionths. Missing values are unknown, not zero.
 /// Native USD is distinct from estimated USD; neither is inferred from credits.</summary>
+/// <param name="ThreadId">Provider thread ID.</param>
+/// <param name="EstimatedUsageCreditsMicros">Estimated credits, in millionths.</param>
+/// <param name="EstimatedUsageUsdMicros">Estimated US dollars, in millionths.</param>
+/// <param name="NativeUsageUsdMicros">Provider-reported US dollars, in millionths.</param>
+/// <param name="Groups">Usage split by model, reasoning effort and speed.</param>
 public sealed record CodexThreadUsage(string ThreadId, long EstimatedUsageCreditsMicros,
     long? EstimatedUsageUsdMicros, long? NativeUsageUsdMicros, IReadOnlyList<CodexThreadUsageGroup> Groups);
+
+/// <summary>Usage of one thread for one model configuration.</summary>
+/// <param name="Model">Model name.</param>
+/// <param name="ReasoningEffort">Reasoning effort.</param>
+/// <param name="Speed">Service speed tier.</param>
+/// <param name="EstimatedUsageCreditsMicros">Estimated credits, in millionths.</param>
+/// <param name="NativeUsageUsdMicros">Provider-reported US dollars, in millionths.</param>
+/// <param name="NetNewInputTokens">Input tokens not served from cache.</param>
+/// <param name="CachedInputTokens">Input tokens served from cache.</param>
+/// <param name="InputTokens">All input tokens.</param>
+/// <param name="OutputTokens">Output tokens, including reasoning.</param>
+/// <param name="TotalTokens">Input plus output tokens.</param>
 public sealed record CodexThreadUsageGroup(string? Model, string? ReasoningEffort, string? Speed,
     long EstimatedUsageCreditsMicros, long? NativeUsageUsdMicros, long? NetNewInputTokens,
     long? CachedInputTokens, long? InputTokens, long? OutputTokens, long? TotalTokens);
+
+/// <summary>Result of <see cref="CodexClient.GetThreadsUsageAsync"/>.</summary>
+/// <param name="ObservedAt">When the usage was read.</param>
+/// <param name="Threads">Threads the provider returned usage for.</param>
+/// <param name="UnavailableThreadIds">Requested threads without available usage.</param>
 public sealed record CodexThreadUsageSnapshot(DateTimeOffset ObservedAt, IReadOnlyList<CodexThreadUsage> Threads,
     IReadOnlyList<string> UnavailableThreadIds);
 

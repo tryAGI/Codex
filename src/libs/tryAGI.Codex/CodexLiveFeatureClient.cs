@@ -13,6 +13,10 @@ public sealed class CodexLiveFeatureClient : IDisposable
     private readonly bool sendAccount;
     private readonly HttpClient http;
     private readonly ICodexUsageObserver? usage;
+    /// <summary>Creates a client that signs requests with ChatGPT OAuth credentials.</summary>
+    /// <param name="authorization">Supplies credentials.</param>
+    /// <param name="usage">Optional admission and accounting hooks.</param>
+    /// <param name="handler">Optional HTTP handler.</param>
     public CodexLiveFeatureClient(ICodexCredentialProvider authorization, ICodexUsageObserver? usage = null, HttpMessageHandler? handler = null)
         : this(authorization.GetCredentialsAsync, true, usage, handler) { }
     private CodexLiveFeatureClient(Func<CancellationToken, ValueTask<CodexCredentials>> credentials, bool sendAccount,
@@ -22,9 +26,17 @@ public sealed class CodexLiveFeatureClient : IDisposable
         http = new(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false,
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Brotli }) { Timeout = Timeout.InfiniteTimeSpan };
     }
+    /// <summary>Creates a client that signs requests with an OpenAI API key.</summary>
+    /// <param name="key">Supplies the API key.</param>
+    /// <param name="handler">Optional HTTP handler.</param>
     public static CodexLiveFeatureClient ForApiKey(Func<CancellationToken, ValueTask<string>> key, HttpMessageHandler? handler = null) =>
         new(async ct => new CodexCredentials(await key(ct).ConfigureAwait(false), "api-key"), false, null, handler);
 
+    /// <summary>Creates a custom voice from a description. Single attempt: an uncertain creation is never retried.</summary>
+    /// <param name="name">Voice name.</param>
+    /// <param name="prompt">Description of the voice.</param>
+    /// <param name="scriptHint">Optional representative script.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     public async Task<CodexPromptVoice> CreateVoiceAsync(string name, string prompt, string? scriptHint = null, CancellationToken cancellationToken = default)
     {
         var body = CodexLiveFeatures.PromptVoice(name, prompt, scriptHint);
@@ -35,6 +47,11 @@ public sealed class CodexLiveFeatureClient : IDisposable
         return new(id, name, prompt);
     }
 
+    /// <summary>Asks the provider to answer multiple-choice questions about a text.</summary>
+    /// <param name="input">Text to decide about, 1–16000 characters.</param>
+    /// <param name="questions">Questions to answer.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The raw decision response; every question has a valid answer.</returns>
     public async Task<JsonElement> DecideAsync(string input, IReadOnlyList<CodexLiveChoiceQuestion> questions, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(input) || input.Length > 16000) throw new ArgumentException("Decision input must contain 1..16000 characters.");
@@ -97,5 +114,6 @@ public sealed class CodexLiveFeatureClient : IDisposable
             }
         }
     }
+    /// <inheritdoc />
     public void Dispose() => http.Dispose();
 }

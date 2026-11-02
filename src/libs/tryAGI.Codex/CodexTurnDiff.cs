@@ -4,7 +4,7 @@ using System.Text;
 namespace tryAGI.Codex;
 
 /// <summary>Net content diff from verified worker captures. Never parses model claims as effects.</summary>
-public sealed class CodexTurnDiff
+internal sealed class CodexTurnDiff
 {
     private const int MaximumBytes = 524_288;
     private readonly Dictionary<string, CodexWorkspaceDiffFile> files = new(StringComparer.Ordinal);

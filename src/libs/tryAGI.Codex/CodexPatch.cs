@@ -2,16 +2,53 @@ using System.Text;
 
 namespace tryAGI.Codex;
 
-public enum CodexPatchKind { Add, Delete, Update }
+/// <summary>The operation a patch hunk performs on its file.</summary>
+public enum CodexPatchKind
+{
+    /// <summary>Create a file (<c>*** Add File:</c>).</summary>
+    Add,
+
+    /// <summary>Delete a file (<c>*** Delete File:</c>).</summary>
+    Delete,
+
+    /// <summary>Edit, and optionally move, a file (<c>*** Update File:</c>).</summary>
+    Update,
+}
+
+/// <summary>Where a context line sits in a chunk's old and new line lists.</summary>
+/// <param name="OldIndex">Index in <see cref="CodexPatchChunk.OldLines"/>.</param>
+/// <param name="NewIndex">Index in <see cref="CodexPatchChunk.NewLines"/>.</param>
 public sealed record CodexPatchContextLine(int OldIndex, int NewIndex);
+
+/// <summary>One <c>@@</c> section of an update hunk.</summary>
+/// <param name="ChangeContext">Text after <c>@@</c> used to locate the section, if any.</param>
+/// <param name="OldLines">Lines expected in the file (context and removed lines).</param>
+/// <param name="NewLines">Replacement lines (context and added lines).</param>
+/// <param name="ContextLines">Positions of the unchanged context lines.</param>
+/// <param name="EndOfFile">The section is anchored to the end of the file (<c>*** End of File</c>).</param>
 public sealed record CodexPatchChunk(string? ChangeContext, IReadOnlyList<string> OldLines,
     IReadOnlyList<string> NewLines, IReadOnlyList<CodexPatchContextLine> ContextLines, bool EndOfFile);
+
+/// <summary>One file operation in a patch.</summary>
+/// <param name="Kind">Add, delete or update.</param>
+/// <param name="Path">Target path as written in the patch. Untrusted data.</param>
+/// <param name="MoveTo">Destination path of an update that moves the file.</param>
+/// <param name="Content">Full content of an added file.</param>
+/// <param name="Chunks">Sections of an update.</param>
 public sealed record CodexPatchHunk(CodexPatchKind Kind, string Path, string? MoveTo, string? Content,
     IReadOnlyList<CodexPatchChunk> Chunks);
+
+/// <summary>A parsed patch.</summary>
+/// <param name="Hunks">File operations in order.</param>
+/// <param name="EnvironmentId">Value of the optional <c>*** Environment ID:</c> header. Untrusted data.</param>
 public sealed record CodexPatchDocument(IReadOnlyList<CodexPatchHunk> Hunks, string? EnvironmentId);
 
+/// <summary>The patch text is malformed or cannot be applied to the given source.</summary>
+/// <param name="message">Description matching the upstream Rust parser's wording.</param>
+/// <param name="lineNumber">1-based patch line, when known.</param>
 public sealed class CodexPatchException(string message, int? lineNumber = null) : ArgumentException(message)
 {
+    /// <summary>1-based patch line, when known.</summary>
     public int? LineNumber { get; } = lineNumber;
 }
 
@@ -19,13 +56,17 @@ public sealed class CodexPatchException(string message, int? lineNumber = null) 
 /// Pure text operations: paths/environment IDs are data, never filesystem authorization.</summary>
 public static partial class CodexPatch
 {
+    /// <summary>Largest patch, in UTF-16 characters, the parser accepts.</summary>
     public const int MaximumPatchCharacters = 600_000;
+
     internal static void ValidateText(string text)
     {
         try { _ = new UTF8Encoding(false, true).GetByteCount(text); }
         catch (EncoderFallbackException) { throw new CodexPatchException("Patch/source text must contain valid Unicode."); }
     }
 
+    /// <summary>Parses a complete patch, accepting a literal heredoc wrapper around it.</summary>
+    /// <exception cref="CodexPatchException">The patch is malformed or too large.</exception>
     public static CodexPatchDocument Parse(string patch)
     {
         ArgumentNullException.ThrowIfNull(patch);
@@ -76,8 +117,11 @@ public sealed class CodexPatchParser
     private int lineNumber, characters;
     private string? environmentId;
     private bool failed;
+    /// <summary>The hunks parsed so far. Partial; for display only.</summary>
     public CodexPatchDocument Snapshot => new(Array.AsReadOnly(hunks.Select(h => h.Snapshot()).ToArray()), environmentId);
 
+    /// <summary>Feeds the next piece of streamed patch text.</summary>
+    /// <exception cref="CodexPatchException">The text so far is malformed; the parser cannot be reused.</exception>
     public void Append(string delta)
     {
         ArgumentNullException.ThrowIfNull(delta);
@@ -97,6 +141,8 @@ public sealed class CodexPatchParser
         catch { failed = true; throw; }
     }
 
+    /// <summary>Completes parsing and returns the whole patch.</summary>
+    /// <exception cref="CodexPatchException">The patch is incomplete or malformed.</exception>
     public CodexPatchDocument Finish()
     {
         if (failed) throw new CodexPatchException("Parser has failed; create a new parser.");

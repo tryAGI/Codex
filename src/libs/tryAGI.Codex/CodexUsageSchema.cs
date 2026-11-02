@@ -3,15 +3,15 @@ using System.Text.Json;
 namespace tryAGI.Codex;
 
 /// <summary>A bounded diagnostic observation, not a billing or quota interpretation.</summary>
-public sealed record CodexUsageSchemaSnapshot(string EventType, DateTimeOffset ObservedAt,
+internal sealed record CodexUsageSchemaSnapshot(string EventType, DateTimeOffset ObservedAt,
     CodexUsageField[] Fields, bool Truncated);
 
 /// <summary>String content and array elements are deliberately not retained.</summary>
-public sealed record CodexUsageField(string Path, string Kind, decimal? Number = null,
+internal sealed record CodexUsageField(string Path, string Kind, decimal? Number = null,
     bool? Boolean = null, int? StringLength = null, int? ArrayLength = null);
 
 /// <summary>Retains usage schema changes without persisting raw provider events or private text.</summary>
-public static class CodexUsageSchema
+internal static class CodexUsageSchema
 {
     public const int MaximumFields = 64;
     public const int MaximumPathCharacters = 4096;

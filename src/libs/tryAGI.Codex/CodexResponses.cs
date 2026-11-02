@@ -6,23 +6,41 @@ using System.Text.Json.Nodes;
 
 namespace tryAGI.Codex;
 
+/// <summary>Settings of a Codex Responses request.</summary>
+/// <param name="Model">Model name.</param>
+/// <param name="Instructions">System instructions.</param>
 public sealed record CodexResponseOptions(string Model, string Instructions)
 {
+    /// <summary>Reasoning effort, for example <c>low</c>, <c>medium</c> or <c>high</c>.</summary>
     public string ReasoningEffort { get; init; } = "low";
+    /// <summary>Advertised tools in Responses format (function, custom or namespace).</summary>
     public IReadOnlyList<JsonElement> Tools { get; init; } = [];
     /// <summary>Require one advertised flat function on the first agent request only.
     /// This selects a function, never its arguments or permission to perform effects.</summary>
     public string? RequiredFirstFunction { get; init; }
+    /// <summary>Prompt cache key; reuse it across turns of one conversation.</summary>
     public string? PromptCacheKey { get; init; }
+    /// <summary>Let the model request several tool calls at once.</summary>
     public bool ParallelToolCalls { get; init; }
+    /// <summary>Most tool calls executed at the same time.</summary>
     public int MaximumConcurrentTools { get; init; } = 4;
+    /// <summary>JSON schema the final answer must follow.</summary>
     public JsonElement? OutputSchema { get; init; }
+    /// <summary>Enforce <see cref="OutputSchema"/> strictly.</summary>
     public bool OutputSchemaStrict { get; init; } = true;
+    /// <summary>Answer verbosity, for example <c>low</c>.</summary>
     public string? Verbosity { get; init; }
+    /// <summary>Reasoning summary mode, for example <c>auto</c>.</summary>
     public string? ReasoningSummary { get; init; }
+    /// <summary>Service tier, for example <c>priority</c>.</summary>
     public string? ServiceTier { get; init; }
+    /// <summary>Correlation identity sent as client metadata.</summary>
     public CodexResponsesIdentity? Identity { get; init; }
 }
+/// <summary>One server-sent event of a Responses stream.</summary>
+/// <param name="Type">Event type, for example <c>response.output_text.delta</c>.</param>
+/// <param name="Payload">Raw event JSON.</param>
+/// <param name="ReceivedAfterRequestMs">Milliseconds between sending the request and receiving this event.</param>
 public sealed record CodexResponseEvent(string Type, JsonElement Payload, double ReceivedAfterRequestMs);
 
 public sealed partial class CodexClient

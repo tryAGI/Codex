@@ -20,6 +20,7 @@ public sealed partial class CodexThreadRpc
     }
 
     private long notificationFailures;
+    /// <summary>Notifications that could not be delivered.</summary>
     public long NotificationFailures => Interlocked.Read(ref notificationFailures);
 
     private async Task<JsonElement> StartAsync(JsonElement p, CancellationToken ct)

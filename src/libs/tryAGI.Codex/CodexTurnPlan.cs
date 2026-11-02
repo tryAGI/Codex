@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace tryAGI.Codex;
 
 /// <summary>Local plan state tool. It cannot authorize filesystem, process or device effects.</summary>
-public static class CodexTurnPlan
+internal static class CodexTurnPlan
 {
     public const string ToolName = "update_plan";
     public static JsonElement Tool { get; } = Parse("""

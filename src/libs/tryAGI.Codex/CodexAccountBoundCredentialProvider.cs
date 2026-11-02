@@ -2,6 +2,7 @@ namespace tryAGI.Codex;
 
 /// <summary>One immutable funding-account binding for a client/ledger lifetime.
 /// Token rotation is allowed; account or known-user replacement requires a fresh binding.</summary>
+/// <param name="inner">Provider whose credentials are checked.</param>
 public sealed class CodexAccountBoundCredentialProvider(ICodexCredentialProvider inner) : ICodexCredentialProvider
 {
     private readonly object gate = new();
@@ -9,6 +10,8 @@ public sealed class CodexAccountBoundCredentialProvider(ICodexCredentialProvider
     private string? user;
     private bool restricted;
 
+    /// <inheritdoc />
+    /// <exception cref="CodexProtocolException">The credentials now belong to a different account or user.</exception>
     public async ValueTask<CodexCredentials> GetCredentialsAsync(CancellationToken cancellationToken = default)
     {
         var active = await inner.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
@@ -28,5 +31,6 @@ public sealed class CodexAccountBoundCredentialProvider(ICodexCredentialProvider
         }
         return active;
     }
+    /// <inheritdoc />
     public override string ToString() => "CodexAccountBoundCredentialProvider [redacted]";
 }

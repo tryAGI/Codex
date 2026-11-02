@@ -4,15 +4,43 @@ using System.Text.Json.Nodes;
 
 namespace tryAGI.Codex;
 
+/// <summary>Outcome of <see cref="CodexThreadAgent.RunAsync"/>.</summary>
+/// <param name="Thread">The thread after the turn was recorded.</param>
+/// <param name="Result">The agent run.</param>
 public sealed record CodexThreadAgentResult(CodexThreadDocument Thread, CodexAgentResult Result);
 
 /// <summary>Executes a new turn against a durable native journal. The host still resolves
 /// settings, owns execution leases, supplies financial admission and authorizes every tool.
 /// Reads never resume work; an ambiguous initial StartTurn requires host reconciliation.</summary>
+/// <param name="store">Thread journal.</param>
+/// <param name="credentials">Supplies ChatGPT OAuth credentials.</param>
+/// <param name="budget">Admission and accounting hooks for every model request.</param>
+/// <param name="endpoints">Endpoints, timeouts and size bounds.</param>
+/// <param name="clientFactory">Optional factory for the underlying <see cref="CodexClient"/>.</param>
 public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialProvider credentials,
     ICodexUsageObserver budget, CodexEndpointOptions? endpoints = null,
     Func<ICodexCredentialProvider, ICodexUsageObserver, CodexClient>? clientFactory = null)
 {
+    /// <summary>Starts a turn on a stored thread, runs it, and records every dispatch and output in the journal.</summary>
+    /// <param name="threadId">Thread ID.</param>
+    /// <param name="expectedRevision">Revision the caller last read.</param>
+    /// <param name="turnId">New turn ID, chosen by the caller before the call.</param>
+    /// <param name="ownerId">Host process or worker running the turn.</param>
+    /// <param name="options">Model, instructions and tools.</param>
+    /// <param name="input">New input items.</param>
+    /// <param name="execute">Executes one authorized tool call.</param>
+    /// <param name="maximumRequests">Upper bound on model requests.</param>
+    /// <param name="observe">Receives every raw Responses event.</param>
+    /// <param name="observeDiagnostics">Receives timing and size metadata.</param>
+    /// <param name="canExecuteConcurrently">Returns <see langword="true"/> for calls that may run alongside others.</param>
+    /// <param name="turnStarted">Called once the turn is durably recorded.</param>
+    /// <param name="cancellationToken">Cancels the turn.</param>
+    /// <param name="control">Steers or interrupts the running turn.</param>
+    /// <param name="validatedItem">Receives each validated output item.</param>
+    /// <param name="observeAsync">Receives every raw Responses event and is awaited before the run continues.</param>
+    /// <param name="journalProjection">Rewrites input items before they are stored in the journal, for example to drop image bytes.</param>
+    /// <param name="historyTurnLimit">Send only the last N stored turns as history, 1–4096.</param>
+    /// <exception cref="CodexThreadConflictException">The thread changed since <paramref name="expectedRevision"/>.</exception>
     public async Task<CodexThreadAgentResult> RunAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, CodexResponseOptions options, IReadOnlyList<JsonElement> input,
         Func<CodexToolCall, CancellationToken, Task<CodexToolOutput>> execute,

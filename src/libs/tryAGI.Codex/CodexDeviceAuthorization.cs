@@ -7,21 +7,45 @@ using System.Text.Json.Serialization;
 
 namespace tryAGI.Codex;
 
+/// <summary>A pending device sign-in. Show <see cref="VerificationUri"/> and <see cref="UserCode"/> to the user.</summary>
 public sealed class CodexDeviceCode
 {
+    /// <summary>Page where the user enters the code.</summary>
     public required Uri VerificationUri { get; init; }
+
+    /// <summary>Code the user enters.</summary>
     public required string UserCode { get; init; }
+
+    /// <summary>Minimum delay between <see cref="CodexDeviceAuthorization.PollAsync"/> calls.</summary>
     public required TimeSpan PollInterval { get; init; }
+
+    /// <summary>When the code stops being accepted.</summary>
     public required DateTimeOffset ExpiresAt { get; init; }
+
     [JsonIgnore] internal string DeviceAuthId { get; init; } = "";
+
+    /// <inheritdoc />
     public override string ToString() => "CodexDeviceCode [redacted]";
 }
 
+/// <summary>ChatGPT OAuth tokens. Store them securely; the refresh token rotates on every refresh.</summary>
 public sealed class CodexOAuthTokens
 {
+    /// <summary>Creates a token set.</summary>
+    /// <param name="accessToken">Bearer access token.</param>
+    /// <param name="refreshToken">Single-use refresh token.</param>
+    /// <param name="accountId">ChatGPT account ID.</param>
+    /// <param name="expiresAt">Access token expiry.</param>
     public CodexOAuthTokens(string accessToken, string refreshToken, string accountId, DateTimeOffset expiresAt)
         : this(accessToken, refreshToken, accountId, expiresAt, null, null) { }
 
+    /// <summary>Creates a token set with user identity.</summary>
+    /// <param name="accessToken">Bearer access token.</param>
+    /// <param name="refreshToken">Single-use refresh token.</param>
+    /// <param name="accountId">ChatGPT account ID.</param>
+    /// <param name="expiresAt">Access token expiry.</param>
+    /// <param name="chatGptUserId">ChatGPT user ID, if known.</param>
+    /// <param name="isFedRampAccount">The account is a FedRAMP account.</param>
     public CodexOAuthTokens(string accessToken, string refreshToken, string accountId, DateTimeOffset expiresAt,
         string? chatGptUserId, bool? isFedRampAccount = null)
     {
@@ -29,25 +53,45 @@ public sealed class CodexOAuthTokens
         ChatGptUserId = chatGptUserId;
         IsFedRampAccount = isFedRampAccount ?? false;
     }
+    /// <summary>Bearer access token.</summary>
     [JsonIgnore] public string AccessToken { get; }
+
+    /// <summary>Single-use refresh token.</summary>
     [JsonIgnore] public string RefreshToken { get; }
+
+    /// <summary>ChatGPT account ID.</summary>
     [JsonIgnore] public string AccountId { get; }
+
+    /// <summary>ChatGPT user ID, if known.</summary>
     [JsonIgnore] public string? ChatGptUserId { get; }
+
+    /// <summary>The account is a FedRAMP account.</summary>
     [JsonIgnore] public bool IsFedRampAccount { get; }
+
+    /// <summary>Access token expiry.</summary>
     public DateTimeOffset ExpiresAt { get; }
+
+    /// <summary>The credentials to hand to <see cref="ICodexCredentialProvider"/>.</summary>
     public CodexCredentials Credentials => new(AccessToken, AccountId)
     { ChatGptUserId = ChatGptUserId, IsFedRampAccount = IsFedRampAccount };
+
+    /// <inheritdoc />
     public override string ToString() => "CodexOAuthTokens [redacted]";
 }
 
 /// <summary>Explicit ChatGPT device authorization and refresh. No reading or copying a CLI's credential store.</summary>
 public sealed class CodexDeviceAuthorization : IDisposable
 {
+    /// <summary>The public OAuth client ID the open-source Codex CLI uses. Not a secret.</summary>
     public const string OfficialCodexClientId = "app_EMoamEEZ73f0CkXaXp7hrann";
     private readonly HttpClient http;
     private readonly string clientId;
     private readonly TimeProvider time;
 
+    /// <summary>Creates a device authorization client.</summary>
+    /// <param name="clientId">OAuth client ID.</param>
+    /// <param name="handler">Optional HTTP handler, for proxies or tests.</param>
+    /// <param name="timeProvider">Clock used for expiry.</param>
     public CodexDeviceAuthorization(string clientId = OfficialCodexClientId, HttpMessageHandler? handler = null, TimeProvider? timeProvider = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
@@ -56,6 +100,7 @@ public sealed class CodexDeviceAuthorization : IDisposable
         { BaseAddress = new Uri("https://auth.openai.com/"), Timeout = TimeSpan.FromSeconds(30) };
     }
 
+    /// <summary>Requests a user code. The code expires after 15 minutes.</summary>
     public async Task<CodexDeviceCode> BeginAsync(CancellationToken cancellationToken = default)
     {
         using var content = JsonContent(new JsonObject { ["client_id"] = clientId });
@@ -129,5 +174,6 @@ public sealed class CodexDeviceAuthorization : IDisposable
 
     private static string Required(JsonElement root, string key) => CodexRealtimeProtocol.Text(root, key) is { Length: > 0 } value ? value : throw new CodexProtocolException($"OAuth response omitted {key}.");
     private static StringContent JsonContent(JsonObject value) => new(value.ToJsonString(), Encoding.UTF8, "application/json");
+    /// <inheritdoc />
     public void Dispose() => http.Dispose();
 }

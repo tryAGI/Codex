@@ -10,17 +10,28 @@ namespace tryAGI.Codex;
 
 // All paths are authenticated host inputs, never RPC config values. No environment,
 // network, subprocess, or server-operator home is consulted by this reader.
+/// <summary>Which on-disk Codex configuration files to read.</summary>
+/// <param name="CodexHome">Absolute <c>CODEX_HOME</c> holding the user's <c>config.toml</c>.</param>
 public sealed record CodexFileConfigurationOptions(string CodexHome)
 {
+    /// <summary>Optional configuration shipped with the host.</summary>
     public string? PackagedConfigFile { get; init; }
+    /// <summary>Optional machine-wide configuration file.</summary>
     public string? SystemConfigFile { get; init; }
+    /// <summary>Optional administrator-managed configuration file.</summary>
     public string? AdminConfigFile { get; init; }
+    /// <summary>Configuration files delivered by a cloud service.</summary>
     public IReadOnlyList<string> CloudConfigFiles { get; init; } = [];
+    /// <summary><c>requirements.toml</c> files whose constraints settings must satisfy.</summary>
     public IReadOnlyList<string> RequirementsFiles { get; init; } = [];
+    /// <summary>Profile to apply from the user configuration.</summary>
     public string? Profile { get; init; }
+    /// <summary>Skip <c>.codex/config.toml</c> files in the working tree.</summary>
     public bool IgnoreProjectConfig { get; init; }
 }
 
+/// <summary>Reads Codex <c>config.toml</c> layers from disk the way the Codex CLI does, for <see cref="CodexThreadRpc"/>.</summary>
+/// <param name="options">Files to read.</param>
 public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions options)
 {
     private const int MaximumBytes = 1_048_576;
@@ -29,6 +40,10 @@ public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions o
         "responses_api_metadata", "model_provider", "model_providers", "notify", "profile", "profiles",
         "experimental_realtime_webrtc_call_base_url", "experimental_realtime_ws_base_url", "otel"];
 
+    /// <summary>Reads all layers for one thread. Symbolic links are rejected; file sizes and counts are bounded.</summary>
+    /// <param name="context">Thread and working directory being resolved.</param>
+    /// <param name="account">Layers and requirements already supplied by the host for the account.</param>
+    /// <param name="ct">Cancels the read.</param>
     public async Task<CodexThreadConfigurationSnapshot> LoadAsync(CodexThreadConfigurationContext context,
         CodexThreadConfigurationSnapshot account, CancellationToken ct)
     {

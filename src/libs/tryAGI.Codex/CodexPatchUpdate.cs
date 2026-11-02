@@ -2,12 +2,21 @@ using System.Text;
 
 namespace tryAGI.Codex;
 
-public enum CodexPatchUpdateMode { NormalizeToLf, PreserveLineEndings }
+/// <summary>How <see cref="CodexPatch.Update"/> reconstructs line endings.</summary>
+public enum CodexPatchUpdateMode
+{
+    /// <summary>Upstream Rust behaviour: lines are split on LF and rejoined with LF; stray CR characters may remain.</summary>
+    NormalizeToLf,
+
+    /// <summary>Keep each original line terminator (LF, CRLF or CR) and the file's dominant one for new lines.</summary>
+    PreserveLineEndings,
+}
 
 public static partial class CodexPatch
 {
     private sealed record Replacement(int Start, int Count, IReadOnlyList<string> Lines);
     private sealed record SourceLine(string Text, string? Ending);
+    /// <summary>Largest source text, in UTF-16 characters, <see cref="Update"/> accepts.</summary>
     public const int MaximumSourceCharacters = 4 * 1024 * 1024;
 
     /// <summary>Derive intended contents without filesystem effects. The host must still

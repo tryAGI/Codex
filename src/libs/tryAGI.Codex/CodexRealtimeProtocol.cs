@@ -4,44 +4,110 @@ using System.Text.Json.Nodes;
 
 namespace tryAGI.Codex;
 
+/// <summary>A conversation item seeded into a new realtime session.</summary>
+/// <param name="Role"><c>user</c> or <c>assistant</c>.</param>
+/// <param name="Text">Item text.</param>
 public sealed record CodexRealtimeInitialItem(string Role, string Text);
+
+/// <summary>Settings for a Codex realtime session.</summary>
+/// <param name="Instructions">System instructions for the voice model.</param>
 public sealed record CodexRealtimeSessionOptions(string Instructions)
 {
+    /// <summary><c>v3</c> (Codex frameless bidi, default), <c>v2</c> (GA realtime) or <c>v1</c> (existing-call sideband).</summary>
     public string Protocol { get; init; } = "v3";
+
+    /// <summary>Realtime model. Defaults to <see cref="CodexProtocolCatalog.DefaultRealtimeModel"/>.</summary>
     public string Model { get; init; } = CodexProtocolCatalog.DefaultRealtimeModel;
+
+    /// <summary>Built-in voice. Defaults to <see cref="CodexProtocolCatalog.DefaultVoice"/>.</summary>
     public string Voice { get; init; } = CodexProtocolCatalog.DefaultVoice;
+
+    /// <summary>Let the voice model speak a short acknowledgement while a client delegation runs.</summary>
     public bool DelegationAckFiller { get; init; }
+
+    /// <summary>V3 only: choice questions the provider answers when the named session events occur.</summary>
     public IReadOnlyList<CodexLiveDecisionTrigger> LiveDecisionTriggers { get; init; } = [];
+
     /// <summary>Explicit native delegation diagnostic; empty preserves the subscribed client-delegation route.</summary>
     public IReadOnlyList<CodexLiveChoiceQuestion> LiveDecisionDelegationQuestions { get; init; } = [];
+
+    /// <summary>V3 only: a custom voice ID (<c>voice_…</c>) created with <see cref="CodexLiveFeatureClient.CreateVoiceAsync"/>.</summary>
     public string? LiveCustomVoiceId { get; init; }
+
+    /// <summary>V3 only: description sent with <see cref="LiveCustomVoiceId"/>, at most 4000 characters.</summary>
     public string? LiveVoiceDescription { get; init; }
+
     /// <summary>Additional GA session fields, including tools, reasoning, VAD, transcription and truncation. Identity fields use dedicated properties.</summary>
     public JsonElement? ProviderSession { get; init; }
+
+    /// <summary>Conversation items seeded when the session starts.</summary>
     public IReadOnlyList<CodexRealtimeInitialItem> InitialItems { get; init; } = [];
 }
 
+/// <summary>A realtime call created over WebRTC.</summary>
+/// <param name="CallId">Call ID used to connect the sideband WebSocket.</param>
+/// <param name="AnswerSdp">SDP answer to apply to the caller's peer connection.</param>
 public sealed record CodexRealtimeCall(string CallId, string AnswerSdp);
+
+/// <summary>A task the voice model handed to the client.</summary>
+/// <param name="Id">Delegation ID. Deduplicate durably before acting on it.</param>
+/// <param name="Transcript">What the user asked for, as the model summarized it.</param>
 public sealed record CodexDelegation(string Id, string Transcript);
+
+/// <summary>One server event from a realtime connection, with typed views of the common payloads.</summary>
+/// <param name="Type">Event type.</param>
+/// <param name="Payload">Raw event JSON.</param>
+/// <param name="ReceivedAfterConnectMs">Milliseconds between connecting and receiving this event.</param>
 public sealed record CodexRealtimeEvent(string Type, JsonElement Payload, double ReceivedAfterConnectMs)
 {
+    /// <summary>The delegation carried by this event, if any.</summary>
     public CodexDelegation? Delegation => CodexRealtimeProtocol.ReadDelegation(Payload) ?? CodexRealtimeGaProtocol.ReadDelegation(Payload);
+
+    /// <summary>The transcript fragment carried by this event, if any.</summary>
     public CodexRealtimeTranscript? Transcript => CodexRealtimeProtocol.ReadTranscript(Payload) ?? CodexRealtimeGaProtocol.ReadTranscript(Payload);
+
+    /// <summary>The provider error carried by this event, if any.</summary>
     public CodexRealtimeError? Error => CodexRealtimeProtocol.ReadError(Payload);
+
+    /// <summary>The output audio carried by this event, if any.</summary>
     public CodexRealtimeAudio? Audio => CodexRealtimeProtocol.ReadAudio(Payload) ?? CodexRealtimeGaProtocol.ReadAudio(Payload);
 }
+
+/// <summary>A user or assistant transcript fragment.</summary>
+/// <param name="Role"><c>user</c> or <c>assistant</c>.</param>
+/// <param name="Text">Transcript text: a delta, or the whole utterance when <paramref name="Final"/> is set.</param>
+/// <param name="Final">The utterance is complete.</param>
 public sealed record CodexRealtimeTranscript(string Role, string Text, bool Final)
 {
+    /// <summary>The final text replaces the accumulated deltas instead of being appended to them.</summary>
     public bool ReplaceFinalText { get; init; }
+
+    /// <summary>Provider ID of the user input fragment this transcript belongs to.</summary>
     public string? InputFragmentId { get; init; }
+
+    /// <summary>Start of the transcribed input, in milliseconds of session audio.</summary>
     public double? InputStartMs { get; init; }
+
+    /// <summary>End of the transcribed input, in milliseconds of session audio.</summary>
     public double? InputEndMs { get; init; }
 }
+
+/// <summary>A chunk of model output audio.</summary>
+/// <param name="Pcm16">Little-endian 16-bit PCM samples.</param>
+/// <param name="SampleRate">Sample rate in Hz.</param>
+/// <param name="Channels">Channel count.</param>
+/// <param name="ItemId">Conversation item the audio belongs to, if known.</param>
 public sealed record CodexRealtimeAudio(ReadOnlyMemory<byte> Pcm16, int SampleRate = 24000, int Channels = 1, string? ItemId = null);
+
+/// <summary>An error event from the realtime provider. Carries identifiers only, never request content.</summary>
+/// <param name="EventId">The client event that caused the error, if reported.</param>
+/// <param name="Code">Provider error code.</param>
+/// <param name="Kind">Provider error type.</param>
+/// <param name="Parameter">The offending parameter, if reported.</param>
 public sealed record CodexRealtimeError(string? EventId, string? Code, string? Kind, string? Parameter);
 
 /// <summary>Frameless bidi (Codex realtime V3) wire shapes, pinned in UPSTREAM.md.</summary>
-public static class CodexRealtimeProtocol
+internal static class CodexRealtimeProtocol
 {
     /// <summary>V3 update intentionally omits model, matching upstream methods_frameless_bidi.
     /// Sending this command does not prove acceptance: retain session.updated/error receipts.</summary>

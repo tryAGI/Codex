@@ -10,6 +10,7 @@ namespace tryAGI.Codex;
 /// <summary>Native network client. Does not launch processes, read Codex files, or invoke an MCP connector.</summary>
 public sealed partial class CodexClient : IDisposable
 {
+    /// <summary>Source of the OpenTelemetry activities this library starts (name <c>tryAGI.Codex</c>).</summary>
     public static readonly ActivitySource ActivitySource = new("tryAGI.Codex");
     private readonly HttpClient http;
     private readonly ICodexCredentialProvider credentials;
@@ -18,6 +19,11 @@ public sealed partial class CodexClient : IDisposable
     internal bool IsBoundTo(ICodexCredentialProvider expectedCredentials, ICodexUsageObserver expectedObserver) =>
         ReferenceEquals(credentials, expectedCredentials) && ReferenceEquals(usageObserver, expectedObserver);
 
+    /// <summary>Creates a client.</summary>
+    /// <param name="credentials">Supplies ChatGPT OAuth credentials before every request.</param>
+    /// <param name="options">Endpoints, timeouts and size bounds.</param>
+    /// <param name="handler">Optional HTTP handler, for proxies or tests.</param>
+    /// <param name="usageObserver">Optional admission and accounting hooks for every model request.</param>
     public CodexClient(ICodexCredentialProvider credentials, CodexEndpointOptions? options = null, HttpMessageHandler? handler = null,
         ICodexUsageObserver? usageObserver = null)
     {
@@ -32,6 +38,10 @@ public sealed partial class CodexClient : IDisposable
         { Timeout = Timeout.InfiniteTimeSpan };
     }
 
+    /// <summary>Creates a WebRTC realtime call from an SDP offer. Never retried: a lost response may still have created a call.</summary>
+    /// <param name="offerSdp">SDP offer from the caller's peer connection.</param>
+    /// <param name="session">Session settings.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     public async Task<CodexRealtimeCall> CreateRealtimeCallAsync(string offerSdp, CodexRealtimeSessionOptions session, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("codex.realtime.call.create");
@@ -50,9 +60,16 @@ public sealed partial class CodexClient : IDisposable
         return new(CodexRealtimeProtocol.CallId(values.First()), answer);
     }
 
+    /// <summary>Connects the V3 sideband WebSocket of a call.</summary>
+    /// <param name="callId">ID from <see cref="CreateRealtimeCallAsync"/>.</param>
+    /// <param name="cancellationToken">Cancels the connection attempt.</param>
     public async Task<CodexRealtimeConnection> ConnectSidebandAsync(string callId, CancellationToken cancellationToken = default)
         => await ConnectSidebandAsync(callId, "v3", cancellationToken).ConfigureAwait(false);
 
+    /// <summary>Connects the sideband WebSocket of a call for a specific protocol.</summary>
+    /// <param name="callId">ID from <see cref="CreateRealtimeCallAsync"/>.</param>
+    /// <param name="protocol"><c>v3</c>, <c>v2</c> or <c>v1</c>.</param>
+    /// <param name="cancellationToken">Cancels the connection attempt.</param>
     public async Task<CodexRealtimeConnection> ConnectSidebandAsync(string callId, string protocol, CancellationToken cancellationToken = default)
     {
         if (CodexRealtimeProtocol.CallId(callId) != callId) throw new ArgumentException("Invalid call ID.", nameof(callId));
@@ -175,5 +192,6 @@ public sealed partial class CodexClient : IDisposable
         return new UTF8Encoding(false, true).GetString(output.GetBuffer(), 0, checked((int)output.Length));
     }
 
+    /// <inheritdoc />
     public void Dispose() => http.Dispose();
 }

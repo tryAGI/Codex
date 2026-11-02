@@ -2,13 +2,27 @@ using System.Text.Json;
 
 namespace tryAGI.Codex;
 
-public enum CodexToolCallKind { Function, Custom }
+/// <summary>How a tool was advertised.</summary>
+public enum CodexToolCallKind
+{
+    /// <summary>A JSON-schema function; input is a JSON object encoded as text.</summary>
+    Function,
+
+    /// <summary>A freeform custom tool; input is plain text.</summary>
+    Custom,
+}
 
 /// <summary>An authorized tool identity and its exact wire input. Function Input is
 /// a JSON object encoded as text; Custom Input is freeform text, never shell code.</summary>
+/// <param name="Id">Provider call ID.</param>
+/// <param name="Name">Tool name.</param>
+/// <param name="Input">Function arguments as JSON text, or freeform custom input.</param>
+/// <param name="Kind">Function or custom tool.</param>
 public sealed record CodexToolCall(string Id, string Name, string Input, CodexToolCallKind Kind)
 {
+    /// <summary>Tool namespace, when the tool was advertised inside one.</summary>
     public string? Namespace { get; init; }
+    /// <summary>Item status reported by the provider.</summary>
     public string? Status { get; init; }
 
     internal CodexFunctionCall Function() => Kind == CodexToolCallKind.Function

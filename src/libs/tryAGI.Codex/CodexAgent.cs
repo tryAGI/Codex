@@ -4,19 +4,42 @@ using System.Text.Json.Nodes;
 
 namespace tryAGI.Codex;
 
+/// <summary>A function call the model asked the host to execute.</summary>
+/// <param name="Id">Provider call ID.</param>
+/// <param name="Name">Function name.</param>
+/// <param name="ArgumentsJson">Arguments as a JSON object encoded as text.</param>
 public sealed record CodexFunctionCall(string Id, string Name, string ArgumentsJson)
 {
+    /// <summary>Tool namespace, when the function was advertised inside one.</summary>
     public string? Namespace { get; init; }
 }
+/// <summary>Outcome of an agent run.</summary>
+/// <param name="Text">Final assistant text.</param>
+/// <param name="History">Every output item of the run, including encrypted reasoning. Append it to the next turn's history.</param>
+/// <param name="Requests">Model requests made.</param>
+/// <param name="ToolCalls">Tool calls executed.</param>
 public sealed record CodexAgentResult(string Text, IReadOnlyList<JsonElement> History, int Requests, int ToolCalls)
 {
+    /// <summary>The run ended from a tool result through <c>completeAfterSingleTool</c>, without a final model request.</summary>
     public bool CompletedDirectly { get; init; }
+    /// <summary>IDs of the calls executed in this run. Pass them back as <c>previouslyExecutedCallIds</c> to never repeat one.</summary>
     public IReadOnlyList<string> ExecutedCallIds { get; init; } = [];
 }
 
 /// <summary>Bounded native reasoning/tool loop. The host retains responsibility for tool authorization and durable action deduplication.</summary>
 public sealed class CodexAgent(CodexClient client)
 {
+    /// <summary>Runs one turn with flat function tools until the model answers without calling one.</summary>
+    /// <param name="options">Model, instructions and advertised tools.</param>
+    /// <param name="history">Conversation items so far, including the new user message.</param>
+    /// <param name="execute">Executes one authorized function call and returns its text output.</param>
+    /// <param name="maximumRequests">Upper bound on model requests in this run.</param>
+    /// <param name="observe">Receives every raw Responses event.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="observeDiagnostics">Receives timing and size metadata, never content.</param>
+    /// <param name="completeAfterSingleTool">Returns final text to finish right after one tool call, or <see langword="null"/> to continue.</param>
+    /// <param name="previouslyExecutedCallIds">Call IDs already executed by an earlier attempt; they are never executed again.</param>
+    /// <exception cref="CodexAgentRequestLimitException">The run used <paramref name="maximumRequests"/> without finishing.</exception>
     public async Task<CodexAgentResult> RunAsync(CodexResponseOptions options, IReadOnlyList<JsonElement> history,
         Func<CodexFunctionCall, CancellationToken, Task<string>> execute,
         int maximumRequests = 8, Action<CodexResponseEvent>? observe = null, CancellationToken cancellationToken = default,
