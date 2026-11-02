@@ -2,9 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Tomlyn;
-using Tomlyn.Model;
-using Tomlyn.Serialization;
 
 namespace tryAGI.Codex;
 
@@ -75,13 +72,11 @@ public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions o
                 total = checked(total + count);
                 if (count > MaximumBytes || total > MaximumBytes) throw Invalid("Configuration sources exceed their aggregate bound.");
                 revision.AppendData(Utf8.GetBytes(path)); revision.AppendData(buffer.AsSpan(0, count));
-                var table = TomlSerializer.Deserialize(Utf8.GetString(buffer, 0, count).TrimStart('\uFEFF'), CodexConfigurationTomlContext.Default.TomlTable)
-                    ?? throw Invalid("Configuration TOML has no root table.");
-                return Convert(table, 0) as JsonObject ?? throw Invalid("Invalid configuration root.");
+                return CodexToml.Parse(Utf8.GetString(buffer, 0, count).TrimStart('\uFEFF'));
             }
             catch (FileNotFoundException) when (!mandatory) { return null; }
             catch (DirectoryNotFoundException) when (!mandatory) { return null; }
-            catch (TomlException) { throw Invalid("Invalid TOML configuration source."); }
+            catch (FormatException) { throw Invalid("Invalid TOML configuration source."); }
             catch (DecoderFallbackException) { throw Invalid("Configuration sources must be valid UTF-8."); }
         }
 
@@ -186,25 +181,6 @@ public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions o
         return new(System.Convert.ToHexString(revision.GetHashAndReset()), layers, requirements.Count == 0 ? null : Element(requirements));
     }
 
-    private static JsonNode? Convert(object? value, int depth)
-    {
-        if (depth > 32) throw Invalid("Configuration exceeds its depth bound.");
-        switch (value)
-        {
-            case TomlTable table:
-                var result = new JsonObject();
-                foreach (var item in table) result.Add(item.Key, Convert(item.Value, depth + 1));
-                return result;
-            case TomlArray array: return new JsonArray(array.Select(item => Convert(item, depth + 1)).ToArray());
-            case TomlTableArray array: return new JsonArray(array.Select(item => Convert(item, depth + 1)).ToArray());
-            case string text: return JsonValue.Create(text);
-            case bool boolean: return JsonValue.Create(boolean);
-            case long number: return JsonValue.Create(number);
-            case double number when double.IsFinite(number): return JsonValue.Create(number);
-            default: throw Invalid("Unsupported native TOML scalar.");
-        }
-    }
-
     private static string Absolute(string path) => Path.IsPathFullyQualified(path) && path.Length <= 4096 && !path.Any(char.IsControl)
         ? Path.GetFullPath(path) : throw Invalid("Configuration paths must be absolute and bounded.");
     private static void MergeDiscovery(JsonObject target, JsonObject source, int depth)
@@ -224,7 +200,3 @@ public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions o
     private static JsonElement Element(JsonNode node) { using var document = JsonDocument.Parse(node.ToJsonString()); return document.RootElement.Clone(); }
     private static CodexThreadRpcException Invalid(string message) => new(-32602, message);
 }
-
-[TomlSerializable(typeof(TomlTable))]
-[TomlSourceGenerationOptions(MaxDepth = 32)]
-internal partial class CodexConfigurationTomlContext : TomlSerializerContext;

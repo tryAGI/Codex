@@ -2,7 +2,7 @@
 
   <!--
     NativeAOT probe. `dotnet publish -c Release` compiles the whole library ahead of time
-    (TrimmerRootAssembly keeps every type, so dependencies such as Tomlyn are analyzed too)
+    (TrimmerRootAssembly keeps every type, so any future dependency is analyzed too)
     and fails on any trim or AOT warning; running the native binary then exercises the
     paths that depend on embedded resources, JSON metadata and TOML parsing.
   -->

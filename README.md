@@ -34,7 +34,7 @@ uses. If you already run Codex, an optional `CodexAppServerClient` drives an ins
 - **App Server client** — JSON-RPC over stdio, the Unix-socket proxy or WebSocket
   (`CodexAppServerClient`).
 - **Trimming and NativeAOT** — no reflection-based serialization; every push publishes a probe
-  with NativeAOT, failing on any trim or AOT warning (including dependencies), and runs it.
+  with NativeAOT, failing on any trim or AOT warning, and runs it.
 
 The host stays in charge: you define the tools, approvals, credential storage, reconnection and
 persistence. There is no built-in shell, browsing, sandboxing or fallback to paid API-key inference.
@@ -45,7 +45,8 @@ persistence. There is no built-in shell, browsing, sandboxing or fallback to pai
 dotnet add package tryAGI.Codex --prerelease
 ```
 
-Requires .NET 10. The only dependency is [Tomlyn](https://github.com/xoofx/Tomlyn) (Codex `config.toml` layers).
+Requires .NET 10. No dependencies: Codex `config.toml` layers are read by a small built-in TOML 1.0
+parser (dates and times, which have no JSON form, are rejected).
 
 ## Quick start
 

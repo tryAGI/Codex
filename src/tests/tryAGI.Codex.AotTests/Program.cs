@@ -41,7 +41,7 @@ Check("source-generated thread JSON", () =>
     var info = CodexThreadJson.Default.CodexThreadDocument;
     return info.Properties.Count > 0;
 });
-Check("TOML configuration (Tomlyn)", () =>
+Check("TOML configuration", () =>
 {
     // Not the system temp folder: on macOS it sits behind a /var symlink, which the reader rejects by design.
     var home = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "codex-aot-" + Guid.NewGuid().ToString("N"))).FullName;

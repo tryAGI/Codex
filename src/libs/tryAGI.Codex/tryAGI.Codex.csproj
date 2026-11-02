@@ -13,7 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Tomlyn" Version="2.10.1" />
     <EmbeddedResource Include="ProtocolBaseline.json" LogicalName="tryAGI.Codex.ProtocolBaseline.json" />
     <EmbeddedResource Include="AppServerProtocol.json" LogicalName="tryAGI.Codex.AppServerProtocol.json" />
     <InternalsVisibleTo Include="tryAGI.Codex.Tests" Key="0024000004800000940000000602000000240000525341310004000001000100a15c0239e6083b7f1e31b6b61bac5e07e24a11b4e404d04247d9c19c423af2ccb7695d3ab0cbc8f5fd2262ed133e2229eaef079f4eb4305a9de21d65c7b0e60988f418d85410a3f94d6bd6f05e35b477e3dbc165cbdb1c0f4891a0792d7c7a1155b46e4c8a43cf76836dd7c19870d6b86946156ebb2b96c7f5b8644a706c95d9" />
