@@ -172,10 +172,21 @@ A runnable version of these snippets is in [`samples/tryAGI.Codex.Sample`](sampl
 | Realtime catalog (models, voices) | `openai/codex` `rust-v0.165.0` (`ProtocolBaseline.json`) |
 | Realtime V3, Responses, compaction, tools, device sign-in, `apply_patch` | `openai/codex` `rust-v0.160.0` source review ([provenance](docs/UPSTREAM.md)) |
 | Native thread/turn RPC (`CodexThreadRpc`) | App Server protocol `0.162.1` (schema-validated in tests) |
-| `CodexAppServerClient` | App Server protocol `0.165.0` schema; smoke-tested against `codex-cli 0.166.0` |
+| `CodexAppServerClient`, `CodexAppServerProtocol` | App Server protocol <!-- app-server-version -->0.165.0<!-- /app-server-version --> (method catalog packaged in the library) |
+
+`CodexAppServerProtocol` lists every request and notification method of that App Server version, so
+a host can check a method name before sending it.
 
 The schemas are in [`specs/codex-app-server`](specs/codex-app-server). Regenerate one for your
 installed version with `codex app-server generate-json-schema --experimental --out <dir>`.
+
+### Staying current
+
+A scheduled workflow checks the newest stable `@openai/codex` release every day. When a new App Server
+version appears, it adds the schema snapshot, regenerates the packaged method catalog and opens a pull
+request. The tests check that every method the library serves or sends still exists in the new
+version; when they pass, the pull request merges automatically and a patch release is published.
+A version that removes or renames a method this library depends on fails the tests and waits for a human.
 
 ## Support
 

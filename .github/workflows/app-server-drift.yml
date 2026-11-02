@@ -1,0 +1,84 @@
+name: App Server drift
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-server-drift
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: Open a pull request for a new App Server version
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # A pull request opened with GITHUB_TOKEN does not trigger the Test workflow
+          # that auto-merge waits for, so the branch and pull request use PERSONAL_TOKEN.
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install the latest stable Codex CLI
+        run: npm install --global @openai/codex@latest
+
+      - name: Detect a new version
+        id: detect
+        run: |
+          set -euo pipefail
+          output="$(codex --version)"
+          [[ "$output" =~ ([0-9]+\.[0-9]+\.[0-9]+) ]] || { echo "Unexpected codex --version output: $output" >&2; exit 1; }
+          version="${BASH_REMATCH[1]}"
+          branch="bot/codex-app-server-$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          if [[ -d "specs/codex-app-server/$version" ]]; then
+            echo "App Server $version is already checked in."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            echo "A pull request branch for $version already exists."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Add the schema snapshot and regenerate the catalog
+        if: steps.detect.outputs.new == 'true'
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          generated="$RUNNER_TEMP/schema"
+          CODEX_HOME="$RUNNER_TEMP/codex-home" codex app-server generate-json-schema --experimental --out "$generated"
+          mkdir -p "specs/codex-app-server/$VERSION"
+          cp "$generated/codex_app_server_protocol.schemas.json" "specs/codex-app-server/$VERSION/"
+          python3 scripts/update-app-server-protocol.py "$VERSION"
+
+      - name: Open the pull request
+        if: steps.detect.outputs.new == 'true'
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+          BRANCH: ${{ steps.detect.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$BRANCH"
+          git add "specs/codex-app-server/$VERSION" src/libs/tryAGI.Codex/AppServerProtocol.json README.md
+          git commit --message "feat: Codex App Server protocol $VERSION"
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "feat: Codex App Server protocol $VERSION" \
+            --body "Adds the App Server $VERSION schema snapshot and regenerates the packaged method catalog. The tests check that every method this library serves or sends still exists. When they pass, this pull request merges automatically and the next release ships the new catalog."
