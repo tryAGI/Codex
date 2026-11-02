@@ -159,18 +159,17 @@ await using var appServer = await CodexAppServerClient.ConnectAsync(new CodexApp
         ValueTask.FromResult(JsonDocument.Parse("""{"decision":"decline"}""").RootElement),
 });
 
-var thread = await appServer.RequestAsync("thread/start", JsonDocument.Parse("{}").RootElement);
+var thread = await appServer.RequestAsync("thread/start", new JsonObject());
 var threadId = thread.GetProperty("thread").GetProperty("id").GetString();
 
-var turn = new JsonObject
+await appServer.RequestAsync("turn/start", new JsonObject
 {
     ["threadId"] = threadId,
     ["input"] = CodexUserInput.ToJsonArray([
         new CodexTextInput("What is in this screenshot?"),
         CodexImageInput.FromBytes(File.ReadAllBytes("screen.png"), "image/png"),
     ]),
-};
-await appServer.RequestAsync("turn/start", JsonDocument.Parse(turn.ToJsonString()).RootElement);
+});
 // ... then read appServer.ReadNotificationsAsync() until "turn/completed".
 ```
 

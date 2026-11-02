@@ -3,9 +3,11 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net.WebSockets;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Channels;
 
 namespace tryAGI.Codex;
@@ -96,6 +98,8 @@ public sealed class CodexAppServerClient : IAsyncDisposable
 
     /// <summary>Sends a request and returns its <c>result</c>. Overloaded (<c>-32001</c>) rejections are retried with backoff.</summary>
     /// <exception cref="CodexAppServerException">The server returned an error, or the transport ended first.</exception>
+    // The priority keeps a literal null or default resolving here rather than being ambiguous with the JsonNode overload.
+    [OverloadResolutionPriority(1)]
     public async Task<JsonElement> RequestAsync(string method, JsonElement? parameters = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
@@ -115,11 +119,44 @@ public sealed class CodexAppServerClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Sends a request built as a <see cref="JsonNode"/>, for example a <see cref="JsonObject"/> holding
+    /// <see cref="CodexUserInput.ToJsonArray"/>, and returns its <c>result</c>.
+    /// Overloaded (<c>-32001</c>) rejections are retried with backoff.
+    /// </summary>
+    /// <param name="method">JSON-RPC method, such as <c>turn/start</c>.</param>
+    /// <param name="parameters">The <c>params</c> value, or <see langword="null"/> to omit it.</param>
+    /// <param name="cancellationToken">Cancels waiting for the response.</param>
+    /// <returns>The <c>result</c> member of the response.</returns>
+    /// <exception cref="CodexAppServerException">The server returned an error, or the transport ended first.</exception>
+    public Task<JsonElement> RequestAsync(string method, JsonNode? parameters, CancellationToken cancellationToken = default) =>
+        RequestAsync(method, ToElement(parameters), cancellationToken);
+
     /// <summary>Sends a notification (a message without an id).</summary>
+    [OverloadResolutionPriority(1)]
     public Task NotifyAsync(string method, JsonElement? parameters = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
         return transport.SendAsync(Serialize(null, method, parameters), cancellationToken);
+    }
+
+    /// <summary>Sends a notification (a message without an id) whose parameters are a <see cref="JsonNode"/>.</summary>
+    /// <param name="method">JSON-RPC method.</param>
+    /// <param name="parameters">The <c>params</c> value, or <see langword="null"/> to omit it.</param>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns>A task that completes when the message is written.</returns>
+    public Task NotifyAsync(string method, JsonNode? parameters, CancellationToken cancellationToken = default) =>
+        NotifyAsync(method, ToElement(parameters), cancellationToken);
+
+    private static JsonElement? ToElement(JsonNode? node)
+    {
+        if (node is null)
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(node.ToJsonString());
+        return document.RootElement.Clone();
     }
 
     /// <summary>Reads notifications until the transport ends or <paramref name="cancellationToken"/> fires.</summary>

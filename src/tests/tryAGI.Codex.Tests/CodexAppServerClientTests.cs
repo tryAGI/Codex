@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Channels;
 
 namespace tryAGI.Codex.Tests;
@@ -30,6 +31,31 @@ public sealed class CodexAppServerClientTests
         var result = await client.RequestAsync("thread/start", Json("""{"cwd":"/tmp"}"""), ct);
         Assert.Equal("t1", result.GetProperty("thread").GetProperty("id").GetString());
         Assert.Equal("/tmp", server.Sent[2].GetProperty("params").GetProperty("cwd").GetString());
+    }
+
+    [Fact]
+    public async Task JsonNodeParametersAreSentAsWritten()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var server = new FakeServer();
+        server.Respond = request => request.GetProperty("method").GetString() == "turn/start" ? """{"turn":{"id":"u1"}}""" : "{}";
+        await using var client = await CodexAppServerClient.ConnectAsync(new CodexAppServerOptions(), server, ct);
+
+        var result = await client.RequestAsync("turn/start", new JsonObject
+        {
+            ["threadId"] = "t1",
+            ["input"] = CodexUserInput.ToJsonArray([new CodexTextInput("hi"), CodexImageInput.FromFileId("file_1")]),
+        }, ct);
+        await client.NotifyAsync("custom/ping", (JsonNode?)null, ct);
+
+        Assert.Equal("u1", result.GetProperty("turn").GetProperty("id").GetString());
+        var parameters = server.Sent[2].GetProperty("params");
+        Assert.Equal("t1", parameters.GetProperty("threadId").GetString());
+        Assert.Equal("""[{"type":"text","text":"hi"},{"type":"image","fileId":"file_1"}]""", parameters.GetProperty("input").GetRawText());
+        var notification = server.Sent[3];
+        Assert.Equal("custom/ping", notification.GetProperty("method").GetString());
+        Assert.False(notification.TryGetProperty("params", out _));
+        Assert.False(notification.TryGetProperty("id", out _));
     }
 
     [Fact]
