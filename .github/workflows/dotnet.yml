@@ -7,8 +7,9 @@ on:
       - v**
   workflow_dispatch:
 
+# The shared release job tags and creates GitHub releases, which needs contents: write.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-test-publish:
@@ -17,8 +18,11 @@ jobs:
     with:
       project-path: Codex.slnx
       dotnet-version: 10.0.x
-      # Publish only from a version tag. Pushes to main build and test without releasing.
-      publish: ${{ startsWith(github.ref, 'refs/tags/v') }}
+      # Releases stay off until the repository variable NUGET_RELEASES is set to true.
+      # Then every push to main publishes a prerelease and a classified stable release.
+      publish: ${{ vars.NUGET_RELEASES == 'true' }}
+      auto-stable-release: true
+      publish-stable: ${{ vars.NUGET_RELEASES == 'true' }}
       additional-test-arguments: '--logger GitHubActions'
     secrets:
       nuget-key: ${{ secrets.NUGET_KEY }}
