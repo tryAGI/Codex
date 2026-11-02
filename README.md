@@ -157,11 +157,26 @@ await using var appServer = await CodexAppServerClient.ConnectAsync(new CodexApp
 });
 
 var thread = await appServer.RequestAsync("thread/start", JsonDocument.Parse("{}").RootElement);
-// ... "turn/start", then read appServer.ReadNotificationsAsync() until "turn/completed".
+var threadId = thread.GetProperty("thread").GetProperty("id").GetString();
+
+var turn = new JsonObject
+{
+    ["threadId"] = threadId,
+    ["input"] = CodexUserInput.ToJsonArray([
+        new CodexTextInput("What is in this screenshot?"),
+        CodexImageInput.FromBytes(File.ReadAllBytes("screen.png"), "image/png"),
+    ]),
+};
+await appServer.RequestAsync("turn/start", JsonDocument.Parse(turn.ToJsonString()).RootElement);
+// ... then read appServer.ReadNotificationsAsync() until "turn/completed".
 ```
 
 Envelopes are raw JSON, so new fields and notifications pass through. Overloaded requests
 (`-32001`) are retried with backoff; plain `ws://` is accepted only for loopback hosts.
+
+`CodexUserInput` models every `UserInput` variant (`text`, `image`, `localImage`, `audio`,
+`localAudio`, `skill`, `mention`) and writes only the members a variant declares. `Parse`
+reads them back, and a variant newer than this package is kept verbatim as `CodexUnknownInput`.
 
 A runnable version of these snippets is in [`samples/tryAGI.Codex.Sample`](samples/tryAGI.Codex.Sample).
 
@@ -187,6 +202,17 @@ version appears, it adds the schema snapshot, regenerates the packaged method ca
 request. The tests check that every method the library serves or sends still exists in the new
 version; when they pass, the pull request merges automatically and a patch release is published.
 A version that removes or renames a method this library depends on fails the tests and waits for a human.
+
+## Running the tests
+
+```bash
+dotnet test src/tests/tryAGI.Codex.Tests/tryAGI.Codex.Tests.csproj
+```
+
+Tests in the `Live` category are skipped unless `CODEX_LIVE_TESTS=1`. They start a real
+`codex app-server` (set `CODEX_EXECUTABLE` if it is not on `PATH`) with an isolated `CODEX_HOME`;
+the authenticated agent and usage checks also need `CODEX_ACCESS_TOKEN` and `CODEX_ACCOUNT_ID`, and
+`CODEX_MODEL` overrides the model they use.
 
 ## Support
 
