@@ -205,6 +205,16 @@ request. The tests check that every method the library serves or sends still exi
 version; when they pass, the pull request merges automatically and a patch release is published.
 A version that removes or renames a method this library depends on fails the tests and waits for a human.
 
+The native clients have no schema to check, so a second daily workflow compares the upstream Rust
+files they were reviewed against (fingerprinted in `ProtocolBaseline.json`) with the newest stable
+`rust-v*` release. When one changed, it opens a review issue for that release, listing the changed
+files and the wire event names (`session.*`, `response.*`, …) that were added or removed; an
+unchanged release produces nothing. After the review, one command records it:
+
+```bash
+python3 scripts/check-upstream-protocol.py update --tag rust-vX.Y.Z
+```
+
 ## Running the tests
 
 ```bash

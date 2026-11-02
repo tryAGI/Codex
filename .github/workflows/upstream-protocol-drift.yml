@@ -1,0 +1,51 @@
+name: Upstream protocol drift
+on:
+  schedule:
+    - cron: '47 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream-protocol-drift
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: Open a review issue for changed upstream protocol sources
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Self-test
+        run: python3 scripts/check-upstream-protocol.py --self-test
+
+      # A changed source needs a human review, so this opens an issue and never a pull request.
+      - name: Compare the newest stable release with the reviewed sources
+        id: check
+        run: |
+          set +e
+          python3 scripts/check-upstream-protocol.py check --report "$RUNNER_TEMP/report.md"
+          status=$?
+          [[ $status -eq 0 || $status -eq 3 ]] || exit $status
+
+      - name: Open or update the review issue
+        if: steps.check.outputs.changed == 'true'
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+        run: |
+          set -euo pipefail
+          title="Review upstream protocol sources: $TAG"
+          number="$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | first | .number // empty")"
+          if [[ -n "$number" ]]; then
+            gh issue edit "$number" --body-file "$RUNNER_TEMP/report.md"
+            echo "Updated issue #$number."
+          else
+            gh issue create --title "$title" --body-file "$RUNNER_TEMP/report.md"
+          fi
