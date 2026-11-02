@@ -33,6 +33,8 @@ uses. If you already run Codex, an optional `CodexAppServerClient` drives an ins
 - **Usage** — account rate-limit windows, credits and per-request usage observation.
 - **App Server client** — JSON-RPC over stdio, the Unix-socket proxy or WebSocket
   (`CodexAppServerClient`).
+- **Trimming and NativeAOT** — no reflection-based serialization; every push publishes a probe
+  with NativeAOT, failing on any trim or AOT warning (including dependencies), and runs it.
 
 The host stays in charge: you define the tools, approvals, credential storage, reconnection and
 persistence. There is no built-in shell, browsing, sandboxing or fallback to paid API-key inference.

@@ -1,0 +1,34 @@
+name: NativeAOT
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aot:
+    name: Trimming and NativeAOT
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      # TreatWarningsAsErrors in the probe turns any trim or AOT warning, from the library or a
+      # dependency, into a failed publish.
+      - name: Publish the probe with NativeAOT
+        run: dotnet publish src/tests/tryAGI.Codex.AotTests/tryAGI.Codex.AotTests.csproj --configuration Release --output "$RUNNER_TEMP/aot"
+
+      - name: Run the native probe
+        run: '"$RUNNER_TEMP/aot/tryAGI.Codex.AotTests"'

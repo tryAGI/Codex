@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NativeAOT probe. `dotnet publish -c Release` compiles the whole library ahead of time
+    (TrimmerRootAssembly keeps every type, so dependencies such as Tomlyn are analyzed too)
+    and fails on any trim or AOT warning; running the native binary then exercises the
+    paths that depend on embedded resources, JSON metadata and TOML parsing.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>tryAGI.Codex.AotTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../libs/tryAGI.Codex/tryAGI.Codex.csproj" />
+    <TrimmerRootAssembly Include="tryAGI.Codex" />
+  </ItemGroup>
+
+</Project>

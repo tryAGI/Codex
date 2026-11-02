@@ -4,5 +4,6 @@
   </Folder>
   <Folder Name="/src/tests/">
     <Project Path="src/tests/tryAGI.Codex.Tests/tryAGI.Codex.Tests.csproj" />
+    <Project Path="src/tests/tryAGI.Codex.AotTests/tryAGI.Codex.AotTests.csproj" />
   </Folder>
 </Solution>
