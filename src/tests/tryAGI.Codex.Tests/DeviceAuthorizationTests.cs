@@ -44,6 +44,31 @@ public sealed class DeviceAuthorizationTests
         await Assert.ThrowsAsync<CodexProtocolException>(() => auth.RefreshAsync(new("old", "refresh", "original", DateTimeOffset.UtcNow), TestContext.Current.CancellationToken));
     }
 
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(CodexRefreshReason.ProactiveExpiry, "proactive_expiry")]
+    [InlineData(CodexRefreshReason.Scheduled, "scheduled")]
+    [InlineData(CodexRefreshReason.UnauthorizedRecovery, "unauthorized_recovery")]
+    [InlineData(CodexRefreshReason.Forced, "forced")]
+    public async Task RefreshReasonIsSentOnlyWhenGiven(CodexRefreshReason? reason, string? wire)
+    {
+        string? body = null;
+        using var auth = new CodexDeviceAuthorization(handler: new Handler(async (r, ct) =>
+        {
+            body = await (r.Content ?? throw new InvalidDataException("Required data was null.")).ReadAsStringAsync(ct);
+            return Json(new() { ["access_token"] = "new", ["refresh_token"] = "rotated", ["id_token"] = IdToken("account") });
+        }));
+        var previous = new CodexOAuthTokens("old", "refresh", "account", DateTimeOffset.UtcNow);
+        var ct = TestContext.Current.CancellationToken;
+        var tokens = reason is { } value ? await auth.RefreshAsync(previous, value, ct) : await auth.RefreshAsync(previous, ct);
+        Assert.Equal("rotated", tokens.RefreshToken);
+        var fields = (body ?? "").Split('&');
+        Assert.Contains("grant_type=refresh_token", fields);
+        if (wire is null) Assert.DoesNotContain(fields, f => f.StartsWith("refresh_reason=", StringComparison.Ordinal));
+        else Assert.Contains("refresh_reason=" + wire, fields);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => auth.RefreshAsync(previous, (CodexRefreshReason)42, ct));
+    }
+
     [Fact]
     public async Task ExpiredCodeNeverContactsIssuer()
     {

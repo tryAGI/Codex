@@ -79,6 +79,22 @@ public sealed class CodexOAuthTokens
     public override string ToString() => "CodexOAuthTokens [redacted]";
 }
 
+/// <summary>Why a token refresh happens. Sent to the auth service as diagnostics only.</summary>
+public enum CodexRefreshReason
+{
+    /// <summary>The access token is about to expire.</summary>
+    ProactiveExpiry,
+
+    /// <summary>A periodic refresh.</summary>
+    Scheduled,
+
+    /// <summary>A request was rejected with 401 and is retried with a new token.</summary>
+    UnauthorizedRecovery,
+
+    /// <summary>The user or host asked for a refresh.</summary>
+    Forced,
+}
+
 /// <summary>Explicit ChatGPT device authorization and refresh. No reading or copying a CLI's credential store.</summary>
 public sealed class CodexDeviceAuthorization : IDisposable
 {
@@ -138,8 +154,29 @@ public sealed class CodexDeviceAuthorization : IDisposable
 
     /// <summary>The host must serialize refreshes and atomically persist the returned rotating token.</summary>
     public Task<CodexOAuthTokens> RefreshAsync(CodexOAuthTokens previous, CancellationToken cancellationToken = default) =>
-        ExchangeAsync(new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["client_id"] = clientId,
-            ["refresh_token"] = previous.RefreshToken }, previous, cancellationToken);
+        RefreshCoreAsync(previous, null, cancellationToken);
+
+    /// <summary>Refreshes and tells the auth service why, as diagnostics only; it never affects token validity.
+    /// The host must serialize refreshes and atomically persist the returned rotating token.</summary>
+    public Task<CodexOAuthTokens> RefreshAsync(CodexOAuthTokens previous, CodexRefreshReason reason, CancellationToken cancellationToken = default)
+    {
+        if (!Enum.IsDefined(reason)) throw new ArgumentOutOfRangeException(nameof(reason));
+        return RefreshCoreAsync(previous, reason, cancellationToken);
+    }
+
+    private Task<CodexOAuthTokens> RefreshCoreAsync(CodexOAuthTokens previous, CodexRefreshReason? reason, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(previous);
+        var fields = new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["client_id"] = clientId, ["refresh_token"] = previous.RefreshToken };
+        if (reason is { } value) fields["refresh_reason"] = value switch
+        {
+            CodexRefreshReason.ProactiveExpiry => "proactive_expiry",
+            CodexRefreshReason.Scheduled => "scheduled",
+            CodexRefreshReason.UnauthorizedRecovery => "unauthorized_recovery",
+            _ => "forced",
+        };
+        return ExchangeAsync(fields, previous, cancellationToken);
+    }
 
     private async Task<CodexOAuthTokens> ExchangeAsync(Dictionary<string, string> fields, CodexOAuthTokens? previous, CancellationToken ct)
     {

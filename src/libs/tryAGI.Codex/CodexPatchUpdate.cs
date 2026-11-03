@@ -137,7 +137,8 @@ public static partial class CodexPatch
         return changes.OrderBy(r => r.Start).ToList(); // Stable order for equal-position insertions.
     }
 
-    private static int? Seek(string[] lines, IReadOnlyList<string> pattern, int start, bool eof, CodexPatchUpdateMode mode, CancellationToken cancellationToken)
+    // Mirrors codex-rs/apply-patch/src/seek_sequence.rs; SeekSequenceContractTests replays its cases.
+    internal static int? Seek(string[] lines, IReadOnlyList<string> pattern, int start, bool eof, CodexPatchUpdateMode mode, CancellationToken cancellationToken)
     {
         if (pattern.Count == 0) return start;
         if (pattern.Count > lines.Length) return null;

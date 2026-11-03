@@ -67,7 +67,7 @@ while (tokens is null)
 }
 
 // Persist tokens securely; refresh before ExpiresAt:
-// tokens = await authorization.RefreshAsync(tokens);
+// tokens = await authorization.RefreshAsync(tokens, CodexRefreshReason.ProactiveExpiry);
 ```
 
 `CodexClient` asks an `ICodexCredentialProvider` for credentials before every request, so your
@@ -143,7 +143,8 @@ await foreach (var e in realtime.ReadEventsAsync())
 
 For WebRTC, create the call with `CreateRealtimeCallAsync(offerSdp, session)`, hand the returned
 SDP answer to your media stack, then `ConnectSidebandAsync(call.CallId)` for the control channel.
-The media stack is intentionally yours.
+The media stack is intentionally yours. To end the call, `CloseSessionAsync()`; to stop observing it
+while the call keeps running, `CloseTransportAsync()` sends a normal close frame and nothing else.
 
 Read sideband events promptly, dispatch delegations separately, deduplicate delegation IDs
 durably before acting, and keep every response output item in history. A failed call creation
