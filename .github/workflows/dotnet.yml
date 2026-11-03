@@ -7,9 +7,8 @@ on:
       - v**
   workflow_dispatch:
 
-# The shared release job tags and creates GitHub releases, which needs contents: write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-test-publish:
@@ -21,8 +20,38 @@ jobs:
       # Releases stay off until the repository variable NUGET_RELEASES is set to true.
       # Then every push to main publishes a prerelease and a classified stable release.
       publish: ${{ vars.NUGET_RELEASES == 'true' }}
-      auto-stable-release: true
-      publish-stable: ${{ vars.NUGET_RELEASES == 'true' }}
       additional-test-arguments: '--logger GitHubActions'
-    secrets:
-      nuget-key: ${{ secrets.NUGET_KEY }}
+
+  # NuGet trusted publishing: nuget.org matches the policy (tryAGI / Codex / dotnet.yml) against this
+  # workflow file, so both pushes run here rather than inside the reusable workflow.
+  nuget-trusted-publish:
+    name: NuGet trusted publishing
+    needs: build-test-publish
+    if: github.event_name == 'push' && vars.NUGET_RELEASES == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: tryAGI/workflows/.github/actions/nuget-publish@main
+        with:
+          user: havendv
+
+  auto-stable-release:
+    name: Automatic stable release
+    needs: nuget-trusted-publish
+    if: github.ref == 'refs/heads/main' && vars.NUGET_RELEASES == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    concurrency:
+      group: automatic-stable-release-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: tryAGI/workflows/.github/actions/auto-stable-release@main
+        with:
+          nuget-user: havendv
+          project-path: Codex.slnx
+          dotnet-version: 10.0.x
+          publish-stable: 'true'
