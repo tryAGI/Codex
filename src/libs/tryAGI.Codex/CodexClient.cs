@@ -154,11 +154,14 @@ public sealed partial class CodexClient : IDisposable
     {
         if (response.IsSuccessStatusCode) return;
         CodexRealtimeError? error = null;
+        CodexUsageLimitException? usageLimit = null;
         try
         {
             using var body = JsonDocument.Parse(await ReadBoundedAsync(response.Content, Math.Min(options.MaximumMessageBytes, 65536), ct).ConfigureAwait(false));
             if (body.RootElement.TryGetProperty("error", out var value) && value.ValueKind == JsonValueKind.Object)
             {
+                var limitHeader = response.Headers.TryGetValues("x-codex-active-limit", out var limits) ? limits.FirstOrDefault() : null;
+                usageLimit = CodexUsageLimitException.TryRead((int)response.StatusCode, value, limitHeader);
                 var envelope = new JsonObject { ["type"] = "error", ["error"] = JsonNode.Parse(value.GetRawText()) };
                 using var eventBody = JsonDocument.Parse(envelope.ToJsonString());
                 error = CodexRealtimeProtocol.ReadError(eventBody.RootElement);
@@ -167,6 +170,7 @@ public sealed partial class CodexClient : IDisposable
             }
         }
         catch (Exception e) when (e is JsonException or CodexProtocolException or DecoderFallbackException) { }
+        if (usageLimit is not null) throw usageLimit;
         throw new CodexProtocolException($"Codex call returned HTTP {(int)response.StatusCode}; code={error?.Code ?? "unknown"}; type={error?.Kind ?? "unknown"}; parameter={error?.Parameter ?? "unknown"}; provider text is omitted.", (int)response.StatusCode)
         { RealtimeError = error };
     }

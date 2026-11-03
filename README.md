@@ -118,6 +118,27 @@ var result = await agent.RunAsync(
 Use a model your ChatGPT plan offers. For lower-level control, `client.StreamResponseAsync(...)`
 yields every raw Responses event of a single request.
 
+### When the plan's allowance runs out
+
+An exhausted ChatGPT allowance is a normal state that clears by itself, so it surfaces as
+`CodexUsageLimitException` (a `CodexProtocolException`) rather than an error to retry with backoff:
+
+```csharp
+while (true)
+{
+    try { result = await agent.RunAsync(options, history, execute); break; }
+    catch (CodexUsageLimitException limit)
+    {
+        // ResetsAt is a hint: the delay is clamped to 1–15 minutes, so an early return is noticed
+        // and a past or missing reset time never turns into a tight loop.
+        await Task.Delay(limit.GetRecheckDelay(DateTimeOffset.UtcNow), cancellationToken);
+    }
+}
+```
+
+Through an installed App Server the same state arrives as a turn error;
+`CodexUsageLimitException.IsAppServerUsageLimit(turnError)` recognizes it without string matching.
+
 ### Start a thread
 
 `CodexThreadStore` keeps thread documents behind an `ICodexThreadStorage` you implement (a database,

@@ -50,7 +50,7 @@ public sealed record CodexEndpointOptions
 /// <param name="message">Error description.</param>
 /// <param name="statusCode">HTTP status code, if any.</param>
 /// <param name="requestId">Provider request ID, if returned.</param>
-public sealed class CodexProtocolException(string message, int? statusCode = null, string? requestId = null) : IOException(message)
+public class CodexProtocolException(string message, int? statusCode = null, string? requestId = null) : IOException(message)
 {
     /// <summary>HTTP status code, if any.</summary>
     public int? StatusCode { get; } = statusCode;
