@@ -4,11 +4,20 @@ using tryAGI.Codex;
 // Usage:
 //   dotnet run                       sign in with ChatGPT, then run one agent turn natively
 //   dotnet run -- --app-server       drive an installed `codex app-server` instead
+//   dotnet run -- --live-credentials <dir>
+//                                    sign in and write only a short-lived access token and the account ID
+//                                    to <dir> for scripts/run-authenticated-live-tests.sh; the refresh token is discarded
 var model = Environment.GetEnvironmentVariable("CODEX_MODEL") ?? "gpt-6.1-sol";
 
 if (args.Contains("--app-server"))
 {
     await RunAppServerAsync();
+    return;
+}
+
+if (Array.IndexOf(args, "--live-credentials") is var index and >= 0)
+{
+    await WriteLiveCredentialsAsync(index + 1 < args.Length ? args[index + 1] : throw new ArgumentException("--live-credentials needs a directory."));
     return;
 }
 
@@ -69,6 +78,34 @@ async Task RunAppServerAsync()
     }
 
     Console.WriteLine();
+}
+
+static async Task WriteLiveCredentialsAsync(string directory)
+{
+    using var authorization = new CodexDeviceAuthorization();
+    var code = await authorization.BeginAsync();
+    // The prompt goes to stderr so nothing but the credential files is produced.
+    Console.Error.WriteLine($"Open {code.VerificationUri} and enter {code.UserCode}");
+    CodexOAuthTokens? tokens = null;
+    while (tokens is null)
+    {
+        await Task.Delay(code.PollInterval);
+        tokens = await authorization.PollAsync(code);
+    }
+
+    Directory.CreateDirectory(directory);
+    await WriteSecretAsync(Path.Combine(directory, "access-token"), tokens.AccessToken);
+    await WriteSecretAsync(Path.Combine(directory, "account-id"), tokens.AccountId);
+    Console.Error.WriteLine($"Signed in; the access token expires at {tokens.ExpiresAt:u}.");
+}
+
+static async Task WriteSecretAsync(string path, string value)
+{
+    var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
+    if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+    await using var stream = new FileStream(path, options);
+    await using var writer = new StreamWriter(stream);
+    await writer.WriteAsync(value);
 }
 
 static JsonElement Json(string json)

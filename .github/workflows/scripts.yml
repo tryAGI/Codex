@@ -25,3 +25,12 @@ jobs:
           version="$(python3 -c 'import json; print(json.load(open("src/libs/tryAGI.Codex/AppServerProtocol.json"))["version"])')"
           python3 scripts/update-app-server-protocol.py "$version"
           git diff --exit-code -- src/libs/tryAGI.Codex/AppServerProtocol.json README.md
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      # scripts/run-authenticated-live-tests.sh signs in through the sample, built against the source.
+      - name: Sample builds against the source
+        run: dotnet build samples/tryAGI.Codex.Sample/tryAGI.Codex.Sample.csproj -p:UseLocalProject=true

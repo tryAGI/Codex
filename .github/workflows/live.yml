@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: '41 6 * * 1'
   workflow_dispatch:
+    inputs:
+      authenticated:
+        description: 'Also run the authenticated tests (use scripts/run-authenticated-live-tests.sh, which supplies a one-run token)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,10 +33,39 @@ jobs:
       - name: Install the latest stable Codex CLI
         run: npm install --global @openai/codex@latest
 
+      # No credentials here: the authenticated tests skip and only the App Server test runs.
       - name: Run live tests
         env:
           CODEX_LIVE_TESTS: '1'
-          # Optional. Without them the authenticated tests are skipped and only the App Server test runs.
+        run: dotnet test Codex.slnx --configuration Release --filter Category=Live --logger GitHubActions
+
+  live-authenticated:
+    name: Authenticated live tests
+    if: github.event_name == 'workflow_dispatch' && inputs.authenticated
+    runs-on: ubuntu-latest
+    # The credentials exist only in this environment, and only while the dispatching script runs.
+    environment: live-authenticated
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install the latest stable Codex CLI
+        run: npm install --global @openai/codex@latest
+
+      - name: Run all live tests
+        env:
+          CODEX_LIVE_TESTS: '1'
+          CODEX_LIVE_REQUIRE_AUTH: '1'
           CODEX_ACCESS_TOKEN: ${{ secrets.CODEX_ACCESS_TOKEN }}
           CODEX_ACCOUNT_ID: ${{ secrets.CODEX_ACCOUNT_ID }}
           CODEX_MODEL: ${{ vars.CODEX_MODEL }}

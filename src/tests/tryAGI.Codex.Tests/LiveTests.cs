@@ -12,7 +12,8 @@ namespace tryAGI.Codex.Tests;
 /// It uses an empty temporary <c>CODEX_HOME</c>, so it never touches a real login.</item>
 /// <item>The authenticated tests need <c>CODEX_ACCESS_TOKEN</c> and <c>CODEX_ACCOUNT_ID</c> from a ChatGPT login,
 /// and optionally <c>CODEX_MODEL</c>. Only a short-lived access token is used: a refresh token rotates on use,
-/// so storing one in CI would break after the first run.</item>
+/// so storing one in CI would break after the first run. <c>scripts/run-authenticated-live-tests.sh</c> supplies
+/// one for a single CI run.</item>
 /// </list>
 /// </remarks>
 [Trait("Category", "Live")]
@@ -91,8 +92,11 @@ public sealed class LiveTests
         Assert.SkipUnless(Enabled, "Set CODEX_LIVE_TESTS=1 to run live tests.");
         var token = Environment.GetEnvironmentVariable("CODEX_ACCESS_TOKEN");
         var account = Environment.GetEnvironmentVariable("CODEX_ACCOUNT_ID");
-        Assert.SkipWhen(string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(account),
-            "Set CODEX_ACCESS_TOKEN and CODEX_ACCOUNT_ID to run authenticated live tests.");
+        var missing = string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(account);
+        // The authenticated CI lane sets this, so missing credentials fail the run instead of skipping silently.
+        Assert.False(missing && Environment.GetEnvironmentVariable("CODEX_LIVE_REQUIRE_AUTH") == "1",
+            "CODEX_LIVE_REQUIRE_AUTH=1 but CODEX_ACCESS_TOKEN or CODEX_ACCOUNT_ID is empty.");
+        Assert.SkipWhen(missing, "Set CODEX_ACCESS_TOKEN and CODEX_ACCOUNT_ID to run authenticated live tests.");
         return new StaticCredentials(new CodexCredentials(token ?? "", account ?? ""));
     }
 

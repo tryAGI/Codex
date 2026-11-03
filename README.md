@@ -248,6 +248,17 @@ Tests in the `Live` category are skipped unless `CODEX_LIVE_TESTS=1`. They start
 the authenticated agent and usage checks also need `CODEX_ACCESS_TOKEN` and `CODEX_ACCOUNT_ID`, and
 `CODEX_MODEL` overrides the model they use.
 
+In CI the `Live` workflow runs the App Server test every Monday, without credentials. The authenticated
+tests run on demand, at least before each minor release:
+
+```bash
+scripts/run-authenticated-live-tests.sh
+```
+
+It signs in with the device flow, keeps only the short-lived access token (the rotating refresh token
+is discarded), stores it as a secret of the `live-authenticated` environment for that one run, and
+deletes it when the run ends. In that run a missing credential fails the tests instead of skipping them.
+
 ## Support
 
 Priority place for bugs: https://github.com/tryAGI/Codex/issues
