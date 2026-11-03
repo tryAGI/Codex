@@ -1,0 +1,27 @@
+name: Scripts
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scripts:
+    name: Self-test the maintenance scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Upstream protocol checker self-test
+        run: python3 scripts/check-upstream-protocol.py --self-test
+
+      # Regenerating the packaged catalog from its own schema snapshot must change nothing.
+      - name: App Server catalog matches its schema snapshot
+        run: |
+          set -euo pipefail
+          version="$(python3 -c 'import json; print(json.load(open("src/libs/tryAGI.Codex/AppServerProtocol.json"))["version"])')"
+          python3 scripts/update-app-server-protocol.py "$version"
+          git diff --exit-code -- src/libs/tryAGI.Codex/AppServerProtocol.json README.md

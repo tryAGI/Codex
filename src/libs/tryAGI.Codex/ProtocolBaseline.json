@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "protocol": "codex-realtime-v3",
   "upstreamRepository": "openai/codex",
-  "upstreamCommit": "360319d8dee62d87e2d59fc0c21805d79519cfed",
-  "reviewedRelease": "rust-v0.165.0",
+  "upstreamCommit": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
+  "reviewedRelease": "rust-v0.166.0",
   "defaultRealtimeModel": "gpt-live-1-codex",
   "defaultVoice": "cove",
   "voices": [
@@ -59,17 +59,31 @@
     ]
   },
   "sourceFiles": {
-    "codex-rs/protocol/src/protocol.rs": "7b896ec457c55d6d8edb959cc08cc7e903fbc73b643cbe98cccec66c2325b1e4",
-    "codex-rs/core/src/realtime_conversation.rs": "b2548eee613203508c4ee1b39f758d1a9d7e3c531a29f346be7a14562d6d24ab",
-    "codex-rs/core/src/client.rs": "a8f9374064bd24cc421c3266f39f105aa8d287e350c72541f9dcde544665fae2",
+    "codex-rs/protocol/src/protocol.rs": "35d4a01a35c1771e7ae24d3c55964c2d6ecfe880a91539c1045f75cac0c8e356",
+    "codex-rs/core/src/realtime_conversation.rs": "38c5ba4cdcc2f2bef321c2fef7612e05cd682926659a7ffaaf1a5b9dd5054b7a",
+    "codex-rs/core/src/client.rs": "6a2e95e2b7014c480f5c543b95f112d79c23551c281050cffaad85d32a9847db",
     "codex-rs/codex-api/src/endpoint/realtime_call.rs": "c9a987c05dadabb620dfaea38e8b739735efaf3f931daeec7c59d69f56788252",
-    "codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs": "1aa9957addeceab814e2f1a8bbdcc2c22a1074b2e307df4e1b0547739918201b",
+    "codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs": "13ee5d24039f8bbd9e8e700eecf7bada183ea21c822ede008923ce5ff5ea1b57",
     "codex-rs/codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi.rs": "e678b750f9ebd12f0fb28f01029f094f7c2f0316641adb82a09dd84fde6b5a99",
     "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs": "faa6826b1884ccceb564e8bb6bd60048f7900ffcc5b50fcacbd840b03a173515",
     "codex-rs/login/src/device_code_auth.rs": "075c3f83cbc2612dde7b50f118b7a3c1ef3b7641ce6acfcca99aff5dd7454012",
     "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs": "2de304fccbfeae2baec2879308cdc4988872a56435ca0e666ecde65ffee367ce",
     "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_common.rs": "a60dfc4759b36799057e08bbb0732e83c9e144d7fb7dd4dde8826bf8b96cb416",
-    "codex-rs/codex-api/src/common.rs": "3ab2c9406e2e9b465b7b23756991bf7893bd884be9af3cff8c222bb26a8df4a0"
+    "codex-rs/codex-api/src/common.rs": "d761418f9fe1fa4b5397f291fd6f8f041a8b9cf5800c134c665fe9bc5bed1e85",
+    "codex-rs/codex-api/src/endpoint/realtime_websocket/methods_common.rs": "358bfba763d1885a27df4b451004de1dad724f193675edc095f42e93c2747a3f",
+    "codex-rs/core/src/compact_remote_v2_attempt.rs": "4e2f6f488c416224c12de83dcecac9044b656a8fbc865d0ca15d2c0465488bf7",
+    "codex-rs/core/src/compact_remote_v2.rs": "844f8b752957fba3103832dacf2dc6cf319e31bf3e2adadc167cfc72d84c1654",
+    "codex-rs/protocol/src/models.rs": "753498bc730ba21ded710d9aa2b2f9163e6bbe4eaa18f1c25d998c36138a54f7",
+    "codex-rs/tools/src/tool_spec.rs": "af8b5286fb6d2eb3574c484b25076f515bca2d4350ecb5059e436966ecdd519d",
+    "codex-rs/tools/src/responses_api.rs": "9a58a70c4992cedce5c2292e6e6f145b7174b2eeb730c181cb8e84ac8e44c069",
+    "codex-rs/protocol/src/tool_name.rs": "2d102304a638001c46ffd5bd31fba05960b88a870e3db5b163b87eb9652c65ac",
+    "codex-rs/login/src/oauth/client.rs": "f79cdda556c137c9a244026030d604324c7c5df73b0961fc5b7a766f05f7a460",
+    "codex-rs/apply-patch/src/parser.rs": "6b8086467d0500f4fc9aa9a35cd33a0bce53c01bcb74b915b9efc6fcf187f7ce",
+    "codex-rs/apply-patch/src/streaming_parser.rs": "5f4b8e60fd24ada7c1b6a696155de3da2b946f7b5436da90e377c9de04b1e578",
+    "codex-rs/apply-patch/src/seek_sequence.rs": "a6d0d35b628a4f1e6f8ba77c533046c27e585a8bdd94ee6cd21d2585b39e34e0",
+    "codex-rs/apply-patch/src/text_file.rs": "35cbbdeb91e86780d99fccd097a5dba2772f048730556b73d685e94658ddc6e3",
+    "codex-rs/apply-patch/src/file_update.rs": "9a2e4f4ccef98e34709bec522554729bfdfd188bb92b7db87ddc7bab87f866e6",
+    "codex-rs/apply-patch/src/lib.rs": "81eeac02181ffb6b1c8e1bdb18457372f11ef800f18675f77f0e10f3ee5dd9f2"
   },
   "reviewedNativeEvents": [
     "session.started",
@@ -145,6 +159,20 @@
     "codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_common.rs": [],
     "codex-rs/codex-api/src/common.rs": [
       "response.create"
-    ]
+    ],
+    "codex-rs/codex-api/src/endpoint/realtime_websocket/methods_common.rs": [],
+    "codex-rs/core/src/compact_remote_v2_attempt.rs": [],
+    "codex-rs/core/src/compact_remote_v2.rs": [],
+    "codex-rs/protocol/src/models.rs": [],
+    "codex-rs/tools/src/tool_spec.rs": [],
+    "codex-rs/tools/src/responses_api.rs": [],
+    "codex-rs/protocol/src/tool_name.rs": [],
+    "codex-rs/login/src/oauth/client.rs": [],
+    "codex-rs/apply-patch/src/parser.rs": [],
+    "codex-rs/apply-patch/src/streaming_parser.rs": [],
+    "codex-rs/apply-patch/src/seek_sequence.rs": [],
+    "codex-rs/apply-patch/src/text_file.rs": [],
+    "codex-rs/apply-patch/src/file_update.rs": [],
+    "codex-rs/apply-patch/src/lib.rs": []
   }
 }

@@ -257,6 +257,19 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         }
         finally { writeGate.Release(); }
     }
+
+    /// <summary>Detaches this connection with a normal WebSocket close and no <c>session.close</c>,
+    /// so a frontend-owned (WebRTC) call keeps running. Dispose the connection afterwards.</summary>
+    public async Task CloseTransportAsync(CancellationToken cancellationToken = default)
+    {
+        await writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", cancellationToken).ConfigureAwait(false);
+        }
+        finally { writeGate.Release(); }
+    }
     /// <summary>Sends new session settings. Keep reading events to see whether they were accepted.</summary>
     public Task UpdateSessionAsync(CodexRealtimeSessionOptions options, CancellationToken cancellationToken = default) =>
         SendAsync(protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(options) : CodexRealtimeProtocol.SessionUpdate(options), cancellationToken);

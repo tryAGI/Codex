@@ -186,8 +186,8 @@ A runnable version of these snippets is in [`samples/tryAGI.Codex.Sample`](sampl
 
 | Surface | Checked against |
 |---------|-----------------|
-| Realtime catalog (models, voices) | `openai/codex` `rust-v0.165.0` (`ProtocolBaseline.json`) |
-| Realtime V3, Responses, compaction, tools, device sign-in, `apply_patch` | `openai/codex` `rust-v0.160.0` source review ([provenance](docs/UPSTREAM.md)) |
+| Realtime catalog (models, voices) | `openai/codex` `rust-v0.166.0` (`ProtocolBaseline.json`) |
+| Realtime V3, Responses, compaction, tools, device sign-in, `apply_patch` | `openai/codex` `rust-v0.166.0` source review ([provenance](docs/UPSTREAM.md)) |
 | Native thread/turn RPC (`CodexThreadRpc`) | App Server protocol `0.162.1` (schema-validated in tests) |
 | `CodexAppServerClient`, `CodexAppServerProtocol` | App Server protocol <!-- app-server-version -->0.166.0<!-- /app-server-version --> (method catalog packaged in the library) |
 

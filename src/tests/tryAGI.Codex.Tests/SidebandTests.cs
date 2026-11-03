@@ -35,7 +35,12 @@ public sealed class SidebandTests
         public override void Abort() => Aborted = true;
         public override void Dispose() { }
         public override Task CloseAsync(WebSocketCloseStatus status, string? description, CancellationToken ct) => Task.CompletedTask;
-        public override Task CloseOutputAsync(WebSocketCloseStatus status, string? description, CancellationToken ct) => Task.CompletedTask;
+        public WebSocketCloseStatus? ClosedOutput { get; private set; }
+        public override Task CloseOutputAsync(WebSocketCloseStatus status, string? description, CancellationToken ct)
+        {
+            ClosedOutput = status;
+            return Task.CompletedTask;
+        }
         public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
@@ -51,6 +56,17 @@ public sealed class SidebandTests
             ct.ThrowIfCancellationRequested();
             Sent.Add(Encoding.UTF8.GetString(buffer));
         }
+    }
+
+    [Fact]
+    public async Task CloseTransportDetachesWithoutEndingTheSession()
+    {
+        var socket = new Socket();
+        await using var connection = new CodexRealtimeConnection(socket, 2048);
+        await connection.CloseTransportAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.ClosedOutput);
+        Assert.Empty(socket.Sent);
+        Assert.False(socket.Aborted);
     }
 
     [Theory]

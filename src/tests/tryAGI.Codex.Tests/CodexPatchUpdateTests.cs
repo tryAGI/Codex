@@ -68,8 +68,9 @@ public sealed class CodexPatchUpdateTests
     [Fact]
     public void LegacyEofLookupRetainsPinnedEarlierRegionBehavior()
     {
-        Assert.Equal("a\nX\n", CodexPatch.Update("a\nb\nc\n", Hunk("@@\n-b\n-c\n+X\n@@\n-b\n-c\n+Y\n*** End of File"), cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Throws<CodexPatchException>(() => CodexPatch.Update("a\nb\nc\n", Hunk("@@\n-b\n-c\n+X\n@@\n-b\n-c\n+Y\n*** End of File"), CodexPatchUpdateMode.PreserveLineEndings, TestContext.Current.CancellationToken));
+        Assert.Equal("a\nX\n", CodexPatch.Update("a\nb\nc\n", Hunk("@@\n-b\n-c\n+X\n@@\n-b\n-c\n+Y\n*** End of File"), CodexPatchUpdateMode.NormalizeToLf, TestContext.Current.CancellationToken));
+        // rust-v0.166.0 removed the legacy mode: the end-of-file lookup never starts before the cursor.
+        Assert.Throws<CodexPatchException>(() => CodexPatch.Update("a\nb\nc\n", Hunk("@@\n-b\n-c\n+X\n@@\n-b\n-c\n+Y\n*** End of File"), cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]

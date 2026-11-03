@@ -5,10 +5,12 @@ namespace tryAGI.Codex;
 /// <summary>How <see cref="CodexPatch.Update"/> reconstructs line endings.</summary>
 public enum CodexPatchUpdateMode
 {
-    /// <summary>Upstream Rust behaviour: lines are split on LF and rejoined with LF; stray CR characters may remain.</summary>
+    /// <summary>Legacy behaviour of Codex releases before <c>rust-v0.166.0</c>: lines are split on LF and
+    /// rejoined with LF; stray CR characters may remain. Kept only to reproduce older results.</summary>
     NormalizeToLf,
 
-    /// <summary>Keep each original line terminator (LF, CRLF or CR) and the file's dominant one for new lines.</summary>
+    /// <summary>Current upstream behaviour: keep each original line terminator (LF, CRLF or CR) and the
+    /// file's dominant one for new lines.</summary>
     PreserveLineEndings,
 }
 
@@ -21,7 +23,7 @@ public static partial class CodexPatch
 
     /// <summary>Derive intended contents without filesystem effects. The host must still
     /// authorize paths, compare the original byte hash at dispatch, and write atomically.</summary>
-    public static string Update(string original, CodexPatchHunk hunk, CodexPatchUpdateMode mode = CodexPatchUpdateMode.NormalizeToLf,
+    public static string Update(string original, CodexPatchHunk hunk, CodexPatchUpdateMode mode = CodexPatchUpdateMode.PreserveLineEndings,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(original); ArgumentNullException.ThrowIfNull(hunk);
