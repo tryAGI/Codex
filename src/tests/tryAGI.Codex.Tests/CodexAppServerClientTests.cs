@@ -59,6 +59,64 @@ public sealed class CodexAppServerClientTests
     }
 
     [Fact]
+    public async Task TypedMethodsRoundTripAndKeepUndeclaredMembers()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var server = new FakeServer();
+        server.Respond = request => request.GetProperty("method").GetString() switch
+        {
+            "turn/start" => """{"turn":{"id":"u1","status":"inProgress","items":[],"itemsView":"full"},"futureField":7}""",
+            "turn/interrupt" => "{}",
+            _ => "{}",
+        };
+        await using var client = await CodexAppServerClient.ConnectAsync(new CodexAppServerOptions(), server, ct);
+
+        var started = await client.RequestAsync(CodexAppServerMethods.TurnStart,
+            CodexAppServerTurnStartParams.Create("t1", [new CodexTextInput("hi")]) with { Effort = "low" }, ct);
+        await client.RequestAsync(CodexAppServerMethods.TurnInterrupt, new CodexAppServerTurnInterruptParams("t1", "u1"), ct);
+
+        Assert.Equal("u1", started.Turn.Id);
+        Assert.Equal(CodexAppServerTurnStatus.InProgress, started.Turn.Status);
+        Assert.Equal("full", started.Turn.AdditionalProperties?["itemsView"].GetString());
+        Assert.Equal(7, started.AdditionalProperties?["futureField"].GetInt32());
+        Assert.Equal("""{"threadId":"t1","input":[{"type":"text","text":"hi"}],"effort":"low"}""", server.Sent[2].GetProperty("params").GetRawText());
+        Assert.Equal("""{"threadId":"t1","turnId":"u1"}""", server.Sent[3].GetProperty("params").GetRawText());
+    }
+
+    [Fact]
+    public async Task ResultsThatDoNotMatchTheirModelFailAsAppServerErrors()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var server = new FakeServer();
+        server.Respond = request => request.GetProperty("method").GetString() == "turn/start" ? """{"turn":"not an object"}""" : "{}";
+        await using var client = await CodexAppServerClient.ConnectAsync(new CodexAppServerOptions(), server, ct);
+
+        await Assert.ThrowsAsync<CodexAppServerException>(() =>
+            client.RequestAsync(CodexAppServerMethods.TurnStart, new CodexAppServerTurnStartParams("t1", []), ct));
+    }
+
+    [Fact]
+    public void TypedNotificationsReadOnlyTheirOwnMethod()
+    {
+        static CodexAppServerNotification Notification(string method, string json) => new(method, Json(json));
+        var completed = Notification("turn/completed", """
+            {"threadId":"t1","turn":{"id":"u1","status":"failed","items":[],"error":{"message":"limit","codexErrorInfo":"usageLimitExceeded"}}}
+            """);
+
+        Assert.True(CodexAppServerNotifications.TurnCompleted.TryRead(completed, out var turn));
+        Assert.Equal(CodexAppServerTurnStatus.Failed, turn.Turn.Status);
+        Assert.True(turn.Turn.Error?.IsUsageLimit);
+        Assert.False(CodexAppServerNotifications.TurnStarted.TryRead(completed, out _));
+        Assert.True(CodexAppServerNotifications.AgentMessageDelta.TryRead(
+            Notification("item/agentMessage/delta", """{"threadId":"t1","turnId":"u1","itemId":"i1","delta":"Hel"}"""), out var delta));
+        Assert.Equal("Hel", delta.Delta);
+        Assert.True(CodexAppServerNotifications.Error.TryRead(
+            Notification("error", """{"threadId":"t1","turnId":"u1","willRetry":true,"error":{"message":"overloaded","codexErrorInfo":"serverOverloaded"}}"""), out var error));
+        Assert.True(error.WillRetry);
+        Assert.False(error.Error.IsUsageLimit);
+    }
+
+    [Fact]
     public async Task ErrorResponsesSurfaceCodeAndMessage()
     {
         var ct = TestContext.Current.CancellationToken;

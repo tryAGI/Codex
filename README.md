@@ -195,6 +195,25 @@ await appServer.RequestAsync("turn/start", new JsonObject
 // ... then read appServer.ReadNotificationsAsync() until "turn/completed".
 ```
 
+The core thread and turn methods also have typed models:
+
+```csharp
+var turn = await appServer.RequestAsync(CodexAppServerMethods.TurnStart,
+    CodexAppServerTurnStartParams.Create(threadId, [new CodexTextInput("Hello")]));
+
+await foreach (var notification in appServer.ReadNotificationsAsync())
+{
+    if (CodexAppServerNotifications.AgentMessageDelta.TryRead(notification, out var delta)) Console.Write(delta.Delta);
+    if (CodexAppServerNotifications.TurnCompleted.TryRead(notification, out var completed)) break;
+}
+```
+
+They are a hand-maintained subset (`thread/start`, `turn/start`, `turn/interrupt`, `turn/started`,
+`turn/completed`, `item/agentMessage/delta`, `error`), not a generated client: the schema has more than
+800 types and changes every release. Each model keeps members it does not declare in
+`AdditionalProperties`, and a test checks every declared member against the newest schema snapshot, so a
+renamed field fails the drift pull request instead of reading as null. Everything else is raw JSON.
+
 Envelopes are raw JSON, so new fields and notifications pass through. Overloaded requests
 (`-32001`) are retried with backoff; plain `ws://` is accepted only for loopback hosts.
 

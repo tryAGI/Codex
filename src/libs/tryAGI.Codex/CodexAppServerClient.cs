@@ -132,6 +132,34 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     public Task<JsonElement> RequestAsync(string method, JsonNode? parameters, CancellationToken cancellationToken = default) =>
         RequestAsync(method, ToElement(parameters), cancellationToken);
 
+    /// <summary>
+    /// Sends a typed request from <see cref="CodexAppServerMethods"/> and reads its typed <c>result</c>.
+    /// Members the models do not declare are kept in <see cref="CodexAppServerPayload.AdditionalProperties"/>.
+    /// </summary>
+    /// <typeparam name="TParams">Parameter type.</typeparam>
+    /// <typeparam name="TResult">Result type.</typeparam>
+    /// <param name="method">The typed method, for example <see cref="CodexAppServerMethods.TurnStart"/>.</param>
+    /// <param name="parameters">The parameters.</param>
+    /// <param name="cancellationToken">Cancels waiting for the response.</param>
+    /// <returns>The typed <c>result</c>.</returns>
+    /// <exception cref="CodexAppServerException">The server returned an error, a result that does not match
+    /// the model, or the transport ended first.</exception>
+    public async Task<TResult> RequestAsync<TParams, TResult>(CodexAppServerMethod<TParams, TResult> method, TParams parameters,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        var result = await RequestAsync(method.Name, JsonSerializer.SerializeToElement(parameters, method.ParamsType), cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return result.Deserialize(method.ResultType)
+                ?? throw new CodexAppServerException(CodexAppServerException.ServerErrorCode, $"{method.Name} returned a null result.");
+        }
+        catch (JsonException ex)
+        {
+            throw new CodexAppServerException($"{method.Name} returned a result that does not match its model.", ex);
+        }
+    }
+
     /// <summary>Sends a notification (a message without an id).</summary>
     [OverloadResolutionPriority(1)]
     public Task NotifyAsync(string method, JsonElement? parameters = null, CancellationToken cancellationToken = default)

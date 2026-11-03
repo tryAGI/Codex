@@ -41,6 +41,15 @@ Check("source-generated thread JSON", () =>
     var info = CodexThreadJson.Default.CodexThreadDocument;
     return info.Properties.Count > 0;
 });
+Check("typed App Server models", () =>
+{
+    var parameters = JsonSerializer.SerializeToElement(
+        CodexAppServerTurnStartParams.Create("t1", [new CodexTextInput("hi")]), CodexAppServerMethods.TurnStart.ParamsType);
+    using var document = JsonDocument.Parse("""{"threadId":"t1","turn":{"id":"u1","status":"completed","items":[],"later":1}}""");
+    return parameters.GetProperty("input")[0].GetProperty("text").GetString() == "hi"
+        && CodexAppServerNotifications.TurnCompleted.TryRead(new("turn/completed", document.RootElement.Clone()), out var completed)
+        && completed.Turn.AdditionalProperties?.ContainsKey("later") == true;
+});
 Check("TOML configuration", () =>
 {
     // Not the system temp folder: on macOS it sits behind a /var symlink, which the reader rejects by design.
