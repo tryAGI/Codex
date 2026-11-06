@@ -230,7 +230,7 @@ A runnable version of these snippets is in [`samples/tryAGI.Codex.Sample`](sampl
 | Realtime catalog (models, voices) | `openai/codex` `rust-v0.166.0` (`ProtocolBaseline.json`) |
 | Realtime V3, Responses, compaction, tools, device sign-in, `apply_patch` | `openai/codex` `rust-v0.166.0` source review ([provenance](docs/UPSTREAM.md)) |
 | Native thread/turn RPC (`CodexThreadRpc`) | App Server protocol `0.162.1` (schema-validated in tests) |
-| `CodexAppServerClient`, `CodexAppServerProtocol` | App Server protocol <!-- app-server-version -->0.166.0<!-- /app-server-version --> (method catalog packaged in the library) |
+| `CodexAppServerClient`, `CodexAppServerProtocol` | App Server protocol <!-- app-server-version -->0.167.0<!-- /app-server-version --> (method catalog packaged in the library) |
 
 `CodexAppServerProtocol` lists every request and notification method of that App Server version, so
 a host can check a method name before sending it.

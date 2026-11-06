@@ -1,5 +1,5 @@
 {
-  "version": "0.166.0",
+  "version": "0.167.0",
   "clientRequests": [
     "account/bedrock/checkGovCloudRequirements",
     "account/bedrock/discover",
@@ -126,6 +126,7 @@
     "thread/goal/clear",
     "thread/goal/get",
     "thread/goal/set",
+    "thread/guardianReview",
     "thread/increment_elicitation",
     "thread/inject_items",
     "thread/items/list",
@@ -270,6 +271,7 @@
     "thread/realtime/transcript/delta",
     "thread/realtime/transcript/done",
     "thread/reverted",
+    "thread/section/changed",
     "thread/settings/updated",
     "thread/started",
     "thread/status/changed",
