@@ -32,7 +32,7 @@ jobs:
 
       - name: Checkout
         if: steps.token.outputs.available == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # A pull request opened with GITHUB_TOKEN does not trigger the Test workflow
           # that auto-merge waits for, so the branch and pull request use PERSONAL_TOKEN.
@@ -41,7 +41,7 @@ jobs:
 
       - name: Setup Node
         if: steps.token.outputs.available == 'true'
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
