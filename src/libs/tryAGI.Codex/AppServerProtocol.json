@@ -1,5 +1,5 @@
 {
-  "version": "0.167.2",
+  "version": "0.169.0",
   "clientRequests": [
     "account/bedrock/checkGovCloudRequirements",
     "account/bedrock/discover",
@@ -14,6 +14,7 @@
     "account/rateLimitResetCredit/consume",
     "account/rateLimits/read",
     "account/read",
+    "account/securitySetup/read",
     "account/sendAddCreditsNudgeEmail",
     "account/usage/read",
     "account/workspaceMessages/read",
@@ -72,6 +73,8 @@
     "mock/experimentalMethod",
     "model/list",
     "modelProvider/capabilities/read",
+    "modelProvider/config/write",
+    "modelProvider/list",
     "permissionProfile/list",
     "plugin/install",
     "plugin/installed",
@@ -138,6 +141,7 @@
     "thread/metadata/update",
     "thread/name/set",
     "thread/prediction/request",
+    "thread/prepareApprovedPlan",
     "thread/queue/add",
     "thread/queue/delete",
     "thread/queue/list",
