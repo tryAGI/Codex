@@ -1,5 +1,5 @@
 {
-  "version": "0.171.0",
+  "version": "0.172.0",
   "clientRequests": [
     "account/bedrock/checkGovCloudRequirements",
     "account/bedrock/discover",
