@@ -63,6 +63,11 @@ public sealed record CodexStoredRealtimeSession(
     /// Absent on earlier journals to preserve their exact materialized history and positions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool CanonicalLegacySegments { get; init; }
+
+    /// <summary>A direct close was admitted, but its transcript has not yet been sealed.
+    /// Recovery may reconcile retained observations from the last attachment, never replay the close.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool DirectCloseDraining { get; init; }
 }
 
 public sealed partial class CodexThreadStore
@@ -150,7 +155,15 @@ public sealed partial class CodexThreadStore
             if (session.State is not ("attached" or "detached" or "ending") ||
                 session.AttachmentId != expectedAttachmentId)
                 throw new InvalidOperationException("Realtime recovery identity or state does not match.");
-            return session with { State = "recoveryRequired", AttachmentId = null };
+            return session with
+            {
+                State = "recoveryRequired", AttachmentId = null,
+                // Upgrade an older attached direct-close snapshot only when the original
+                // unsealed lifecycle state is still known. An already fenced old end is ambiguous.
+                DirectCloseDraining = session.DirectCloseDraining ||
+                    session.State == "attached" && session.TransportKind == CodexRealtimeTransportKind.DirectWebSocket &&
+                    session.EndOperationId is not null,
+            };
         }, cancellationToken);
 
     /// <summary>After the host has verified persisted history and the same logical call's status,
@@ -173,6 +186,7 @@ public sealed partial class CodexThreadStore
             return ReplaceRealtimeSession(document, recovered with
             {
                 State = verifiedEnded ? "ended" : "detached",
+                DirectCloseDraining = false,
                 ClosedRevision = verifiedEnded ? checked(document.Revision + 1) : null,
             });
         }, cancellationToken);
@@ -200,7 +214,7 @@ public sealed partial class CodexThreadStore
             if (prior != operationId) throw new InvalidOperationException("Direct close is owned by another operation.");
             return new(false, before);
         }
-        var next = ReplaceRealtimeSession(before, session with { EndOperationId = operationId });
+        var next = ReplaceRealtimeSession(before, session with { EndOperationId = operationId, DirectCloseDraining = true });
         return new(true, await PublishAsync(before.Revision, next with
         {
             Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
@@ -235,7 +249,10 @@ public sealed partial class CodexThreadStore
         }
         var sealedThread = SealRealtimeHistory(before, session, "end:" + endOperationId.ToString("N"), "sessionEnd");
         var sealedSession = FindRealtimeSession(sealedThread, sessionId, ownerId);
-        var next = ReplaceRealtimeSession(sealedThread, sealedSession with { State = "ending", AttachmentId = null, EndOperationId = endOperationId });
+        var next = ReplaceRealtimeSession(sealedThread, sealedSession with
+        {
+            State = "ending", AttachmentId = null, EndOperationId = endOperationId, DirectCloseDraining = false,
+        });
         return new(true, await PublishAsync(before.Revision, next with
         {
             Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
@@ -306,6 +323,9 @@ public sealed partial class CodexThreadStore
                 (session.State == "attached") != (session.AttachmentId is not null) || session.AttachmentId == Guid.Empty ||
                 (session.UsedAttachmentIds is { } used && (used.Length > MaximumItems || used.Contains(Guid.Empty) || used.Distinct().Count() != used.Length)) ||
                 (session.AttachmentId is { } attachment && !(session.UsedAttachmentIds?.Contains(attachment) ?? false)) ||
+                session.DirectCloseDraining && (session.TransportKind != CodexRealtimeTransportKind.DirectWebSocket ||
+                    session.EndOperationId is null || session.State is not ("attached" or "recoveryRequired") ||
+                    session.UsedAttachmentIds is not { Length: 1 }) ||
                 session.EndOperationId == Guid.Empty || (session.State == "ending" && session.EndOperationId is null) ||
                 (session.State == "detached" || session.State == "attached" &&
                     session.TransportKind == CodexRealtimeTransportKind.ExistingCall) && session.EndOperationId is not null)

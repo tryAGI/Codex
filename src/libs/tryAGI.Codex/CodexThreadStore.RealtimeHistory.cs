@@ -125,7 +125,7 @@ public sealed partial class CodexThreadStore
         if (recovery)
         {
             Id(attachmentId);
-            if (session.State != "recoveryRequired" || session.EndOperationId is not null ||
+            if (session.State != "recoveryRequired" ||
                 session.UsedAttachmentIds?.LastOrDefault() != attachmentId)
                 throw new InvalidOperationException("Recovered observation does not belong to the last fenced attachment.");
         }
@@ -139,6 +139,11 @@ public sealed partial class CodexThreadStore
             NotifyReconciledRealtimeSnapshot(before);
             return new(false, before);
         }
+        // A sealed end permits receipt reconciliation but no new speech. An admitted
+        // direct close still draining its final events is different: retain its exact
+        // last-generation observations without authorizing another provider operation.
+        if (recovery && session.EndOperationId is not null && !session.DirectCloseDraining)
+            throw new InvalidOperationException("Realtime end history has already been sealed or its drain state is unknown.");
         var item = new CodexStoredRealtimeHistoryEvent(observationId, "observation",
             NextRealtimeObservationTime(history), before.Turns.Length, attachmentId,
             source.Type, source.Payload.Clone(), source.ReceivedAfterConnectMs,
@@ -307,7 +312,20 @@ public sealed partial class CodexThreadStore
     {
         if (history.Events.Length >= MaximumItems || history.Events.Any(e => e.Id == item.Id))
             throw new InvalidOperationException("Realtime journal capacity or identity conflict.");
-        return ReplayRealtimeHistory(session, history.Mode, [.. history.Events, item]);
+        var next = ReplayRealtimeHistory(session, history.Mode, [.. history.Events, item]);
+        if (item.Kind is "observation" or "promotion") EnsureRealtimeClosureCapacity(next);
+        return next;
+    }
+
+    // Reserve one record per unsettled handoff and one seal when speech is pending.
+    // Older journals remain readable; never spend this reserve on new observations or
+    // presentation events. The separate serialized-document byte bound still applies.
+    internal static void EnsureRealtimeClosureCapacity(CodexStoredRealtimeHistory history)
+    {
+        var required = history.Handoffs.Count(h => h.State == "pending") +
+            (history.Frames.Any(f => f.Disposition == "pending") ? 1 : 0);
+        if (required > MaximumItems - history.Events.Length)
+            throw new InvalidOperationException("Realtime journal must retain capacity for handoff settlement and the final transcript seal.");
     }
 
     private static CodexStoredRealtimeHistory ReplayRealtimeHistory(CodexStoredRealtimeSession session,

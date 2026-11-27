@@ -174,6 +174,92 @@ public sealed class RealtimeHistoryTests
     }
 
     [Fact]
+    public async Task DirectCloseRecoveryRetainsFinalSpeechWithoutReplayingTheEndIntent()
+    {
+        var storage = new Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        thread = await store.CreateDirectRealtimeSessionAsync(thread.Id, thread.Revision, "session", "v3", "owner", Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        var operation = Guid.NewGuid();
+        var close = await store.BeginDirectRealtimeCloseAsync(thread.Id, thread.Revision, "session", "owner", attachment, operation, Ct);
+        Assert.True(close.Admitted);
+        thread = close.Thread;
+        Assert.True(Session(thread).DirectCloseDraining);
+        var delta = Event("""{"type":"input_transcript.added","item":{"text":"last "}}""");
+        storage.ThrowAfterCommit = true;
+        await Assert.ThrowsAsync<IOException>(() => store.RecordRealtimeObservationAsync(thread.Id, thread.Revision,
+            "session", "owner", attachment, "delta", delta, Ct));
+        var recovered = new CodexThreadStore(storage, "account");
+        thread = await recovered.ReadAsync(thread.Id, Ct);
+        thread = await recovered.RequireRealtimeHistoryRecoveryAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        Assert.True(Session(thread).DirectCloseDraining);
+        Assert.Equal(operation, Session(thread).EndOperationId);
+        var duplicate = await recovered.RecoverRealtimeObservationAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, "delta", delta, Ct);
+        Assert.False(duplicate.Admitted);
+        Assert.Equal(thread.Revision, duplicate.Thread.Revision);
+        var final = Event("""{"type":"turn.done","turn":{"role":"user","transcript":"last words"}}""");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => recovered.RecoverRealtimeObservationAsync(thread.Id, thread.Revision,
+            "session", "owner", Guid.NewGuid(), "final", final, Ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => recovered.ConfirmRealtimeHistoryRecoveryAsync(thread.Id, thread.Revision,
+            "session", "owner", false, Ct));
+        var retained = await recovered.RecoverRealtimeObservationAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, "final", final, Ct);
+        Assert.True(retained.Admitted);
+        thread = retained.Thread;
+        thread = await recovered.ConfirmRealtimeHistoryRecoveryAsync(thread.Id, thread.Revision, "session", "owner", true, Ct);
+        var ended = Session(thread);
+        Assert.Equal("ended", ended.State);
+        Assert.False(ended.DirectCloseDraining);
+        Assert.Equal(operation, ended.EndOperationId);
+        Assert.Equal("last words", Assert.Single(ended.History!.Frames).Text);
+        Assert.Single(ended.History.Carryover);
+        Assert.Empty(thread.Turns);
+    }
+
+    [Fact]
+    public async Task SealedEndRecoveryReconcilesExistingReceiptButCannotAppendNewSpeech()
+    {
+        var (_, store, thread, attachment) = await Setup();
+        var speech = Event("""{"type":"input_transcript.added","item":{"text":"saved"}}""");
+        thread = (await store.RecordRealtimeObservationAsync(thread.Id, thread.Revision, "session", "owner", attachment, "saved", speech, Ct)).Thread;
+        var end = Guid.NewGuid();
+        thread = (await store.BeginRealtimeEndAsync(thread.Id, thread.Revision, "session", "owner", attachment, end, Ct)).Thread;
+        thread = await store.RequireRealtimeHistoryRecoveryAsync(thread.Id, thread.Revision, "session", "owner", null, Ct);
+        Assert.False(Session(thread).DirectCloseDraining);
+        var duplicate = await store.RecoverRealtimeObservationAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, "saved", speech, Ct);
+        Assert.False(duplicate.Admitted);
+        Assert.Equal(thread.Revision, duplicate.Thread.Revision);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.RecoverRealtimeObservationAsync(thread.Id, thread.Revision,
+            "session", "owner", attachment, "new", speech, Ct));
+        var finished = await store.ConfirmRealtimeHistoryRecoveryAsync(thread.Id, thread.Revision, "session", "owner", true, Ct);
+        Assert.Single(Session(finished).History!.Carryover);
+        Assert.Equal("saved", Assert.Single(Session(finished).History!.Frames).Text);
+    }
+
+    [Fact]
+    public async Task EventBudgetReservesPendingHandoffSettlementAndTailSeal()
+    {
+        var (_, store, thread, attachment) = await Setup();
+        thread = await Observe(store, thread, attachment, "speech", """{"type":"input_transcript.added","item":{"text":"please"}}""");
+        thread = await Observe(store, thread, attachment, "handoff", """{"type":"delegation.created","item":{"id":"d","type":"delegation","target":"client","content":[{"type":"input_text","text":"please"}]}}""");
+        var history = Session(thread).History!;
+        // Test only the count boundary with a real projected history; do not manufacture
+        // a persisted journal with repeated observation identities.
+        CodexStoredRealtimeHistory AtCount(CodexStoredRealtimeHistory value, int count) =>
+            value with { Events = Enumerable.Repeat(value.Events[0], count).ToArray() };
+        CodexThreadStore.EnsureRealtimeClosureCapacity(AtCount(history, 32766));
+        Assert.Throws<InvalidOperationException>(() => CodexThreadStore.EnsureRealtimeClosureCapacity(AtCount(history, 32767)));
+        var retired = store.ResolveRealtimeHandoffHistory(thread, "session", "d", null);
+        var settled = Session(retired).History!;
+        CodexThreadStore.EnsureRealtimeClosureCapacity(AtCount(settled, 32767));
+        Assert.Throws<InvalidOperationException>(() => CodexThreadStore.EnsureRealtimeClosureCapacity(AtCount(settled, 32768)));
+    }
+
+    [Fact]
     public async Task PendingHandoffBlocksTailUntilAdmissionSettles()
     {
         var (_, store, thread, attachment) = await Setup();
