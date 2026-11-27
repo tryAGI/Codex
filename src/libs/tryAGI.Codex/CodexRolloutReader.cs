@@ -143,7 +143,7 @@ public static class CodexRolloutReader
         {
             return new(start, lineNumber, next, hasNewline, CodexRolloutLineStatus.InvalidUtf8, raw, null);
         }
-        if (string.IsNullOrWhiteSpace(StrictUtf8.GetString(raw)))
+        if (IsBlank(raw))
             return new(start, lineNumber, next, hasNewline, CodexRolloutLineStatus.Blank, raw, null);
 
         try
@@ -157,6 +157,18 @@ public static class CodexRolloutReader
             return new(start, lineNumber, next, hasNewline, CodexRolloutLineStatus.InvalidJson, raw, null);
         }
     }
+
+    private static bool IsBlank(ReadOnlySpan<byte> text)
+    {
+        // The entire line was UTF-8 validated; ordinary JSON needs no UTF-16 copy.
+        while (!text.IsEmpty)
+        {
+            if (Rune.DecodeFromUtf8(text, out var rune, out var consumed) != System.Buffers.OperationStatus.Done ||
+                !Rune.IsWhiteSpace(rune)) return false;
+            text = text[consumed..];
+        }
+        return true;
+    }
 }
 
 /// <summary>The exclusive inherited prefix reference in a Rust paginated rollout.</summary>
@@ -164,6 +176,18 @@ public static class CodexRolloutReader
 /// <param name="EndOrdinalExclusive">First ordinal excluded from the prefix.</param>
 /// <param name="EndByteOffset">Logical byte boundary of the prefix.</param>
 public sealed record CodexRolloutHistoryBase(Guid RolloutId, ulong EndOrdinalExclusive, ulong EndByteOffset);
+
+/// <summary>Immutable metadata and byte checkpoint for an already verified import prefix.</summary>
+/// <param name="ThreadId">Logical thread identity.</param>
+/// <param name="SessionId">Root session identity.</param>
+/// <param name="IsPaginated">Whether the rollout has paginated history.</param>
+/// <param name="HistoryBase">Optional external immutable prefix reference.</param>
+/// <param name="SubagentHistoryStartOrdinal">First ordinal belonging to the subagent.</param>
+/// <param name="LastOrdinal">Last verified durable ordinal.</param>
+/// <param name="Cursor">Continuation in the exact immutable source.</param>
+public sealed record CodexRolloutReplayCheckpoint(Guid ThreadId, Guid SessionId, bool IsPaginated,
+    CodexRolloutHistoryBase? HistoryBase, ulong? SubagentHistoryStartOrdinal,
+    ulong? LastOrdinal, CodexRolloutReadCursor Cursor);
 
 /// <summary>
 /// Validated header and ordinal fence for an immutable rollout import. This is not a payload
@@ -193,6 +217,40 @@ public sealed class CodexRolloutReplayFence
     public CodexRolloutReadCursor Cursor { get; private set; } = null!;
 
     private CodexRolloutReplayFence() { }
+
+    /// <summary>
+    /// Captures the validated prefix. The embedding host must store this atomically with its
+    /// imported history and retain the source revision. Capturing does not itself commit anything.
+    /// </summary>
+    public CodexRolloutReplayCheckpoint CaptureCheckpoint() =>
+        new(ThreadId, SessionId, IsPaginated, HistoryBase, SubagentHistoryStartOrdinal, LastOrdinal, Cursor);
+
+    /// <summary>
+    /// Restores an integrity-checked checkpoint retrieved from trusted host storage, not from a
+    /// client/model. The host verifies that its import and this checkpoint committed atomically
+    /// against the exact source revision before resuming. No previous source records are read.
+    /// </summary>
+    public static CodexRolloutReplayFence RestoreCheckpoint(CodexRolloutReplayCheckpoint checkpoint,
+        Guid expectedThreadId, string verifiedSourceRevision)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(verifiedSourceRevision);
+        if (expectedThreadId == Guid.Empty || checkpoint.ThreadId != expectedThreadId ||
+            checkpoint.SessionId == Guid.Empty || checkpoint.Cursor is null ||
+            checkpoint.Cursor.SourceRevision != verifiedSourceRevision ||
+            checkpoint.Cursor.ByteOffset <= 0 || checkpoint.Cursor.NextLineNumber < 2 ||
+            checkpoint.IsPaginated != checkpoint.LastOrdinal.HasValue ||
+            (!checkpoint.IsPaginated && checkpoint.HistoryBase is not null) ||
+            (checkpoint.HistoryBase is { } prefix &&
+                (prefix.RolloutId == Guid.Empty || checkpoint.LastOrdinal!.Value < prefix.EndOrdinalExclusive)))
+            throw new InvalidDataException("Invalid rollout checkpoint or source identity.");
+        return new()
+        {
+            ThreadId = checkpoint.ThreadId, SessionId = checkpoint.SessionId, IsPaginated = checkpoint.IsPaginated,
+            HistoryBase = checkpoint.HistoryBase, SubagentHistoryStartOrdinal = checkpoint.SubagentHistoryStartOrdinal,
+            LastOrdinal = checkpoint.LastOrdinal, Cursor = checkpoint.Cursor,
+        };
+    }
 
     /// <summary>
     /// Starts from the first nonblank source line. The caller must obtain it from the beginning

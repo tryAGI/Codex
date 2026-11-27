@@ -95,6 +95,26 @@ public sealed class CodexRolloutReaderTests
     }
 
     [Fact]
+    public async Task VerifiedCheckpointRestoresWithoutReprocessingThePrefix()
+    {
+        var body = Header(",\"history_mode\":\"paginated\"", ",\"ordinal\":0") + "\n" + Event(2) + "\n" + Event(4);
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(body));
+        var entries = await ScanAsync(stream);
+        var fence = CodexRolloutReplayFence.Begin(entries[0], Thread);
+        fence.Observe(entries[1]);
+        var checkpoint = fence.CaptureCheckpoint();
+        var restored = CodexRolloutReplayFence.RestoreCheckpoint(checkpoint, Thread, "rev");
+        Assert.Equal(checkpoint, restored.CaptureCheckpoint());
+        var resumed = Assert.Single(await ScanAsync(stream, cursor: restored.Cursor));
+        restored.Observe(resumed);
+        Assert.Equal(5UL, restored.NextOrdinalAtEnd());
+        Assert.Throws<InvalidDataException>(() => CodexRolloutReplayFence.RestoreCheckpoint(checkpoint, Thread, "changed"));
+        Assert.Throws<InvalidDataException>(() => CodexRolloutReplayFence.RestoreCheckpoint(checkpoint, Rollout, "rev"));
+        Assert.Throws<InvalidDataException>(() => CodexRolloutReplayFence.RestoreCheckpoint(
+            checkpoint with { LastOrdinal = null }, Thread, "rev"));
+    }
+
+    [Fact]
     public async Task FenceRefusesCorruptionWithoutAdvancingCheckpoint()
     {
         var body = Header(",\"history_mode\":\"paginated\"", ",\"ordinal\":0") + "\n{broken\n" + Event(1);
