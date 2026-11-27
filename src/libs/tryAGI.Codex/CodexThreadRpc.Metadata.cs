@@ -48,10 +48,7 @@ public sealed partial class CodexThreadRpc
         await admission.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (Volatile.Read(ref stopping)) throw new CodexThreadRpcException(-32010, "Native thread host is draining.");
-            // Do not invalidate the captured revision while a new turn is still being admitted.
-            if (active.TryGetValue(id, out var running) && !running.Started.Task.IsCompleted)
-                throw new CodexThreadConflictException();
+            CheckAttachmentAdmission(id);
             var before = await store.ReadAsync(id, ct).ConfigureAwait(false);
             updated = await store.SetNameAsync(id, before.Revision, name, ct).ConfigureAwait(false);
         }

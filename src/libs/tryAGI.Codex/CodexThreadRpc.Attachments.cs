@@ -71,6 +71,7 @@ public sealed partial class CodexThreadRpc
 
     private void CheckAttachmentAdmission(Guid id)
     {
+        RequireNoArchiveTransition(id);
         if (Volatile.Read(ref stopping)) throw new CodexThreadRpcException(-32010, "Native thread host is draining.");
         if (active.TryGetValue(id, out var running) && !running.Started.Task.IsCompleted)
             throw new CodexThreadConflictException();
