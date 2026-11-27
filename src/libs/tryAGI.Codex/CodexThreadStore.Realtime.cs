@@ -68,6 +68,11 @@ public sealed record CodexStoredRealtimeSession(
     /// Recovery may reconcile retained observations from the last attachment, never replay the close.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool DirectCloseDraining { get; init; }
+
+    /// <summary>Reserve document bytes for closing this logical session without losing committed speech.
+    /// Older journals can still be read and closed without retroactive enrollment.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ClosureByteReserve { get; init; }
 }
 
 public sealed partial class CodexThreadStore
@@ -104,6 +109,7 @@ public sealed partial class CodexThreadStore
                 {
                     TransportKind = kind, StartedRevision = checked(document.Revision + 1),
                     CanonicalLegacySegments = protocol is "v1" or "v2",
+                    ClosureByteReserve = true,
                 }] };
         }, ct);
 
@@ -125,6 +131,7 @@ public sealed partial class CodexThreadStore
             document = ReplaceRealtimeSession(document, session with
             {
                 State = "attached", AttachmentId = attachmentId, UsedAttachmentIds = [.. used, attachmentId],
+                ClosureByteReserve = true,
             });
             return document.Turns.LastOrDefault() is { Status: "inProgress" } turn
                 ? BindRealtimePresentation(document, turn.Id, sessionId) : document;

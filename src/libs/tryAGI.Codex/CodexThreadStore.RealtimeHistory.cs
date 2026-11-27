@@ -153,6 +153,7 @@ public sealed partial class CodexThreadStore
         var next = ReplaceRealtimeSession(before, session with
         {
             History = AppendRealtimeHistory(session, history, item),
+            ClosureByteReserve = session.ClosureByteReserve || !recovery,
         });
         return new(true, await PublishAsync(before.Revision, next with
         {
@@ -326,6 +327,73 @@ public sealed partial class CodexThreadStore
             (history.Frames.Any(f => f.Disposition == "pending") ? 1 : 0);
         if (required > MaximumItems - history.Events.Length)
             throw new InvalidOperationException("Realtime journal must retain capacity for handoff settlement and the final transcript seal.");
+    }
+
+    // The reserve follows the open logical session, not the transport. Ordinary
+    // reasoning/settings writes must not consume space promised to its closing journal.
+    // Use a cheap conservative UTF-16-to-escaped-JSON bound first, and count actual
+    // serialized closing records only near the document limit.
+    internal static void EnsureRealtimeClosureByteCapacity(CodexThreadDocument document, int encodedBytes)
+    {
+        var session = document.RealtimeSessions?.LastOrDefault();
+        if (session is not { ClosureByteReserve: true } || session.State == "ended") return;
+        var lifecycle = session.State == "ending" ? 384L :
+            session.State == "recoveryRequired" ? session.EndOperationId is not null && !session.DirectCloseDraining ? 256L : 512L : 1024L;
+        var remaining = (long)MaximumDocumentBytes - encodedBytes;
+        var history = session.History;
+        if (history is null)
+        {
+            RequireRoom(lifecycle);
+            return;
+        }
+
+        var pending = history.Frames.Where(f => f.Disposition == "pending").ToArray();
+        var unsettled = history.Handoffs.Where(h => h.State == "pending").ToArray();
+        var save = history.Mode != CodexRealtimeHistoryMode.LegacyNoFlush;
+        // Lifecycle changes include end intent, recovery state, revision, timestamp and
+        // the final closed revision. Each settlement adds one event and grows its state
+        // string by one byte. XML escaping can expand an ampersand to ten JSON bytes.
+        var approximate = lifecycle + unsettled.Sum(h => 1024L + 6L * h.HandoffId.Length);
+        if (pending.Length != 0)
+        {
+            approximate += 1024L + pending.Length * 4L;
+            if (save)
+                approximate += 2048L + 6L * session.SessionId.Length +
+                    pending.Sum(f => 12L * (f.Role.Length + f.Text.Length + 3L) + 6L * f.Id.Length + 4L);
+        }
+        if (approximate <= remaining) return;
+
+        long required = lifecycle;
+        foreach (var handoff in unsettled)
+        {
+            var rejected = new CodexStoredRealtimeHistoryEvent("handoff:" + new string('f', 32),
+                "rejected", long.MaxValue, int.MaxValue, Reason: "attachmentRetired",
+                HandoffId: handoff.HandoffId, CommitRevision: long.MaxValue);
+            required += JsonSerializer.SerializeToUtf8Bytes(rejected, CodexThreadJson.Default.CodexStoredRealtimeHistoryEvent).Length + 2L;
+        }
+        if (pending.Length != 0)
+        {
+            // End operation IDs are longer than the recovery-end revision identity.
+            var sealId = "end:" + new string('f', 32);
+            var seal = new CodexStoredRealtimeHistoryEvent(sealId, "seal", long.MaxValue, int.MaxValue,
+                Reason: "sessionEnd", CommitRevision: long.MaxValue);
+            required += JsonSerializer.SerializeToUtf8Bytes(seal, CodexThreadJson.Default.CodexStoredRealtimeHistoryEvent).Length + 1L;
+            if (save)
+            {
+                var carryover = new CodexStoredRealtimeCarryover(sealId, session.SessionId, int.MaxValue,
+                    "sessionEnd", pending.Select(f => f.Id).ToArray(),
+                    CarryoverInput(pending, "sessionEnd", history.Mode == CodexRealtimeHistoryMode.Canonical || session.Protocol == "v3"));
+                required += JsonSerializer.SerializeToUtf8Bytes(carryover, CodexThreadJson.Default.CodexStoredRealtimeCarryover).Length + 1L;
+            }
+            else required += pending.Length * 3L; // "legacyOnly" is longer than "pending".
+        }
+        RequireRoom(required);
+
+        void RequireRoom(long bytes)
+        {
+            if (bytes > remaining)
+                throw new InvalidOperationException("Native thread journal must retain document capacity for realtime closure and transcript carryover.");
+        }
     }
 
     private static CodexStoredRealtimeHistory ReplayRealtimeHistory(CodexStoredRealtimeSession session,

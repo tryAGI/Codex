@@ -271,7 +271,7 @@ public sealed partial class CodexThreadStore
         // Archive is a durable execution fence, including writers entering through other hosts.
         if (value.ArchivedAt is not null) RequireSettledArchiveWriter(value);
         // Round-trip validation produces an owned copy before handing bytes to storage.
-        var body = Encode(value); var next = Decode(body);
+        var body = Encode(value, reserveRealtimeClosure: true); var next = Decode(body);
         if (value.Settings.TryGetProperty("ephemeral", out var transient) && transient.ValueKind == JsonValueKind.True)
         {
             ct.ThrowIfCancellationRequested();
@@ -292,10 +292,13 @@ public sealed partial class CodexThreadStore
         return next;
     }
     /// <summary>Serializes a thread document, enforcing <see cref="MaximumDocumentBytes"/>.</summary>
-    public static JsonElement Encode(CodexThreadDocument value)
+    public static JsonElement Encode(CodexThreadDocument value) => Encode(value, reserveRealtimeClosure: false);
+
+    private static JsonElement Encode(CodexThreadDocument value, bool reserveRealtimeClosure)
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value, CodexThreadJson.Default.CodexThreadDocument);
         if (bytes.Length > MaximumDocumentBytes) throw new InvalidDataException("Native thread journal is full; source must be archived before continuing.");
+        if (reserveRealtimeClosure) EnsureRealtimeClosureByteCapacity(value, bytes.Length);
         using var parsed = JsonDocument.Parse(bytes); return parsed.RootElement.Clone();
     }
     /// <summary>Parses and validates a stored document without writing it.</summary>
