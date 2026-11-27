@@ -235,7 +235,7 @@ public sealed partial class CodexThreadStore
         return await PublishAsync(null, source with { Id = destinationId, Revision = 1, CreatedAt = now, UpdatedAt = now,
             ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected, RealtimeSessions = null, ArchivedAt = null,
             InheritedRealtimeCarryover = ForkRealtimeCarryover(source, count, cutoff is null), CompactionCheckpoint = null,
-            ReadReceipt = null, QueuedSubmissions = null,
+            ReadReceipt = null, QueuedSubmissions = null, Goal = ForkGoal(source, effectiveSettings ?? source.Settings),
             Attachments = ForkAttachments(source, effectiveSettings ?? source.Settings, now),
             Settings = effectiveSettings?.Clone() ?? source.Settings }, cancellationToken).ConfigureAwait(false);
     }
@@ -318,6 +318,7 @@ public sealed partial class CodexThreadStore
             throw new InvalidDataException("Native thread identity, revision or history is invalid.");
         ValidateReadReceipt(value.ReadReceipt);
         ValidateQueue(value);
+        ValidateGoal(value.Goal);
         ValidateAttachments(value.Attachments);
         ValidateRealtimeSessions(value.RealtimeSessions);
         ValidateRealtimeHistoryProjection(value);

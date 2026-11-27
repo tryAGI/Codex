@@ -68,6 +68,7 @@ public sealed partial class CodexThreadRpc(
     public static bool Handles(string method) => method is "thread/start" or "thread/resume" or "thread/fork"
         or "thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list" or "thread/items/read" or "thread/name/set" or "thread/metadata/update" or "thread/archive" or "thread/unarchive" or "thread/delete" or "thread/readState/update"
         or "thread/queue/add" or "thread/queue/list" or "thread/queue/update" or "thread/queue/delete" or "thread/queue/reorder" or "thread/queue/start"
+        or "thread/goal/set" or "thread/goal/get" or "thread/goal/clear"
         or "thread/attachment/add" or "thread/attachment/list" or "thread/attachment/remove" or "thread/attachmentOwner/list"
         or "turn/start" or "turn/steer" or "turn/interrupt" or "turn/settings/update"
         or "thread/realtime/start" or "thread/realtime/stop" or "thread/realtime/list" or "thread/realtime/listVoices"
@@ -106,6 +107,7 @@ public sealed partial class CodexThreadRpc(
                 "thread/readState/update" => await UpdateReadStateAsync(p, ct).ConfigureAwait(false),
                 "thread/queue/add" or "thread/queue/list" or "thread/queue/update" or "thread/queue/delete" or "thread/queue/reorder" or "thread/queue/start"
                     => await QueueAsync(method, p, ct).ConfigureAwait(false),
+                "thread/goal/set" or "thread/goal/get" or "thread/goal/clear" => await GoalAsync(method, p, ct).ConfigureAwait(false),
                 "thread/attachment/add" => await AddAttachmentAsync(p, ct).ConfigureAwait(false),
                 "thread/attachment/list" => await ListAttachmentsAsync(p, ct).ConfigureAwait(false),
                 "thread/attachment/remove" => await RemoveAttachmentAsync(p, ct).ConfigureAwait(false),

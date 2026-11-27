@@ -64,7 +64,7 @@ public sealed partial class CodexThreadStore
         var visible = turn.Status switch
         {
             "failed" => true,
-            "completed" => !string.IsNullOrWhiteSpace(finalText)
+            "completed" => thread.Goal?.Status != "active" && !string.IsNullOrWhiteSpace(finalText)
                 && !finalText.Contains("<decision>DONT_NOTIFY</decision>", StringComparison.Ordinal),
             "interrupted" => finalText is not null,
             _ => false
