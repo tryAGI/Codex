@@ -11,12 +11,35 @@ namespace tryAGI.Codex.Tests;
 // A bounded synthetic Responses source. Rust uses HTTP on isolated loopback;
 // managed Codex uses an injected handler with the identical event generator.
 // Neither path receives real credentials or reaches a real provider.
+internal enum RustSyntheticTurnMode { Text, Interrupt, Tool }
+
 internal sealed class RustSyntheticTurnProvider : IAsyncDisposable
 {
     internal const string FirstPrompt = "Synthetic parity prompt one.";
     internal const string SecondPrompt = "Synthetic parity prompt two.";
     internal const string FirstAnswer = "Synthetic parity answer one.";
     internal const string SecondAnswer = "Synthetic parity answer two.";
+    internal const string ToolName = "parity_lookup";
+    internal const string ToolCallId = "synthetic-tool-call";
+    internal const string ToolResultText = "synthetic-tool-result";
+    internal const string ToolArguments = """{"key":"synthetic"}""";
+    private const string ToolSchema = """{"type":"object","properties":{"key":{"type":"string"}},"required":["key"],"additionalProperties":false}""";
+    internal RustSyntheticTurnMode Mode { get; }
+    internal TaskCompletionSource NativeBlocked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal TaskCompletionSource RustBlocked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal TaskCompletionSource NativeCancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal TaskCompletionSource ReleaseRust { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal ConcurrentQueue<CodexToolCall> NativeToolCalls { get; } = new();
+    internal ConcurrentQueue<JsonElement> RustToolCalls { get; } = new();
+    internal IReadOnlyList<JsonElement> NativeTools => Mode == RustSyntheticTurnMode.Tool
+        ? [RustThreadModelDifferentialFixture.Json($$"""{"type":"function","name":"{{ToolName}}","description":"Synthetic read-only tool","parameters":{{ToolSchema}},"strict":false}""")]
+        : [];
+    internal JsonArray RustTools => new(new JsonObject
+    {
+        ["name"] = ToolName, ["description"] = "Synthetic read-only tool",
+        ["inputSchema"] = JsonNode.Parse(ToolSchema),
+    });
+
     private readonly HttpListener listener = new();
     private readonly CancellationTokenSource lifetime = new();
     private readonly Task serving;
@@ -27,8 +50,9 @@ internal sealed class RustSyntheticTurnProvider : IAsyncDisposable
     internal ConcurrentQueue<string> Rejections { get; } = new();
     internal string BaseUrl { get; }
 
-    internal RustSyntheticTurnProvider()
+    internal RustSyntheticTurnProvider(RustSyntheticTurnMode mode = RustSyntheticTurnMode.Text)
     {
+        Mode = mode;
         using var reservation = new TcpListener(IPAddress.Loopback, 0);
         reservation.Start();
         var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
@@ -39,7 +63,7 @@ internal sealed class RustSyntheticTurnProvider : IAsyncDisposable
         serving = ServeAsync();
     }
 
-    private static string Events(int index)
+    private string Events(int index)
     {
         var id = $"synthetic-response-{index}";
         var item = new JsonObject
@@ -51,6 +75,13 @@ internal sealed class RustSyntheticTurnProvider : IAsyncDisposable
                 ["type"] = "output_text", ["text"] = index == 1 ? FirstAnswer : SecondAnswer,
             }),
         };
+        if (Mode == RustSyntheticTurnMode.Tool && index == 1)
+            item = new JsonObject
+            {
+                ["type"] = "function_call", ["id"] = "synthetic-tool-item",
+                ["call_id"] = ToolCallId, ["name"] = ToolName, ["arguments"] = ToolArguments,
+                ["status"] = "completed",
+            };
         var events = new[]
         {
             new JsonObject { ["type"] = "response.created", ["response"] = new JsonObject { ["id"] = id } },
@@ -112,6 +143,19 @@ internal sealed class RustSyntheticTurnProvider : IAsyncDisposable
                     if (request.Length > 2_000_000)
                         throw new InvalidDataException("Unexpected synthetic request size.");
                     RustRequests.Enqueue(RustThreadModelDifferentialFixture.Json(request));
+                    if (Mode == RustSyntheticTurnMode.Interrupt && index == 1)
+                    {
+                        context.Response.StatusCode = 200;
+                        context.Response.ContentType = "text/event-stream";
+                        context.Response.SendChunked = true;
+                        var prefix = Encoding.UTF8.GetBytes(
+                            "data: {\"type\":\"response.created\",\"response\":{\"id\":\"synthetic-interrupt\"}}\n\n");
+                        await context.Response.OutputStream.WriteAsync(prefix, lifetime.Token);
+                        await context.Response.OutputStream.FlushAsync(lifetime.Token);
+                        RustBlocked.TrySetResult();
+                        await ReleaseRust.Task.WaitAsync(lifetime.Token);
+                        continue;
+                    }
                     var bytes = Encoding.UTF8.GetBytes(Events(index));
                     context.Response.StatusCode = 200;
                     context.Response.ContentType = "text/event-stream";
@@ -136,9 +180,20 @@ internal sealed class RustSyntheticTurnProvider : IAsyncDisposable
             Assert.InRange(index, 1, 2);
             var content = request.Content ?? throw new InvalidDataException("Missing synthetic request body.");
             owner.NativeRequests.Enqueue(RustThreadModelDifferentialFixture.Json(await content.ReadAsStringAsync(ct)));
+            if (owner.Mode == RustSyntheticTurnMode.Interrupt && index == 1)
+            {
+                owner.NativeBlocked.TrySetResult();
+                try { await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct); }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    owner.NativeCancelled.TrySetResult();
+                    throw;
+                }
+                throw new InvalidOperationException("The blocked provider must be interrupted.");
+            }
             return new(HttpStatusCode.OK)
             {
-                Content = new StringContent(Events(index), Encoding.UTF8, "text/event-stream"),
+                Content = new StringContent(owner.Events(index), Encoding.UTF8, "text/event-stream"),
             };
         }
     }
@@ -175,10 +230,37 @@ internal sealed class RustSyntheticTurnProvider : IAsyncDisposable
                 handler: new NativeHandler(this), usageObserver: observer));
         return (await agent.RunAsync(run.Thread.Id, run.Thread.Revision, run.TurnId, run.OwnerId,
             run.Options, run.Input,
-            (_, _) => throw new InvalidOperationException("Synthetic text fixture does not admit tools."),
-            maximumRequests: 1, turnStarted: (document, _) => started(document),
+            (call, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                if (Mode != RustSyntheticTurnMode.Tool || call.Kind != CodexToolCallKind.Function ||
+                    call.Name != ToolName || call.Id != ToolCallId ||
+                    !JsonElement.DeepEquals(RustThreadModelDifferentialFixture.Json(call.Input),
+                        RustThreadModelDifferentialFixture.Json(ToolArguments)))
+                    throw new InvalidOperationException("Unexpected synthetic tool invocation.");
+                NativeToolCalls.Enqueue(call);
+                Assert.Single(NativeToolCalls);
+                return Task.FromResult(new CodexToolOutput(ToolResultText));
+            },
+            maximumRequests: Mode == RustSyntheticTurnMode.Tool ? 2 : 1, turnStarted: (document, _) => started(document),
             cancellationToken: ct, control: run.Control, validatedItem: run.ValidatedItem,
             observeAsync: run.ObserveProvider)).Thread;
+    }
+
+    internal ValueTask<JsonElement> HandleRustToolAsync(CodexAppServerRequest request, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (Mode != RustSyntheticTurnMode.Tool || request.Method != "item/tool/call" ||
+            request.Params is not { } p)
+            throw new InvalidOperationException("Unexpected Rust server request.");
+        Assert.Equal(ToolCallId, p.GetProperty("callId").GetString());
+        Assert.Equal(ToolName, p.GetProperty("tool").GetString());
+        Assert.True(JsonElement.DeepEquals(RustThreadModelDifferentialFixture.Json(ToolArguments), p.GetProperty("arguments")));
+        RustToolCalls.Enqueue(p.Clone());
+        Assert.Single(RustToolCalls);
+        return ValueTask.FromResult(RustThreadModelDifferentialFixture.Json(
+            new JsonObject { ["success"] = true, ["contentItems"] = new JsonArray(
+                new JsonObject { ["type"] = "inputText", ["text"] = ToolResultText }) }.ToJsonString()));
     }
 
     public async ValueTask DisposeAsync()
@@ -195,7 +277,7 @@ public sealed class RustTurnLifecycleDifferentialTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static JsonObject Input(string threadId, string prompt) => new()
+    internal static JsonObject Input(string threadId, string prompt) => new()
     {
         ["threadId"] = threadId,
         ["input"] = new JsonArray(new JsonObject
@@ -204,14 +286,14 @@ public sealed class RustTurnLifecycleDifferentialTests
         }),
     };
 
-    private static string TurnId(JsonElement result) =>
+    internal static string TurnId(JsonElement result) =>
         result.GetProperty("turn").GetProperty("id").GetString()
         ?? throw new InvalidDataException("Missing turn identity.");
 
     private static bool IsThread(JsonElement payload, string threadId) =>
         payload.TryGetProperty("threadId", out var id) && id.GetString() == threadId;
 
-    private static bool IsTerminal(string method, JsonElement payload, string threadId, string turnId) =>
+    internal static bool IsTerminal(string method, JsonElement payload, string threadId, string turnId) =>
         method == "turn/completed" && IsThread(payload, threadId) && TurnId(payload) == turnId;
 
     private static void AssertLifecycle(IReadOnlyList<(string Method, JsonElement Payload)> events,
@@ -235,7 +317,7 @@ public sealed class RustTurnLifecycleDifferentialTests
         Assert.True(Array.IndexOf(relevant, message) < Array.IndexOf(relevant, terminal));
     }
 
-    private static async Task RunPairAsync(RustThreadModelDifferentialFixture f, (string Native, string Rust) ids,
+    internal static async Task RunPairAsync(RustThreadModelDifferentialFixture f, (string Native, string Rust) ids,
         string prompt, string answer)
     {
         var native = await f.CallNative("turn/start", Input(ids.Native, prompt)).WaitAsync(TimeSpan.FromSeconds(25), Ct);

@@ -98,7 +98,7 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
         codexHome = root.CreateSubdirectory("codex-home").FullName;
     }
 
-    internal static async Task<RustThreadModelDifferentialFixture> CreateAsync(bool enableSyntheticTurns = false)
+    internal static async Task<RustThreadModelDifferentialFixture> CreateAsync(bool enableSyntheticTurns = false, RustSyntheticTurnMode mode = RustSyntheticTurnMode.Text)
     {
         Assert.SkipUnless(Environment.GetEnvironmentVariable("CODEX_RUST_DIFFERENTIAL") == "1",
             "Use the explicit isolated Rust differential runner.");
@@ -119,7 +119,7 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
         var f = new RustThreadModelDifferentialFixture(root, executable);
         try
         {
-            if (enableSyntheticTurns) f.SyntheticTurns = new RustSyntheticTurnProvider();
+            if (enableSyntheticTurns) f.SyntheticTurns = new RustSyntheticTurnProvider(mode);
             var providerSelection = f.SyntheticTurns is null ? "" : "model_provider = \"mock_provider\"";
             var providerConfig = f.SyntheticTurns is not { } provider ? "" : $"""
                 [model_providers.mock_provider]
@@ -179,12 +179,14 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
             {
                 NativeNotifications.Enqueue((method, value.Clone()));
                 return Task.CompletedTask;
-            });
+            }, tools: SyntheticTurns?.NativeTools);
         rust = await CodexAppServerClient.ConnectAsync(new CodexAppServerOptions
         {
             ExecutablePath = executable, WorkingDirectory = rustRoot, CodexHome = codexHome,
             ClientName = "tryagi_differential", ExperimentalApi = true,
             InitializeTimeout = TimeSpan.FromSeconds(40), MaxOverloadRetries = 0,
+            ServerRequestHandler = SyntheticTurns is { Mode: RustSyntheticTurnMode.Tool } toolProvider
+                ? toolProvider.HandleRustToolAsync : null,
         }, Ct);
     }
 
@@ -193,8 +195,9 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
         var nativeResult = await Native.InvokeAsync("thread/start", Json("{}"), ct: Ct);
         // Native currently projects paginated history but does not accept the
         // Rust historyMode parameter. This scenario compares behavior only.
-        var rustResult = await Rust.RequestAsync("thread/start", new JsonObject
-            { ["model"] = Recommended, ["historyMode"] = "paginated" }, Ct)
+        var parameters = new JsonObject { ["model"] = Recommended, ["historyMode"] = "paginated" };
+        if (SyntheticTurns is { Mode: RustSyntheticTurnMode.Tool } provider) parameters["dynamicTools"] = provider.RustTools;
+        var rustResult = await Rust.RequestAsync("thread/start", parameters, Ct)
             .WaitAsync(TimeSpan.FromSeconds(30), Ct);
         return (Id(nativeResult), Id(rustResult));
     }

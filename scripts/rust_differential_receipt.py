@@ -20,7 +20,9 @@ SCOPES = {"filesystem": ("RustFileSystemDifferentialTests", 5),
           "thread-lifecycle": ("RustThreadLifecycleDifferentialTests", 2),
           "model-catalog": ("RustModelCatalogDifferentialTests", 1),
           "turn-lifecycle": ("RustTurnLifecycleDifferentialTests", 1),
-          "provider-model-catalog": ("RustProviderModelDifferentialTests", 1)}
+          "provider-model-catalog": ("RustProviderModelDifferentialTests", 1),
+          "turn-interruption": ("RustTurnInterruptionDifferentialTests", 1),
+          "tool-continuation": ("RustToolContinuationDifferentialTests", 1)}
 
 
 def sha(path):

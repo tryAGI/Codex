@@ -5,7 +5,7 @@ on:
       scope:
         description: Independent differential suite
         type: choice
-        options: [filesystem, thread-lifecycle, model-catalog, turn-lifecycle, provider-model-catalog]
+        options: [filesystem, thread-lifecycle, model-catalog, turn-lifecycle, provider-model-catalog, turn-interruption, tool-continuation]
         default: filesystem
 
 permissions:
