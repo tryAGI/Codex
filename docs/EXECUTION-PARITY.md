@@ -19,7 +19,7 @@ All paths in the Rust column are relative to `codex-rs` at the pinned revision.
 | `app-server-protocol/src/protocol/v2/process.rs`; `app-server/tests/suite/v2/process_exec.rs` (spawn returns before exit, drain timeout, handle release, cap flags, kill) | `CodexProcessExecution` implements separate process/spawn, writeStdin, resizePty, kill, outputDelta and exited using an explicit contained host adapter and transport response barrier. | Managed lifecycle tests in `CodexProcessExecutionTests`; #101, real adapter pending #104 |
 | `exec`, `exec-server` including process_sandbox_tests, sandbox_integrity, regular_file_tests, no_follow | SDK adapter boundary only; transport, real PTY, process containment and drain semantics still need separate acceptance. | #78, #81, #104 |
 | `app-server-protocol/src/protocol/v2/fs.rs`; `app-server/tests/suite/v2/fs.rs` | Existing `CodexFileSystem`, `CodexFileSystemNative`, `CodexFileSystemWatches`, `CodexFileSystemTests`, `CodexFileSystemWatchTests`. | Existing code mapped, not independently certified here; #79 |
-| `file-system`, `file-watcher/src/file_watcher_tests.rs`, exec-server no_follow and fs_sandbox_windows_tests | Preserve fs/watch behavior; authorization before path-based I/O is not proof of race-free rooted enforcement. | #103 |
+| `file-system`, `file-watcher/src/file_watcher_tests.rs`, exec-server no_follow and fs_sandbox_windows_tests | Opt-in `CodexMacOsRootedFileSystem` uses a pinned root descriptor and kernel O_NOFOLLOW_ANY for readFile/getMetadata/readDirectory, and rejects all mutations. Existing path-based host is unchanged and is not an enforcement fallback. General rooted mutation, recursive/watch and platform coverage remain open. | #103, #144 |
 | `file-search/src/lib.rs`, `snapshot.rs`, `matcher_tests.rs`; `app-server/tests/suite/fuzzy_file_search.rs` | `CodexFileSearch` implements one-shot search and connection-scoped sessions, cancellation and top-50 notifications; `CodexStableDirectoryFileSearchSource` uses a host-protected rooted traversal. Exact Nucleo scores and ignore/snapshot behavior remain separate. | #102, #136, #137 |
 | `apply-patch/src/lib.rs`, `apply-patch/src/file_update_tests.rs`, `apply-patch/tests/suite`; command_exec apply_patch line endings test | Existing `CodexPatch`, `CodexPatchUpdate`, `CodexWorkspacePatch`, `CodexWorkspacePatchTransport` and related tests; preconditions and plan digest already represented. | Preserve; differential coverage and authorization integration pending #79, #80 |
 | `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. Compiled enforcement, scoped grants, legacy routing and actual dispatch remain separate. | #80, #111–#113; coordinate #64 |
@@ -229,3 +229,37 @@ Storage round-trips through source-generated metadata in the CAS test adapter; t
 certify real host persistence, actual reviewer execution or live delivery. Strict-review
 dispatch fencing, warning notifications and uncertain-publication reconciliation remain #142;
 review runner and real history integration remain #129/#130/#113.
+
+## Descriptor-relative rooted reads (#103)
+
+`CodexMacOsRootedFileSystem` is an opt-in macOS arm64 (12+) read-only RPC capability.
+The host chooses and authorizes the absolute root, pins its directory descriptor, and
+authorizes each disclosure. The root name is checked against the pinned device/inode
+before admission; caller paths are resolved relative to the anchor in one openat with
+Darwin O_NOFOLLOW_ANY, without a separate path-based reopen. Intermediate and final
+symlinks are refused. Opened file/metadata are obtained from the descriptor with fstat;
+listing uses fdopendir/readdir and single-component fstatat with AT_SYMLINK_NOFOLLOW.
+Cross-device objects, special nodes and regular files with multiple hard links are refused
+or omitted from listings. O_NONBLOCK prevents waiting on FIFO opens. Read bytes and
+listing entries are bounded. All known fs/* methods are claimed; unsupported mutations,
+recursive operations and watches fail closed instead of falling back to the path handler.
+
+The host must still protect the chosen root identity during acquisition, exclude untrusted
+devices/mount/alias topology and authorize the pinned object semantics. This does not
+certify continuous namespace containment after arbitrary renames or concurrent creation
+of hard links. The ordinary CodexFileSystem implementation remains unchanged; hosts
+must explicitly select the rooted capability for that authorization scope. Darwin
+arm64 is the only validated ABI. Rooted mutations, atomic replacement, recursive
+copy/remove and watch registration remain #144; cross-platform and full parity remain #103.
+
+Actual macOS arm64 / .NET 10 validation: 9 focused rooted filesystem tests passed,
+0 failed, 1 unsupported-platform test skipped. Combined filesystem/watch/search/rooted
+suite: 45 passed, 0 failed, 1 skipped. Admitted build receipt
+native-20261127-2b65db79d42840a2bb9116c19ce68bb4. The original durable run
+codex-65-rooted-fs-tests-20261127-01 survived worker reconnect and passed after 212s
+in CPU admission. Tests cover exact binary reads, descriptor metadata/listing, an
+intermediate symlink substituted during authorization, replaced root inode, leaf/internal
+symlink rejection, existing external hard links, nonblocking FIFO rejection, authorization,
+bounds, foreign connections and disposal. The separate actual descriptor ABI probe
+codex-65-rooted-dirent-probe-20261127-01 confirmed Darwin directory/regular/symlink kinds.
+No general mutable-root or mutation enforcement claim is made.
