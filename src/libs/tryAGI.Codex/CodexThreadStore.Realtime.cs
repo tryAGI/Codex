@@ -27,6 +27,9 @@ public sealed record CodexStoredRealtimeSession(
 
     /// <summary>Durable speech frames, observation identities and backing reasoning carryover.</summary>
     public CodexStoredRealtimeHistory? History { get; init; }
+
+    /// <summary>Durable start-or-steer receipts. A receipt never grants permission to replay provider dispatch.</summary>
+    public CodexStoredRealtimeHandoffAdmission[]? HandoffAdmissions { get; init; }
 }
 
 public sealed partial class CodexThreadStore
@@ -179,6 +182,7 @@ public sealed partial class CodexThreadStore
                 session.EndOperationId == Guid.Empty || (session.State == "ending" && session.EndOperationId is null) ||
                 (session.State is "attached" or "detached") && session.EndOperationId is not null)
                 throw new InvalidDataException("Invalid realtime session journal.");
+            ValidateRealtimeHandoffAdmissions(session);
             open = session.State != "ended";
         }
     }
