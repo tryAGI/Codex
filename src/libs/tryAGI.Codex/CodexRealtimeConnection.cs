@@ -206,7 +206,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                     }
                     finally { writeGate.Release(); }
                 }
-                yield return new(type, payload, Stopwatch.GetElapsedTime(connectedAt).TotalMilliseconds);
+                yield return new(type, payload, Stopwatch.GetElapsedTime(connectedAt).TotalMilliseconds) { Protocol = protocol };
             }
         }
         finally { Interlocked.Exchange(ref reading, 0); }

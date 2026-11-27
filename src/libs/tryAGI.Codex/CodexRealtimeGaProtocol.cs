@@ -94,30 +94,46 @@ internal static class CodexRealtimeGaProtocol
     { ["type"] = "function_call_output", ["call_id"] = callId, ["output"] = output } };
     public static CodexRealtimeAudio? ReadAudio(JsonElement payload)
     {
-        if (CodexRealtimeProtocol.Text(payload, "type") != "response.output_audio.delta") return null;
-        if (CodexRealtimeProtocol.Text(payload, "delta") is not { Length: > 0 and <= 349528 } encoded)
-            throw new CodexProtocolException("GA output audio missing or exceeded the bounded frame size.");
+        var type = CodexRealtimeProtocol.Text(payload, "type");
+        if (type is not ("response.output_audio.delta" or "response.audio.delta" or "conversation.output_audio.delta")) return null;
+        var v1 = type == "conversation.output_audio.delta";
+        var sampleRate = CodexRealtimeEventProjections.Unsigned(payload, "sample_rate");
+        var channels = CodexRealtimeEventProjections.Unsigned(payload, "channels") ?? CodexRealtimeEventProjections.Unsigned(payload, "num_channels");
+        if (v1 && (sampleRate is null or 0 or > int.MaxValue || channels is null or 0 or > ushort.MaxValue)) return null;
+        var rate = sampleRate is > 0 and <= int.MaxValue ? (int)sampleRate.Value : 24000;
+        var count = channels is > 0 and <= ushort.MaxValue ? (int)channels.Value : 1;
+        var data = CodexRealtimeProtocol.Text(payload, "delta") ?? (v1 ? CodexRealtimeProtocol.Text(payload, "data") : null);
+        if (data is not { Length: > 0 and <= 349528 } encoded)
+            throw new CodexProtocolException("Legacy output audio missing or exceeded the bounded frame size.");
         byte[] bytes;
         try { bytes = Convert.FromBase64String(encoded); }
         catch (FormatException) { throw new CodexProtocolException("GA output audio is invalid base64."); }
         if (bytes.Length is <= 0 or > 262144 || bytes.Length % 2 != 0)
             throw new CodexProtocolException("GA output audio is invalid PCM16.");
-        return new(bytes, ItemId: CodexRealtimeProtocol.Text(payload, "item_id"));
+        return new(bytes, rate, count, v1 ? null : CodexRealtimeProtocol.Text(payload, "item_id"))
+        {
+            SamplesPerChannel = CodexRealtimeEventProjections.Unsigned(payload, "samples_per_channel"),
+        };
     }
     public static CodexRealtimeTranscript? ReadTranscript(JsonElement payload)
     {
         var type = CodexRealtimeProtocol.Text(payload, "type");
-        if (type is "response.output_audio_transcript.delta" or "response.output_text.delta")
-            return new("assistant", CodexRealtimeProtocol.Text(payload, "delta") ?? "", false);
+        if (type is "response.output_audio_transcript.delta" or "response.output_text.delta" or "conversation.output_transcript.delta")
+            return CodexRealtimeProtocol.Text(payload, "delta") is { } output ? new("assistant", output, false) : null;
+        if (type is "conversation.input_transcript.delta" or "conversation.item.input_audio_transcription.delta")
+            return CodexRealtimeProtocol.Text(payload, "delta") is { } input ? new("user", input, false)
+            {
+                InputFragmentId = CodexRealtimeProtocol.Text(payload, "item_id"),
+            } : null;
         if (type is "response.output_audio_transcript.done" or "response.output_text.done")
         {
             var final = CodexRealtimeProtocol.Text(payload, "transcript") ?? CodexRealtimeProtocol.Text(payload, "text");
             return new("assistant", final ?? "", true) { ReplaceFinalText = final is not null };
         }
-        if (type == "conversation.item.input_audio_transcription.completed")
+        if (type is "conversation.item.input_audio_transcription.completed" or "conversation.input_transcript.turn_marked")
         {
             var final = CodexRealtimeProtocol.Text(payload, "transcript");
-            return new("user", final ?? "", true) { ReplaceFinalText = final is not null };
+            return new("user", final ?? "", true) { ReplaceFinalText = final is not null, InputFragmentId = CodexRealtimeProtocol.Text(payload, "item_id") };
         }
         return null;
     }

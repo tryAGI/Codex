@@ -110,17 +110,46 @@ public sealed record CodexDelegation(string Id, string Transcript);
 /// <param name="ReceivedAfterConnectMs">Milliseconds between connecting and receiving this event.</param>
 public sealed record CodexRealtimeEvent(string Type, JsonElement Payload, double ReceivedAfterConnectMs)
 {
-    /// <summary>The delegation carried by this event, if any.</summary>
-    public CodexDelegation? Delegation => CodexRealtimeProtocol.ReadDelegation(Payload) ?? CodexRealtimeGaProtocol.ReadDelegation(Payload);
+    /// <summary>The wire adapter that produced this event, or null for a manually constructed event.</summary>
+    public string? Protocol { get; init; }
+
+    /// <summary>Whether the pinned Rust adapter recognizes this event type (independent of payload validity).</summary>
+    public bool RecognizedByRust => Protocol is { } protocol
+        ? CodexRealtimeEventProjections.Recognized(protocol, Type)
+        : new[] { "v1", "v2", "v3" }.Any(p => CodexRealtimeEventProjections.Recognized(p, Type));
+
+    /// <summary>Session identity and optional configuration receipt.</summary>
+    public CodexRealtimeSessionReceipt? Session => CodexRealtimeEventProjections.Session(Payload);
+    /// <summary>Explicit background-agent handoff, including its conversation item ID.</summary>
+    public CodexRealtimeHandoff? Handoff => CodexRealtimeEventProjections.Handoff(Payload, Protocol);
+    /// <summary>Explicit remain-silent function, separate from delegation.</summary>
+    public CodexRealtimeNoop? Noop => CodexRealtimeEventProjections.Noop(Payload, Protocol);
+    /// <summary>Conversation item added or done, with original item JSON.</summary>
+    public CodexRealtimeConversationItem? ConversationItem => CodexRealtimeEventProjections.ConversationItem(Payload);
+    /// <summary>Speech-started event, if reported.</summary>
+    public CodexRealtimeSpeechStarted? SpeechStarted => CodexRealtimeEventProjections.SpeechStarted(Payload);
+    /// <summary>Response creation or terminal receipt, if reported.</summary>
+    public CodexRealtimeResponseReceipt? Response => CodexRealtimeEventProjections.Response(Payload);
+    /// <summary>Completed frameless turn, if reported.</summary>
+    public CodexRealtimeTurn? Turn => CodexRealtimeEventProjections.Turn(Payload);
+
+    /// <summary>The delegation carried by this event, if any. Arbitrary function calls are not delegations.</summary>
+    public CodexDelegation? Delegation => Handoff is { } handoff
+        ? new(handoff.HandoffId, handoff.InputTranscript)
+        : Protocol is null or "v2" ? CodexRealtimeGaProtocol.ReadDelegation(Payload) : null;
 
     /// <summary>The transcript fragment carried by this event, if any.</summary>
-    public CodexRealtimeTranscript? Transcript => CodexRealtimeProtocol.ReadTranscript(Payload) ?? CodexRealtimeGaProtocol.ReadTranscript(Payload);
+    public CodexRealtimeTranscript? Transcript => Protocol == "v3" ? CodexRealtimeProtocol.ReadTranscript(Payload)
+        : Protocol is "v1" or "v2" ? CodexRealtimeGaProtocol.ReadTranscript(Payload)
+        : CodexRealtimeProtocol.ReadTranscript(Payload) ?? CodexRealtimeGaProtocol.ReadTranscript(Payload);
 
     /// <summary>The provider error carried by this event, if any.</summary>
     public CodexRealtimeError? Error => CodexRealtimeProtocol.ReadError(Payload);
 
     /// <summary>The output audio carried by this event, if any.</summary>
-    public CodexRealtimeAudio? Audio => CodexRealtimeProtocol.ReadAudio(Payload) ?? CodexRealtimeGaProtocol.ReadAudio(Payload);
+    public CodexRealtimeAudio? Audio => Protocol == "v3" ? CodexRealtimeProtocol.ReadAudio(Payload)
+        : Protocol is "v1" or "v2" ? CodexRealtimeGaProtocol.ReadAudio(Payload)
+        : CodexRealtimeProtocol.ReadAudio(Payload) ?? CodexRealtimeGaProtocol.ReadAudio(Payload);
 }
 
 /// <summary>A user or assistant transcript fragment.</summary>
@@ -147,7 +176,11 @@ public sealed record CodexRealtimeTranscript(string Role, string Text, bool Fina
 /// <param name="SampleRate">Sample rate in Hz.</param>
 /// <param name="Channels">Channel count.</param>
 /// <param name="ItemId">Conversation item the audio belongs to, if known.</param>
-public sealed record CodexRealtimeAudio(ReadOnlyMemory<byte> Pcm16, int SampleRate = 24000, int Channels = 1, string? ItemId = null);
+public sealed record CodexRealtimeAudio(ReadOnlyMemory<byte> Pcm16, int SampleRate = 24000, int Channels = 1, string? ItemId = null)
+{
+    /// <summary>Provider-reported sample count per channel, when supplied by the legacy adapter.</summary>
+    public uint? SamplesPerChannel { get; init; }
+}
 
 /// <summary>An error event from the realtime provider. Carries identifiers only, never request content.</summary>
 /// <param name="EventId">The client event that caused the error, if reported.</param>
