@@ -18153,11 +18153,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
+      "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
-      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.CountsAllRetainedInputImagesInTheInstalledShape",
       "evidence": null,
-      "rationale": "Image budget and retained selection candidate; exact upstream mixed-content cases remain separate."
+      "rationale": "Pinned Rust compact_remote_v2.rs:1206: one user message with text and two retained inline input images; exact count and raw retained projection with the new checkpoint."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_discards_messages_before_truncating",
@@ -18173,11 +18173,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.FiltersDiscardedHistoryBeforeApplyingTokenBudget",
       "evidence": null,
-      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_discards_messages_before_truncating. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+      "rationale": "Pinned Rust compact_remote_v2.rs:1180: oversized developer and environment_context items must be filtered before the 64,000-token retained budget; exact old/new/checkpoint order and input immutability."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_filters_to_installed_retention_shape",
@@ -18193,11 +18193,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.InstalledShapeKeepsUserAndHookButDiscardsPreviousCheckpointAndOutputs",
       "evidence": null,
-      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_filters_to_installed_retention_shape. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+      "rationale": "Pinned Rust compact_remote_v2.rs:1040: installed raw shape keeps user and synthetic equivalent hook XML then new checkpoint; excludes developer/system/assistant output, function call and previous checkpoint. Does not certify checkpoint harness sidecar or actual hook execution."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_preserves_retained_metadata_sidecar",
@@ -18214,10 +18214,10 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.ExistingRetainedEnvelopeMetadataAndResizeNoticeAreNotReclassified",
       "evidence": null,
-      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_preserves_retained_metadata_sidecar. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+      "rationale": "Pinned Rust compact_remote_v2.rs:1087 expects compaction_without_file_error_sources=true on new checkpoint envelope. Existing retained sidecars and notices are mapped to independent fixture; marker semantics not found on reviewed published revision d473fa4, reported to #45. Do not certify the full row until exact durable sidecar behavior is verified."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2.rs:collect_compaction_output_accepts_additional_output_items",
@@ -18408,11 +18408,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
+      "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
-      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.TruncatingAMessagePreservesItsExistingDefaultHarnessMetadata",
       "evidence": null,
-      "rationale": "Retention metadata and attached notice candidate."
+      "rationale": "Pinned Rust compact_remote_v2.rs:1163: default harness metadata remains present after truncating a 200-word message to a 4-token budget; input remains unchanged."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2_installation_tests.rs:prepared_prefix_rejection_respects_caller_intent",
@@ -30352,6 +30352,26 @@
       "rationale": "Native RPC and realtime notification: websocket_v2_background_agent_steering_ack_requests_response_create. Applicable native feature candidate; exact observable equivalence and test evidence remain open."
     },
     {
+      "id": "scenario:canonical-chatgpt-direct-route-with-query",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "canonical-chatgpt-direct-route-with-query",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L2254",
+      "ownerIssue": 138,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient.DirectRealtimeUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSocketParityTests.cs::RealtimeSocketParityTests.ChatGptDirectRouteRemainsCanonicalWithExplicitQuery",
+      "evidence": null,
+      "rationale": "SDK's explicit canonical official OAuth direct endpoint remains slash-free for configured endpoint with and without trailing slash; explicit trace query and model preserved. Regression fix d473fa4; custom V3 provider normalization remains covered separately. No live I/O."
+    },
+    {
       "id": "scenario:compaction-usage",
       "lane": "behavior",
       "kind": "scenario",
@@ -30744,6 +30764,26 @@
         ]
       },
       "rationale": "Narrow V3 speech split and delayed final deduplication around successful tool. Does not certify Rust UUIDv7 identity or late replay semantics."
+    },
+    {
+      "id": "scenario:native-retained-envelope-existing-metadata",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "native-retained-envelope-existing-metadata",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/src/compact_remote_v2.rs#L1087",
+      "ownerIssue": 45,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexCompaction.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.ExistingRetainedEnvelopeMetadataAndResizeNoticeAreNotReclassified",
+      "evidence": null,
+      "rationale": "Narrow existing input sidecar parity only: feature off/on, client-authored developer notice versus attached generated notice, default sidecar preserved verbatim. New checkpoint harness marker remains unverified."
     },
     {
       "id": "scenario:native-v3-audio-delegation-tool-feedback-followup",
