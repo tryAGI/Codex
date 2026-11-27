@@ -19,7 +19,8 @@ ASSET_SHA256 = "63e3b00065ed7f62166d0522e17f663cb866a31d80d03e63365482ed34a1d991
 SCOPES = {"filesystem": ("RustFileSystemDifferentialTests", 5),
           "thread-lifecycle": ("RustThreadLifecycleDifferentialTests", 2),
           "model-catalog": ("RustModelCatalogDifferentialTests", 1),
-          "turn-lifecycle": ("RustTurnLifecycleDifferentialTests", 1)}
+          "turn-lifecycle": ("RustTurnLifecycleDifferentialTests", 1),
+          "provider-model-catalog": ("RustProviderModelDifferentialTests", 1)}
 
 
 def sha(path):
