@@ -188,7 +188,7 @@ public sealed partial class CodexThreadRpc
         return await store.ReadAsync(thread.Id, CancellationToken.None).ConfigureAwait(false);
     }
 
-    private Task CompletedAsync(CodexThreadDocument thread, Running running)
+    private async Task CompletedAsync(CodexThreadDocument thread, Running running)
     {
         running.Control.Seal();
         var completed = thread.Turns.Single(t => t.Id == running.Id);
@@ -198,7 +198,8 @@ public sealed partial class CodexThreadRpc
         JsonObject snapshot;
         try { snapshot = Turn(completed, "summary"); }
         catch (CodexThreadRpcException) { Interlocked.Increment(ref notificationFailures); snapshot = Turn(completed, "notLoaded"); }
-        return EmitAsync("turn/completed", new JsonObject { ["threadId"] = thread.Id.ToString(), ["turn"] = snapshot });
+        await EmitAsync("turn/completed", new JsonObject { ["threadId"] = thread.Id.ToString(), ["turn"] = snapshot }).ConfigureAwait(false);
+        await NotifyTerminalReadStateAsync(thread, completed.Id).ConfigureAwait(false);
     }
     private void RemoveActive(Guid id, Running running) =>
         ((ICollection<KeyValuePair<Guid, Running>>)active).Remove(new(id, running));

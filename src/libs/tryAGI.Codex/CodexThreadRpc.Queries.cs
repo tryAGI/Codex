@@ -12,7 +12,9 @@ public sealed partial class CodexThreadRpc
         ValidateFields(p, ["threadId", "includeTurns"]);
         var thread = await store.ReadAsync(Id(p, "threadId"), ct).ConfigureAwait(false);
         if (Flag(thread.Settings, "ephemeral") && Flag(p, "includeTurns")) throw Invalid("Ephemeral threads do not support includeTurns.");
-        return Element(new JsonObject { ["thread"] = Thread(thread, Flag(p, "includeTurns")) });
+        var result = new JsonObject { ["thread"] = Thread(thread, Flag(p, "includeTurns")) };
+        AddReadState(result, thread);
+        return Element(result);
     }
 
     private async Task<JsonElement> ListAsync(JsonElement p, bool onlyLoaded, CancellationToken ct)
@@ -56,7 +58,7 @@ public sealed partial class CodexThreadRpc
         var sortPositions = onlyLoaded ? null : documents.ToDictionary(d => d.Id.ToString(),
             d => (sort == "created_at" ? d.CreatedAt : d.UpdatedAt).UtcTicks);
         var page = Page(onlyLoaded ? "loaded" : "threads", p, rows, sortPositions: sortPositions);
-        if (!onlyLoaded) return page;
+        if (!onlyLoaded) return AddReadStates(page, documents);
         var result = Object(page); result.Remove("backwardsCursor"); return Element(result);
     }
 
