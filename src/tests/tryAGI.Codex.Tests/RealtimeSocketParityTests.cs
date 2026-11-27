@@ -52,6 +52,43 @@ public sealed class RealtimeSocketParityTests
         Assert.Throws<CodexProtocolException>(() => CodexRealtimeProtocol.SidebandUri(provider, "../admin", protocol));
     }
 
+    [Theory]
+    [InlineData("v1", "https://example.com/proxy/v1/", "/proxy/v1/realtime")]
+    [InlineData("v2", "https://example.com/proxy/v1", "/proxy/v1/realtime")]
+    [InlineData("v3", "https://example.com/proxy/v1", "/proxy/v1")]
+    [InlineData("v3", "https://example.com/proxy/v1/", "/proxy/v1/")]
+    [InlineData("v3", "https://example.com/proxy/realtime/", "/proxy/live")]
+    [InlineData("v3", "https://example.com/proxy/live/", "/proxy/live")]
+    [InlineData("v3", "https://example.com/custom/", "/custom/")]
+    public void RustAdapterPathNormalizationIsNotUniform(string protocol, string endpoint, string path)
+    {
+        Assert.Equal(path, CodexRealtimeProtocol.RealtimeSocketUri(new(endpoint), protocol, null).AbsolutePath);
+    }
+
+    [Theory]
+    [InlineData("v1", "wss://example.com/v1/realtime?foo=bar&intent=quicksilver&model=snapshot&trace=1")]
+    [InlineData("v2", "wss://example.com/v1/realtime?foo=bar&model=snapshot&trace=1")]
+    [InlineData("v3", "wss://example.com/v1/live?foo=bar&model=snapshot&trace=1")]
+    public void ExplicitProviderQueryFollowsRustPrecedence(string protocol, string expected)
+    {
+        var query = new Dictionary<string, string> { ["trace"] = "1", ["intent"] = "ignored", ["model"] = "ignored" };
+        Assert.Equal(expected, CodexClient.DirectRealtimeUri(new("https://example.com/v1/realtime?foo=bar"), "snapshot", protocol, query).AbsoluteUri);
+        Assert.Equal(3, query.Count);
+    }
+
+    [Fact]
+    public void QueryModelIsUsedOnlyWhenNoExplicitModelAndReservedCallIdentityCannotBeOverridden()
+    {
+        var query = new Dictionary<string, string> { ["model"] = "snapshot", ["trace"] = "space & equals=1" };
+        Assert.Equal("wss://example.com/v1/realtime?model=snapshot&trace=space+%26+equals%3D1&call_id=rtc_test",
+            CodexRealtimeProtocol.SidebandUri(new("https://example.com/v1"), "rtc_test", "v2", query).AbsoluteUri);
+        Assert.Throws<ArgumentException>(() => CodexRealtimeProtocol.SidebandUri(new("https://example.com/v1?%63all_id=rtc_other"), "rtc_test", "v2"));
+        Assert.Throws<ArgumentException>(() => CodexRealtimeProtocol.SidebandUri(new("https://example.com/v1"), "rtc_test", "v3",
+            new Dictionary<string, string> { ["call_id"] = "rtc_other" }));
+        Assert.Throws<ArgumentException>(() => CodexClient.DirectRealtimeUri(new("https://example.com/v1"), "snapshot", "v2",
+            new Dictionary<string, string> { ["call_id"] = "rtc_other" }));
+    }
+
     [Fact]
     public void RustUriPreservesExistingQuery()
     {

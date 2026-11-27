@@ -339,33 +339,75 @@ internal static class CodexRealtimeProtocol
         return session;
     }
 
-    internal static Uri SidebandUri(Uri configured, string callId, string protocol)
+    internal static Uri SidebandUri(Uri configured, string callId, string protocol,
+        IReadOnlyDictionary<string, string>? queryParameters = null)
     {
         if (CallId(callId) != callId) throw new ArgumentException("Invalid call ID.", nameof(callId));
-        return RealtimeSocketUri(configured, protocol, null, callId);
+        return RealtimeSocketUri(configured, protocol, null, callId, queryParameters);
     }
 
-    internal static Uri RealtimeSocketUri(Uri backend, string protocol, string? model, string? callId = null)
+    internal static Uri RealtimeSocketUri(Uri backend, string protocol, string? model, string? callId = null,
+        IReadOnlyDictionary<string, string>? queryParameters = null)
     {
         if (protocol is not ("v1" or "v2" or "v3")) throw new ArgumentException("Unsupported realtime protocol.", nameof(protocol));
-        if (backend.Scheme is not ("https" or "wss")) throw new ArgumentException("Realtime requires a secure transport.", nameof(backend));
-        var path = backend.AbsolutePath.TrimEnd('/');
-        var suffix = protocol == "v3" ? "/live" : "/realtime";
-        if (path.Length == 0) path = "/v1" + suffix;
-        else if (path.EndsWith("/v1", StringComparison.Ordinal)) path += suffix;
-        else if (protocol == "v3" && path.EndsWith("/realtime", StringComparison.Ordinal)) path = path[..^9] + suffix;
-        // The existing SDK sideband base was a V3 /live URL, not a provider API base.
-        else if (callId is not null && protocol != "v3" && path.EndsWith("/live", StringComparison.Ordinal)) path = path[..^5] + suffix;
+        if (!backend.IsAbsoluteUri || backend.Scheme is not ("https" or "wss") || backend.UserInfo.Length != 0 || backend.Fragment.Length != 0)
+            throw new ArgumentException("Realtime requires a secure transport without embedded credentials or fragments.", nameof(backend));
+        // Keep the pinned Rust distinction: V3 only rewrites the root /v1 or an existing
+        // /realtime suffix. A custom nested V3 route is already a complete provider path.
+        var path = backend.AbsolutePath;
+        if (protocol == "v3")
+        {
+            if (path is "" or "/" or "/v1" or "/v1/") path = "/v1/live";
+            else if (path.TrimEnd('/').EndsWith("/realtime", StringComparison.Ordinal)) path = path.TrimEnd('/')[..^9] + "/live";
+            else if (path.EndsWith("/live/", StringComparison.Ordinal)) path = path.TrimEnd('/');
+        }
+        else
+        {
+            if (path is "" or "/") path = "/v1/realtime";
+            else if (path.EndsWith("/realtime/", StringComparison.Ordinal)) path = path.TrimEnd('/');
+            else if (path.EndsWith("/v1", StringComparison.Ordinal)) path += "/realtime";
+            else if (path.EndsWith("/v1/", StringComparison.Ordinal)) path += "realtime";
+            // Retain the SDK's existing legacy sideband default, which is configured as a V3 URL.
+            else if (callId is not null && path.TrimEnd('/').EndsWith("/live", StringComparison.Ordinal))
+                path = path.TrimEnd('/')[..^5] + "/realtime";
+        }
         var query = new List<string>();
-        if (backend.Query.Length > 1) query.Add(backend.Query[1..]);
+        if (backend.Query.Length > 1)
+        {
+            var existing = backend.Query[1..];
+            foreach (var pair in existing.Split('&'))
+                if (Uri.UnescapeDataString(pair.Split('=', 2)[0].Replace('+', ' ')).Equals("call_id", StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("Use the explicit realtime call identity.", nameof(backend));
+            query.Add(existing);
+        }
         if (protocol == "v1") query.Add("intent=quicksilver");
-        if (model is not null) query.Add("model=" + Uri.EscapeDataString(model));
+        if (model is not null) query.Add("model=" + FormEncode(model));
+        if (queryParameters is not null)
+        {
+            if (queryParameters.Count > 32) throw new ArgumentException("Too many realtime query parameters.", nameof(queryParameters));
+            foreach (var (key, value) in queryParameters.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                if (key.Equals("call_id", StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("Use the explicit realtime call identity.", nameof(queryParameters));
+                if (key == "intent" || key == "model" && model is not null) continue;
+                if (key.Length is 0 or > 128 || value is null || value.Length > 4096 || key.Any(char.IsControl) || value.Any(char.IsControl))
+                    throw new ArgumentException("Invalid realtime query parameter.", nameof(queryParameters));
+                query.Add(FormEncode(key) + "=" + FormEncode(value));
+            }
+        }
         if (callId is not null)
         {
-            if (protocol == "v3") path += "/" + Uri.EscapeDataString(callId);
-            else query.Add("call_id=" + Uri.EscapeDataString(callId));
+            // Even internal callers cannot inject an unvalidated path or duplicate call ID.
+            if (CallId(callId) != callId) throw new ArgumentException("Invalid call ID.", nameof(callId));
+            if (protocol == "v3") path += (path.EndsWith('/') ? "" : "/") + Uri.EscapeDataString(callId);
+            else query.Add("call_id=" + FormEncode(callId));
         }
         return new UriBuilder(backend) { Scheme = "wss", Port = backend.IsDefaultPort ? -1 : backend.Port, Path = path, Query = string.Join("&", query) }.Uri;
+
+        // URL query pairs use form encoding; model and parameter values cannot inject delimiters.
+        static string FormEncode(string value) => Uri.EscapeDataString(value)
+            .Replace("%20", "+", StringComparison.Ordinal).Replace("%2A", "*", StringComparison.Ordinal)
+            .Replace("~", "%7E", StringComparison.Ordinal);
     }
 
     public static CodexDelegation? ReadDelegation(JsonElement payload)

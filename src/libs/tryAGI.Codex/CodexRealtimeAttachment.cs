@@ -123,7 +123,8 @@ public sealed partial class CodexClient
         ValidateAttachmentIdentity(callId, attachment.Protocol);
         var configured = attachment.SidebandBaseUri ?? options.SidebandBaseUri;
         ValidateAttachmentDestination(configured, attachment);
-        var uri = CodexRealtimeProtocol.SidebandUri(configured, callId, attachment.Protocol);
+        var uri = CodexRealtimeProtocol.SidebandUri(configured, callId, attachment.Protocol,
+            attachment.Authentication == CodexRealtimeAttachmentAuthentication.ClientCredentials ? options.RealtimeQueryParameters : null);
         foreach (var id in new[] { attachment.SessionId, attachment.VoiceSessionId })
             if (id is not null && (id.Length is < 1 or > 128 || id.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('_' or '-' or '.'))))
                 throw new ArgumentException("Invalid realtime attachment header identity.", nameof(attachment));

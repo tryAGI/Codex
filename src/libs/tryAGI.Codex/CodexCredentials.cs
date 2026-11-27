@@ -43,6 +43,10 @@ public sealed record CodexEndpointOptions
     public Uri BackendBaseUri { get; init; } = new("https://chatgpt.com/backend-api/codex/");
     /// <summary>Realtime sideband base URI (WSS).</summary>
     public Uri SidebandBaseUri { get; init; } = new("wss://api.openai.com/v1/live/");
+    /// <summary>Optional non-secret provider query parameters for SDK-authorized realtime WebSockets.
+    /// The adapter controls intent, an explicit model takes precedence, and call_id cannot be supplied.
+    /// These values are never forwarded to an externally authorized attachment.</summary>
+    public IReadOnlyDictionary<string, string>? RealtimeQueryParameters { get; init; }
     /// <summary>Default <c>originator</c> header value sent by this library.</summary>
     public const string DefaultOriginator = "tryagi_codex";
     /// <summary>Value of the <c>originator</c> header.</summary>

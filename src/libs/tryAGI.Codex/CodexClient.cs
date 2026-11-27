@@ -216,7 +216,7 @@ public sealed partial class CodexClient : IDisposable
             !destination.IsDefaultPort || destination.UserInfo.Length != 0 || destination.Fragment.Length != 0 ||
             destination.Scheme is not ("https" or "wss"))
             throw new ArgumentException("Realtime sideband requires the trusted OpenAI API origin.");
-        var uri = CodexRealtimeProtocol.SidebandUri(destination, callId, protocol);
+        var uri = CodexRealtimeProtocol.SidebandUri(destination, callId, protocol, options.RealtimeQueryParameters);
         var auth = await GetRealtimeAuthorizationAsync(ct).ConfigureAwait(false);
         var connect = (CancellationToken token) => CodexRealtimeConnection.ConnectAsync(uri, auth.Token, auth.AccountId,
             options, token, protocol, chatGptCall: realtimeApiKeyProvider is null, session);
@@ -263,14 +263,16 @@ public sealed partial class CodexClient : IDisposable
             throw new ArgumentException("Direct V1 requires explicit API credentials. Use ForRealtimeApi.", nameof(session));
         if (!api && session.Protocol == "v3") ValidateChatGptCallDestination(options.BackendBaseUri);
         // Preserve the previously explicit GA OAuth route without falling back across credential types.
-        return DirectRealtimeUri(api || session.Protocol == "v2" ? RealtimeApiBaseUri : options.BackendBaseUri, session.Model, session.Protocol);
+        return DirectRealtimeUri(api || session.Protocol == "v2" ? RealtimeApiBaseUri : options.BackendBaseUri,
+            session.Model, session.Protocol, options.RealtimeQueryParameters);
     }
 
-    internal static Uri DirectRealtimeUri(Uri backend, string model, string protocol = "v3")
+    internal static Uri DirectRealtimeUri(Uri backend, string model, string protocol = "v3",
+        IReadOnlyDictionary<string, string>? queryParameters = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         if (model.Length > 128 || model.Any(char.IsControl)) throw new ArgumentException("Invalid realtime model.");
-        return CodexRealtimeProtocol.RealtimeSocketUri(backend, protocol, model);
+        return CodexRealtimeProtocol.RealtimeSocketUri(backend, protocol, model, queryParameters: queryParameters);
     }
 
     private async Task<HttpRequestMessage> RequestAsync(string path, JsonObject body, CancellationToken ct)

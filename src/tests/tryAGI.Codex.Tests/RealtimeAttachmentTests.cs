@@ -273,6 +273,31 @@ public sealed class RealtimeAttachmentTests
     }
 
     [Fact]
+    public async Task ExplicitProviderQueryIsBoundToSdkAuthorizedRoutes()
+    {
+        var auth = new OAuth();
+        using var client = new CodexClient(auth, new CodexEndpointOptions
+        {
+            RealtimeQueryParameters = new Dictionary<string, string> { ["trace"] = "sdk-only", ["model"] = "ignored-direct" },
+        });
+        var ct = TestContext.Current.CancellationToken;
+        var direct = client.DirectRealtimeDestination(new CodexRealtimeSessionOptions("prompt") { Protocol = "v3", Model = "snapshot" }, api: true);
+        Assert.Equal("wss://api.openai.com/v1/live?model=snapshot&trace=sdk-only", direct.AbsoluteUri);
+        var (sdkUri, _) = await client.PrepareRealtimeAttachmentAsync("rtc_test",
+            new CodexRealtimeAttachmentOptions { Protocol = "v3" }, ct);
+        Assert.Equal("wss://api.openai.com/v1/live/rtc_test?model=ignored-direct&trace=sdk-only", sdkUri.AbsoluteUri);
+        var (externalUri, _) = await client.PrepareRealtimeAttachmentAsync("rtc_test", new CodexRealtimeAttachmentOptions
+        {
+            SidebandBaseUri = new Uri("wss://external.invalid/v1"),
+            Authentication = CodexRealtimeAttachmentAuthentication.ExternalHeaders,
+            ExternalHeaderProvider = _ => ValueTask.FromResult<IReadOnlyDictionary<string, string>>(
+                new Dictionary<string, string> { ["Authorization"] = "Bearer external-test" }),
+        }, ct);
+        Assert.Equal("wss://external.invalid/v1/live/rtc_test", externalUri.AbsoluteUri);
+        Assert.Equal(1, auth.Requests);
+    }
+
+    [Fact]
     public async Task ExternalAttachmentNeverUsesSdkCredentialsAndRejectsConflictingIdentity()
     {
         var auth = new OAuth();
