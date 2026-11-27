@@ -65,6 +65,7 @@ public sealed partial class CodexThreadRpc(
     /// <summary>Returns <see langword="true"/> for the thread and turn methods this host serves.</summary>
     public static bool Handles(string method) => method is "thread/start" or "thread/resume" or "thread/fork"
         or "thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list" or "thread/items/read" or "thread/name/set"
+        or "thread/attachment/add" or "thread/attachment/list" or "thread/attachment/remove" or "thread/attachmentOwner/list"
         or "turn/start" or "turn/steer" or "turn/interrupt" or "turn/settings/update"
         or "thread/realtime/start" or "thread/realtime/stop" or "thread/realtime/list" or "thread/realtime/listVoices"
         or "thread/realtime/appendAudio" or "thread/realtime/appendText" or "thread/realtime/appendSpeech";
@@ -76,7 +77,7 @@ public sealed partial class CodexThreadRpc(
     /// <exception cref="CodexThreadRpcException">The request failed.</exception>
     public async Task<JsonElement> InvokeAsync(string method, JsonElement? parameters, CancellationToken ct = default)
     {
-        if (Volatile.Read(ref stopping) && method is not ("thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list" or "thread/items/read"))
+        if (Volatile.Read(ref stopping) && method is not ("thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list" or "thread/items/read" or "thread/attachment/list" or "thread/attachmentOwner/list"))
             throw new CodexThreadRpcException(-32010, "Native thread host is draining.");
         var p = parameters is { ValueKind: JsonValueKind.Object } value ? value : parameters is null
             ? Json("{}") : throw Invalid("RPC parameters must be an object.");
@@ -95,6 +96,10 @@ public sealed partial class CodexThreadRpc(
                 "thread/items/list" => await HistoryAsync(p, true, ct).ConfigureAwait(false),
                 "thread/items/read" => await ReadItemsAsync(p, ct).ConfigureAwait(false),
                 "thread/name/set" => await SetNameAsync(p, ct).ConfigureAwait(false),
+                "thread/attachment/add" => await AddAttachmentAsync(p, ct).ConfigureAwait(false),
+                "thread/attachment/list" => await ListAttachmentsAsync(p, ct).ConfigureAwait(false),
+                "thread/attachment/remove" => await RemoveAttachmentAsync(p, ct).ConfigureAwait(false),
+                "thread/attachmentOwner/list" => await ListAttachmentOwnersAsync(p, ct).ConfigureAwait(false),
                 "turn/start" => await StartAsync(p, ct).ConfigureAwait(false),
                 "turn/steer" => Steer(p),
                 "turn/interrupt" => await InterruptAsync(p, ct).ConfigureAwait(false),

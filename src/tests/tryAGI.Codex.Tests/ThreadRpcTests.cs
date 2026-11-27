@@ -799,6 +799,72 @@ public sealed class ThreadRpcTests
     }
 
     [Fact]
+    public async Task ThreadAttachmentsAreDurableIdempotentAndForkIndependent()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var id = await Create(f.Host()); var cold = f.Host();
+        JsonElement Identity(Guid owner, string key) => Args(new JsonObject
+            { ["threadId"] = owner.ToString(), ["attachmentType"] = "pull_request", ["identityKey"] = key });
+        JsonElement Add(Guid owner, string key, string payload)
+        {
+            var p = (JsonObject)JsonNode.Parse(Identity(owner, key).GetRawText())!;
+            p["payload"] = payload;
+            return Args(p);
+        }
+        var one = await cold.InvokeAsync("thread/attachment/add", Add(id, "pr:1", "original"), ct);
+        Assert.Equal("created", one.GetProperty("outcome").GetString());
+        var before = await f.Store.ReadAsync(id, ct);
+        var duplicate = await cold.InvokeAsync("thread/attachment/add", Add(id, "pr:1", "different"), ct);
+        Assert.Equal("existing", duplicate.GetProperty("outcome").GetString());
+        Assert.True(JsonElement.DeepEquals(one.GetProperty("attachment"), duplicate.GetProperty("attachment")));
+        Assert.Equal(before.Revision, (await f.Store.ReadAsync(id, ct)).Revision);
+        Assert.Single(f.Events, e => e.Method == "thread/attachment/updated");
+
+        await cold.InvokeAsync("thread/attachment/add", Add(id, "pr:2", "second"), ct);
+        var first = await cold.InvokeAsync("thread/attachment/list", Args(new JsonObject { ["threadId"] = id.ToString(), ["limit"] = 1 }), ct);
+        var next = first.GetProperty("nextCursor").GetString();
+        Assert.NotNull(next);
+        var second = await cold.InvokeAsync("thread/attachment/list", Args(new JsonObject { ["threadId"] = id.ToString(), ["cursor"] = next }), ct);
+        Assert.Single(second.GetProperty("data").EnumerateArray());
+        Assert.NotEqual(first.GetProperty("data")[0].GetProperty("id").GetString(), second.GetProperty("data")[0].GetProperty("id").GetString());
+        Assert.Empty((await cold.InvokeAsync("thread/loaded/list", Json("{}"), ct)).GetProperty("data").EnumerateArray());
+
+        var fork = await cold.InvokeAsync("thread/fork", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        var childId = Guid.Parse(fork.GetProperty("thread").GetProperty("id").GetString()!);
+        var child = await cold.InvokeAsync("thread/attachment/list", Args(new JsonObject { ["threadId"] = childId.ToString() }), ct);
+        Assert.Equal(2, child.GetProperty("data").GetArrayLength());
+        Assert.DoesNotContain(child.GetProperty("data").EnumerateArray(), a =>
+            a.GetProperty("id").GetString() == one.GetProperty("attachment").GetProperty("id").GetString());
+
+        var owners = await cold.InvokeAsync("thread/attachmentOwner/list",
+            Json("{\"attachmentType\":\"pull_request\",\"identityKey\":\"pr:1\",\"limit\":1}"), ct);
+        Assert.Single(owners.GetProperty("data").EnumerateArray());
+        Assert.NotNull(owners.GetProperty("nextCursor").GetString());
+        var ownerPage = await cold.InvokeAsync("thread/attachmentOwner/list", Args(new JsonObject
+        {
+            ["attachmentType"] = "pull_request", ["identityKey"] = "pr:1", ["cursor"] = owners.GetProperty("nextCursor").GetString()
+        }), ct);
+        Assert.Single(ownerPage.GetProperty("data").EnumerateArray());
+
+        await cold.InvokeAsync("thread/attachment/remove", Identity(childId, "pr:1"), ct);
+        var removed = await f.Store.ReadAsync(childId, ct);
+        await cold.InvokeAsync("thread/attachment/remove", Identity(childId, "pr:1"), ct);
+        Assert.Equal(removed.Revision, (await f.Store.ReadAsync(childId, ct)).Revision);
+        Assert.Equal(2, (await f.Store.ReadAsync(id, ct)).Attachments!.Length);
+        var reattached = await cold.InvokeAsync("thread/attachment/add", Add(childId, "pr:1", "new"), ct);
+        Assert.Equal("created", reattached.GetProperty("outcome").GetString());
+        Assert.Equal("new", reattached.GetProperty("attachment").GetProperty("payload").GetString());
+
+        var foreignCursor = await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/attachment/list",
+            Args(new JsonObject { ["threadId"] = childId.ToString(), ["cursor"] = next }), ct));
+        Assert.Equal(-32602, foreignCursor.Code);
+        var invalid = await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/attachment/add",
+            Add(id, new string('x', 257), "invalid"), ct));
+        Assert.Equal(-32602, invalid.Code);
+        Assert.Empty(f.Provider.Requests);
+    }
+
+    [Fact]
     public async Task ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks()
     {
         var ct = TestContext.Current.CancellationToken;
