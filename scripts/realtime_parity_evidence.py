@@ -38,6 +38,7 @@ OFFLINE_CLASSES = (
     "RealtimeFeedbackWireTests", "RealtimeStartupContextTests", "RealtimeModelIdentityTests",
     "ThreadAgentTests", "ThreadRpcTests", "CodexResponsesInterruptionTests",
     "DirectRealtimeLifecycleTests", "NativeRealtimeLiveGuardTests",
+    "RustParityPresentationTests", "RealtimePresentationTests", "NativeBackingArtifactTests",
 )
 TRX_NS = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 HEX40 = re.compile(r"[a-f0-9]{40}")
