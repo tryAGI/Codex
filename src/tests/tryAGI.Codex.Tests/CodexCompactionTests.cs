@@ -105,6 +105,18 @@ public sealed class CodexCompactionTests
     }
 
     [Fact]
+    public async Task SparseProviderTerminalRetainsEncryptedCompactionCheckpoint()
+    {
+        var stream = "data: {\"type\":\"response.output_item.done\",\"item\":" + Checkpoint +
+            "}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"compacted\",\"usage\":{\"output_tokens\":4}}}\n\n";
+        using var client = new CodexClient(new Credentials(), handler: new Handler(_ => stream));
+        var result = await client.CompactAsync(new("test", "test"), [], TestContext.Current.CancellationToken);
+        Assert.Equal("compacted", result.ResponseId);
+        Assert.True(JsonElement.DeepEquals(Json(Checkpoint), result.Item));
+        Assert.Equal(4, result.Usage!.Value.GetProperty("output_tokens").GetInt32());
+    }
+
+    [Fact]
     public async Task ContinuationSeesCheckpointAndPreservesIdsInItsResult()
     {
         using var client = new CodexClient(new Credentials(), handler: new Handler(body =>

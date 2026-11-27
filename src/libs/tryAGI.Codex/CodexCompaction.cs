@@ -47,7 +47,7 @@ public sealed partial class CodexClient
         var original = history.Select(item => item.Clone()).ToArray();
         using var trigger = JsonDocument.Parse("{\"type\":\"compaction_trigger\"}");
         var input = original.Append(trigger.RootElement.Clone()).ToArray();
-        var completedItems = new SortedDictionary<int, JsonElement>();
+        IReadOnlyList<JsonElement>? items = null;
         JsonElement? terminal = null;
         // Rust retains the current model/tools/instructions, enables parallel tool calls,
         // and disables the ordinary final-answer schema for this request.
@@ -55,31 +55,17 @@ public sealed partial class CodexClient
         using var activity = ActivitySource.StartActivity("codex.responses.compact");
         await foreach (var response in StreamResponseAsync(options, input, cancellationToken, observeDiagnostics).ConfigureAwait(false))
         {
-            if (response.Type == "response.output_item.done")
+            if (response.Type == "response.completed")
             {
-                if (!response.Payload.TryGetProperty("output_index", out var indexValue) || !indexValue.TryGetInt32(out var index) ||
-                    index is < 0 or >= 4096 || !response.Payload.TryGetProperty("item", out var item) || item.ValueKind != JsonValueKind.Object)
-                    throw new CodexProtocolException("Compaction output item has an invalid index or body.");
-                if (completedItems.TryGetValue(index, out var previous) && !JsonElement.DeepEquals(previous, item))
-                    throw new CodexProtocolException("Conflicting compaction output items.");
-                completedItems[index] = item.Clone();
+                terminal = response.Payload.GetProperty("response").Clone();
+                items = response.CompletedOutput;
             }
-            if (response.Type == "response.completed") terminal = response.Payload.GetProperty("response").Clone();
         }
         cancellationToken.ThrowIfCancellationRequested();
-        if (terminal is not { } result || !result.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array ||
+        if (terminal is not { } result || items is null ||
             string.IsNullOrWhiteSpace(CodexRealtimeProtocol.Text(result, "id")) ||
             CodexRealtimeProtocol.Text(result, "status") is not (null or "completed"))
-            throw new CodexProtocolException("Compaction requires a completed response with an ID and output array.");
-        var items = output.EnumerateArray().Select(item => item.Clone()).ToArray();
-        if (items.Length == 0)
-        {
-            if (!completedItems.Keys.SequenceEqual(Enumerable.Range(0, completedItems.Count)))
-                throw new CodexProtocolException("Compaction response has missing output items.");
-            items = completedItems.Values.ToArray();
-        }
-        else if (completedItems.Any(pair => pair.Key >= items.Length || !JsonElement.DeepEquals(pair.Value, items[pair.Key])))
-            throw new CodexProtocolException("Compaction response conflicts with completed output items.");
+            throw new CodexProtocolException("Compaction requires a completed response with an ID and validated output.");
         var checkpoints = items.Where(item => CodexRealtimeProtocol.Text(item, "type") is "compaction" or "compaction_summary").ToArray();
         if (checkpoints.Length != 1 || string.IsNullOrWhiteSpace(CodexRealtimeProtocol.Text(checkpoints[0], "encrypted_content")))
             throw new CodexProtocolException("Compaction requires exactly one nonempty encrypted compaction item.");

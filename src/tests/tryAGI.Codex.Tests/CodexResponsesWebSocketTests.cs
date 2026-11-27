@@ -89,6 +89,49 @@ public sealed class CodexResponsesWebSocketTests
     }
 
     [Fact]
+    public async Task SparseCompletionPreservesRawReceiptAndUsesStreamedEncryptedItemsForContinuation()
+    {
+        var socket = new Socket(
+            """{"type":"response.completed","response":{"id":"warm"}}""",
+            """{"type":"response.output_item.done","item":{"type":"reasoning","encrypted_content":"opaque","summary":[]}}""",
+            """{"type":"response.completed","response":{"id":"first","usage":{"output_tokens":2}}}""",
+            """{"type":"response.completed","response":{"id":"second"}}""");
+        await using var session = new CodexResponsesWebSocketSession((_, _) =>
+            Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket)));
+        var observer = new Observer();
+        using var client = new CodexClient(new Credentials(), handler: new Handler(), usageObserver: observer);
+        var settings = new CodexResponseOptions("model", "instructions")
+        { Identity = Identity, WebSocketSession = session, PrewarmWebSocket = true };
+        CodexResponseEvent? terminal = null;
+        await foreach (var item in client.StreamResponseAsync(settings, [User], TestContext.Current.CancellationToken))
+            if (item.Type == "response.completed") terminal = item;
+        Assert.NotNull(terminal);
+        Assert.False(terminal.Payload.GetProperty("response").TryGetProperty("output", out _));
+        Assert.True(JsonElement.DeepEquals(Reasoning, Assert.Single(terminal.CompletedOutput!)));
+        await Read(client, settings, User, Reasoning, Tool);
+        Assert.Equal(2, observer.Completed);
+        Assert.Equal("first", socket.Frames[2]["previous_response_id"]!.GetValue<string>());
+        Assert.Equal(Tool.GetRawText(), Assert.Single(socket.Frames[2]["input"]!.AsArray())!.ToJsonString());
+    }
+
+    [Theory]
+    [InlineData("""{"type":"response.output_item.added","output_index":0,"item":{"id":"unfinished","type":"message","role":"assistant","content":[]}}""")]
+    [InlineData("""{"type":"response.output_text.delta","item_id":"unfinished","delta":"partial"}""")]
+    public async Task SparseTerminalCannotHideUnfinishedOutput(string preview)
+    {
+        var socket = new Socket(preview, """{"type":"response.completed","response":{"id":"first"}}""");
+        await using var session = new CodexResponsesWebSocketSession((_, _) =>
+            Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket)));
+        var observer = new Observer();
+        using var client = new CodexClient(new Credentials(), handler: new Handler(), usageObserver: observer);
+        var settings = new CodexResponseOptions("model", "instructions") { Identity = Identity, WebSocketSession = session };
+        var exception = await Assert.ThrowsAsync<CodexProtocolException>(() => Read(client, settings, User));
+        Assert.Contains("unfinished_streamed_output", exception.Message);
+        Assert.Equal(1, observer.Completed); // Provider receipt was observed, but no validated output escaped.
+        Assert.Equal(WebSocketState.Closed, socket.State);
+    }
+
+    [Fact]
     public async Task PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput()
     {
         var socket = new Socket(Completed("warm"), Completed("first", "[" + Reasoning.GetRawText() + "]"), Completed("second"));

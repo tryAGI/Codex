@@ -58,6 +58,9 @@ public sealed record CodexResponseEvent(string Type, JsonElement Payload, double
         ? usage with { ResponseId = usage.ResponseId ?? ResponseId } : null;
     /// <summary>Provider response identifier established by this event or an earlier frame of the same stream.</summary>
     public string? ResponseId { get; init; }
+    /// <summary>Validated output in provider order, available only for a successful completion.
+    /// A sparse provider terminal remains unchanged in <see cref="Payload"/>.</summary>
+    public IReadOnlyList<JsonElement>? CompletedOutput { get; init; }
     /// <summary>Local receipt time.</summary>
     public DateTimeOffset ObservedAt { get; init; } = DateTimeOffset.UtcNow;
 }
@@ -178,7 +181,7 @@ public sealed partial class CodexClient
             ? await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false) : null;
         var events = ws is not null ? ws.ReadAsync(deadline.Token) : ReadSseAsync(stream!, options.MaximumMessageBytes, deadline.Token);
         var completed = false;
-        var outputValidation = new CodexResponseOutputValidation();
+        var outputValidation = new CodexResponseOutputValidation(options.MaximumMessageBytes);
         var correlation = ws?.NewCorrelation() ?? new CodexResponsesCorrelation();
         await foreach (var data in events.ConfigureAwait(false))
         {
@@ -218,9 +221,14 @@ public sealed partial class CodexClient
                 diagnostics.Mark("response.protocol_rejected." + outputFailure);
                 throw new CodexProtocolException("Codex completed output rejected (" + outputFailure + "); not a silent success.");
             }
-            ws?.Observe(type, payload, body);
             completed |= type == "response.completed";
-            yield return new(type, payload, Stopwatch.GetElapsedTime(started).TotalMilliseconds) { Identity = identity, RequestId = accountingId, ResponseId = correlation.ResponseId };
+            if (completed && ws is not null)
+                ws.Complete(body, correlation.ResponseId!, outputValidation.CompletedOutput!);
+            yield return new(type, payload, Stopwatch.GetElapsedTime(started).TotalMilliseconds)
+            {
+                Identity = identity, RequestId = accountingId, ResponseId = correlation.ResponseId,
+                CompletedOutput = completed ? outputValidation.CompletedOutput : null,
+            };
             if (completed) yield break;
         }
         if (!completed)

@@ -159,6 +159,9 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
                 if (output.GetArrayLength() == 0) shape = completedOutputShape;
                 observe(Point("response.output_shape." + (shape ?? "empty")));
             }
+            else if (response.ValueKind == JsonValueKind.Object && !response.TryGetProperty("output", out _) &&
+                Text(response, "id") is not null)
+                observe(Point("response.output_shape." + (completedOutputShape ?? "empty")));
             else observe(Point("response.output_shape.invalid_output"));
         }
     }

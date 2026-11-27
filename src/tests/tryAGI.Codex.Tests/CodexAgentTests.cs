@@ -36,6 +36,33 @@ public sealed class CodexAgentTests
     { Tools = [Json("""{"type":"function","name":"act","parameters":{"type":"object"}}""")] };
 
     [Fact]
+    public async Task SparseCompletionAuthorizesCompletedToolOnlyAfterReceipt()
+    {
+        const string sparse = "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"response-one\"}}\n\n";
+        var first = "data: {\"type\":\"response.output_item.done\",\"item\":" + Function + "}\n\n" + sparse;
+        using var client = new CodexClient(new Credentials(), handler: new Handler(number =>
+            number == 1 ? first : Completed(Message)));
+        var receiptObserved = false;
+        var effects = 0;
+        var result = await new CodexAgent(client).RunAsync(Options, [], (_, _) =>
+        {
+            Assert.True(receiptObserved);
+            effects++;
+            return Task.FromResult("tool receipt");
+        }, observe: item =>
+        {
+            if (item.Type == "response.completed" && item.ResponseId == "response-one")
+            {
+                Assert.False(item.Payload.GetProperty("response").TryGetProperty("output", out _));
+                Assert.Single(item.CompletedOutput!);
+                receiptObserved = true;
+            }
+        }, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(1, effects);
+        Assert.Equal("готов", result.Text);
+    }
+
+    [Fact]
     public async Task RequiredFirstFunctionIsExclusiveThenReleasesTheLoopToAuto()
     {
         var bodies = new List<JsonElement>();

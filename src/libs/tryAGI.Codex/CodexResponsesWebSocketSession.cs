@@ -148,18 +148,17 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
         return new JsonArray(input.Skip(oldInput.Count + output.Count).Select(item => item?.DeepClone()).ToArray());
     }
 
-    private void Remember(JsonObject body, JsonElement response, int maximumBytes)
+    private void Remember(JsonObject body, string id, IReadOnlyList<JsonElement> output, int maximumBytes)
     {
         previous = null;
         previousOutput = null;
         responseId = null;
-        var id = CodexRealtimeProtocol.Text(response, "id");
-        if (string.IsNullOrWhiteSpace(id) || !response.TryGetProperty("output", out var output) ||
-            output.ValueKind != JsonValueKind.Array ||
-            (long)Encoding.UTF8.GetByteCount(body.ToJsonString()) + Encoding.UTF8.GetByteCount(output.GetRawText()) > (long)maximumBytes * 4)
+        if (string.IsNullOrWhiteSpace(id) ||
+            (long)Encoding.UTF8.GetByteCount(body.ToJsonString()) +
+            output.Sum(item => (long)Encoding.UTF8.GetByteCount(item.GetRawText())) > (long)maximumBytes * 4)
             return;
         previous = (JsonObject)body.DeepClone();
-        previousOutput = JsonNode.Parse(output.GetRawText()) as JsonArray;
+        previousOutput = new JsonArray(output.Select(item => JsonNode.Parse(item.GetRawText())).ToArray());
         responseId = id;
     }
 
@@ -186,9 +185,6 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
     {
         private bool completed;
         private bool released;
-        private readonly List<JsonElement> streamed = [];
-        private bool streamedOverflow;
-        private long streamedBytes;
 
         internal IReadOnlyList<CodexObservedQuota>? Quotas { get; init; }
         internal bool NeedsPrewarm => owner.previous is null;
@@ -233,18 +229,19 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
                 if (correlation.Observe(type, payload) is { } failure)
                     throw new CodexProtocolException("Responses prewarm rejected (" + failure + ").");
                 routing.CaptureEvent(payload, type, generation);
-                if (type is "error" or "response.failed" or "response.incomplete" or "response.output_item.added" or "response.output_item.done")
+                if (type is "error" or "response.failed" or "response.incomplete" or "response.output_item.added" or "response.output_item.done" ||
+                    type.StartsWith("response.", StringComparison.Ordinal) && type.EndsWith(".delta", StringComparison.Ordinal))
                     throw new CodexProtocolException("Responses prewarm did not prove a non-generating completion.");
                 if (type != "response.completed") continue;
-                if (!payload.TryGetProperty("response", out var response) ||
-                    !response.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array ||
-                    output.GetArrayLength() != 0 ||
+                if (!payload.TryGetProperty("response", out var response) || response.ValueKind != JsonValueKind.Object ||
+                    response.TryGetProperty("output", out var output) && (output.ValueKind != JsonValueKind.Array ||
+                    output.GetArrayLength() != 0) ||
                     response.TryGetProperty("status", out var status) && status.GetString() != "completed" ||
                     response.TryGetProperty("usage", out var usage) && usage.ValueKind != JsonValueKind.Null &&
                     (usage.ValueKind != JsonValueKind.Object || !HasOnlyZeroUsage(usage)))
                     throw new CodexProtocolException("Responses prewarm unexpectedly produced output or usage.");
                 owner.completedResponses.Add(correlation.ResponseId!);
-                owner.Remember(body, response, maximumBytes);
+                owner.Remember(body, correlation.ResponseId!, [], maximumBytes);
                 return;
             }
             throw new CodexProtocolException("Responses prewarm ended without completion.");
@@ -258,30 +255,10 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
             _ => false,
         };
 
-        internal void Observe(string type, JsonElement payload, JsonObject body)
+        internal void Complete(JsonObject body, string id, IReadOnlyList<JsonElement> output)
         {
-            if (type == "response.output_item.done" && payload.TryGetProperty("item", out var item))
-            {
-                streamedBytes += Encoding.UTF8.GetByteCount(item.GetRawText());
-                if (!streamedOverflow && streamed.Count < 1024 && streamedBytes <= (long)maximumBytes * 4)
-                    streamed.Add(item.Clone());
-                else { streamedOverflow = true; streamed.Clear(); }
-            }
-            if (type != "response.completed") return;
-            var response = payload.GetProperty("response");
-            var output = response.GetProperty("output");
-            owner.completedResponses.Add(response.GetProperty("id").GetString()!);
-            // If streaming and terminal output disagree, never infer a continuation prefix.
-            if (!streamedOverflow && (streamed.Count == 0 ||
-                streamed.Count == output.GetArrayLength() && streamed.Zip(output.EnumerateArray()).All(pair =>
-                    JsonElement.DeepEquals(pair.First, pair.Second))))
-                owner.Remember(body, response, maximumBytes);
-            else
-            {
-                owner.previous = null;
-                owner.previousOutput = null;
-                owner.responseId = null;
-            }
+            owner.completedResponses.Add(id);
+            owner.Remember(body, id, output, maximumBytes);
             completed = true;
         }
 

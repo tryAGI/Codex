@@ -121,9 +121,8 @@ public sealed class CodexAgent(CodexClient client)
         {
             if (control is not null) options = await control.CaptureAsync(options, input, cancellationToken).ConfigureAwait(false);
             var requestOptions = request == 1 ? options : options with { RequiredFirstFunction = null };
-            JsonElement? result = null;
+            IReadOnlyList<JsonElement>? completedOutput = null;
             CodexResponseDiagnostic? requestDiagnostic = null;
-            var completedItems = new SortedDictionary<int, JsonElement>();
             await foreach (var item in client.StreamResponseAsync(requestOptions, input, cancellationToken,
                 observeDiagnostics is null ? null : point =>
                 {
@@ -133,33 +132,9 @@ public sealed class CodexAgent(CodexClient client)
             {
                 observe?.Invoke(item);
                 if (observeAsync is not null) await observeAsync(item, cancellationToken).ConfigureAwait(false);
-                if (item.Type == "response.output_item.done")
-                {
-                    if (!item.Payload.TryGetProperty("output_index", out var indexValue) || !indexValue.TryGetInt32(out var index) ||
-                        index is < 0 or >= 4096 || !item.Payload.TryGetProperty("item", out var completedItem) ||
-                        completedItem.ValueKind != JsonValueKind.Object)
-                        throw new CodexProtocolException("Completed output item has an invalid index or body.");
-                    if (completedItems.TryGetValue(index, out var previous) && !JsonElement.DeepEquals(previous, completedItem))
-                        throw new CodexProtocolException("Conflicting completed output items.");
-                    completedItems[index] = completedItem.Clone();
-                }
-                if (item.Type == "response.completed") result = item.Payload.GetProperty("response").Clone();
+                if (item.Type == "response.completed") completedOutput = item.CompletedOutput;
             }
-            if (result is null || !result.Value.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array)
-                throw new CodexProtocolException("Completed response has no output array.");
-            var items = output.EnumerateArray().Select(x => x.Clone()).ToArray();
-            if (items.Length == 0)
-            {
-                if (!completedItems.Keys.SequenceEqual(Enumerable.Range(0, completedItems.Count)))
-                    throw new CodexProtocolException("Completed response has missing output items.");
-                items = completedItems.Values.ToArray();
-            }
-            else if (completedItems.Any(x => x.Key >= items.Length || !JsonElement.DeepEquals(x.Value, items[x.Key])))
-                throw new CodexProtocolException("Terminal response conflicts with completed output items.");
-            var itemIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var item in items)
-                if (CodexRealtimeProtocol.Text(item, "id") is { } id && !itemIds.Add(id))
-                    throw new CodexProtocolException("Repeated output item ID.");
+            var items = completedOutput ?? throw new CodexProtocolException("Completed response has no validated output.");
             var functions = items.Where(x => CodexRealtimeProtocol.Text(x, "type") is "function_call" or "custom_tool_call").ToArray();
             if (requestOptions.RequiredFirstFunction is { } required &&
                 (functions.Length != 1 || CodexRealtimeProtocol.Text(functions[0], "type") != "function_call" ||
