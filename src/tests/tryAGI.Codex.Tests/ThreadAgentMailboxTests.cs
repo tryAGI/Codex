@@ -238,7 +238,7 @@ public sealed class ThreadAgentMailboxTests
         var first = Attempt(left, Mail(10, "first"));
         var second = Attempt(right, Mail(11, "second"));
         start.SetResult();
-        Assert.Single((await Task.WhenAll(first, second)).Where(won => won));
+        Assert.Single(await Task.WhenAll(first, second), won => won);
         var current = await right.ReadAgentMailboxAsync(Root, Child, Ct);
         Assert.Equal(1L, current.Revision);
         Assert.Single(current.Pending);
