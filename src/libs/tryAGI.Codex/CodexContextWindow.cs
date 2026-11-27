@@ -6,6 +6,28 @@ using System.Text.Json.Serialization;
 
 namespace tryAGI.Codex;
 
+/// <summary>Absolute request-input baseline for one compaction window. A server-observed
+/// baseline is immutable; an estimate may be replaced by the first available server input count.</summary>
+public sealed record CodexContextWindowPrefill
+{
+    /// <summary>Input tokens at the captured baseline, not accumulated billing.</summary>
+    [JsonRequired] public required long InputTokens { get; init; }
+    /// <summary>True when the baseline was estimated rather than reported by the server.</summary>
+    [JsonRequired] public required bool IsEstimated { get; init; }
+    /// <summary>Inference reservation that established the baseline.</summary>
+    [JsonRequired] public required string RequestId { get; init; }
+    /// <summary>Provider response that established the baseline.</summary>
+    [JsonRequired] public required string ResponseId { get; init; }
+    /// <summary>Window and stable prompt-configuration digest.</summary>
+    [JsonRequired] public required string ScopeSha256 { get; init; }
+    /// <summary>Funding owner digest, not credentials.</summary>
+    [JsonRequired] public required string AuthOwnerSha256 { get; init; }
+    /// <summary>Exact request-input prefix digest.</summary>
+    [JsonRequired] public required string HistorySha256 { get; init; }
+    /// <summary>Number of items in the captured request-input prefix.</summary>
+    [JsonRequired] public required int HistoryItemCount { get; init; }
+}
+
 /// <summary>Provider context counters observed at one validated terminal response. The prefix digest
 /// binds the observation to the model-visible history, not the complete journal or billed usage.</summary>
 public sealed record CodexStoredContextWindowObservation
@@ -28,6 +50,12 @@ public sealed record CodexStoredContextWindowObservation
     public long? ModelContextWindow { get; init; }
     /// <summary>Explicit provider remaining-context tokens, or unknown.</summary>
     public long? RemainingTokens { get; init; }
+    /// <summary>First input-token baseline for the scoped auto-compaction window, if enabled.</summary>
+    public CodexContextWindowPrefill? Prefill { get; init; }
+    /// <summary>Input tokens of this single response, not cumulative billing or active context.</summary>
+    public long? SampledInputTokens { get; init; }
+    /// <summary>Output tokens of this single response, not cumulative billing or active context.</summary>
+    public long? SampledOutputTokens { get; init; }
     /// <summary>Local observation time.</summary>
     [JsonRequired] public required DateTimeOffset ObservedAt { get; init; }
 }
@@ -42,8 +70,22 @@ public sealed record CodexContextWindowStatus
     public required long EstimatedAdditionalTokens { get; init; }
     /// <summary>Observed used tokens plus estimated additions, or the approximate full prompt.</summary>
     public required long ProjectedActiveTokens { get; init; }
+    /// <summary>Last matching input-token baseline, distinct from active-context usage.</summary>
+    public CodexContextWindowPrefill? Prefill { get; init; }
+    /// <summary>Input plus output tokens of the last matching individual response, used only as an estimate when explicit context is absent.</summary>
+    public long? ResponseUsageContextEstimate { get; init; }
+    /// <summary>True when the projected context is anchored to prefill plus estimated suffix rather than a current provider context count.</summary>
+    public bool PrefillAnchoredEstimate { get; init; }
+    /// <summary>Projected usage counted against the configured auto-compaction scope.</summary>
+    public long AutoCompactScopeTokens { get; init; }
+    /// <summary>Configured scope limit, independent of the full context window.</summary>
+    public long? AutoCompactScopeLimit { get; init; }
+    /// <summary>Remaining unbuffered scope or full-window capacity, whichever is smaller.</summary>
+    public long? BaseWindowTokensRemaining { get; init; }
     /// <summary>Effective hard context limit after applying the host policy, if known.</summary>
     public long? EffectiveContextLimit { get; init; }
+    /// <summary>True when the full model window is exhausted, independent of the scope budget.</summary>
+    public bool FullContextWindowLimitReached { get; init; }
     /// <summary>The projected context reaches the hard limit or configured compaction threshold.</summary>
     public bool TokenLimitReached { get; init; }
     /// <summary>The lower speculative threshold is reached, but the hard threshold is not.</summary>
@@ -82,12 +124,23 @@ internal static class CodexContextWindow
             ["checkpoint_response"] = checkpoint?.ResponseId,
         }.ToJsonString());
 
+    private static string PrefillScopeHash(CodexResponseOptions settings, CodexStoredCompactionCheckpoint? checkpoint)
+        => ScopeHash(settings with { RequiredFirstFunction = null }, checkpoint);
+
+    private static CodexContextWindowPrefill? MatchPrefill(CodexResponseOptions settings,
+        CodexStoredCompactionCheckpoint? checkpoint, CodexThreadCompactionScheduler.AuthOwner owner,
+        IReadOnlyList<JsonElement> history, CodexContextWindowPrefill? prefill)
+        => prefill is not null && prefill.ScopeSha256 == PrefillScopeHash(settings, checkpoint) &&
+            prefill.AuthOwnerSha256 == AuthHash(owner) && prefill.InputTokens >= 0 &&
+            prefill.HistoryItemCount >= 0 && prefill.HistoryItemCount <= history.Count &&
+            prefill.HistorySha256 == HistoryHash(history, prefill.HistoryItemCount) ? prefill : null;
+
     internal static CodexStoredContextWindowObservation? Capture(CodexResponseOptions settings,
         CodexStoredCompactionCheckpoint? checkpoint, CodexThreadCompactionScheduler.AuthOwner owner,
-        IReadOnlyList<JsonElement> input, CodexResponseEvent terminal)
+        IReadOnlyList<JsonElement> input, CodexResponseEvent terminal, CodexStoredContextWindowObservation? previous = null)
     {
-        // Billing totals, cached tokens, reasoning tokens and session snapshots are not
-        // active-context usage. Only explicit counters of a validated reasoning terminal qualify.
+        // Only a validated foreground terminal can establish a context sample.
+        // Its input count can establish the prefill baseline, never the observed active-context count.
         if (terminal.Type != "response.completed" || terminal.CompletedOutput is not { } output ||
             terminal.Usage is not { } usage || terminal.Identity != settings.Identity ||
             terminal.RequestId is not { Length: > 0 and <= 512 } requestId ||
@@ -97,8 +150,25 @@ internal static class CodexContextWindow
             CodexRealtimeProtocol.Text(response, "model") is { } model && model != settings.Model ||
             input.Count + (long)output.Count > MaximumPrefixItems)
             return null;
+        CodexContextWindowPrefill? prefill = null;
+        var scoped = settings.AutomaticCompaction?.TokenLimitScope == CodexAutoCompactTokenLimitScope.BodyAfterPrefix;
+        if (scoped)
+        {
+            prefill = MatchPrefill(settings, checkpoint, owner, input, previous?.Prefill);
+            var inputTokens = usage.Tokens?.InputTokens;
+            if (prefill is null || prefill.IsEstimated && inputTokens is not null)
+            {
+                prefill = new()
+                {
+                    InputTokens = inputTokens ?? CodexThreadCompaction.EstimateTokens(settings, input),
+                    IsEstimated = inputTokens is null, RequestId = requestId, ResponseId = responseId,
+                    ScopeSha256 = PrefillScopeHash(settings, checkpoint), AuthOwnerSha256 = AuthHash(owner),
+                    HistorySha256 = HistoryHash(input, input.Count), HistoryItemCount = input.Count,
+                };
+            }
+        }
         if (usage.ContextUsedTokens is null && usage.ModelContextWindow is not > 0 &&
-            usage.ContextRemainingTokens is null)
+            usage.ContextRemainingTokens is null && prefill is null)
             return null;
         var prefix = input.Concat(output).ToArray();
         return new()
@@ -109,6 +179,9 @@ internal static class CodexContextWindow
             UsedTokens = usage.ContextUsedTokens,
             ModelContextWindow = usage.ModelContextWindow is > 0 ? usage.ModelContextWindow : null,
             RemainingTokens = usage.ContextRemainingTokens, ObservedAt = terminal.ObservedAt,
+            Prefill = prefill,
+            SampledInputTokens = scoped ? usage.Tokens?.InputTokens : null,
+            SampledOutputTokens = scoped ? usage.Tokens?.OutputTokens : null,
         };
     }
 
@@ -116,58 +189,97 @@ internal static class CodexContextWindow
         IReadOnlyList<JsonElement> history, CodexStoredContextWindowObservation? observation,
         CodexStoredCompactionCheckpoint? checkpoint, CodexThreadCompactionScheduler.AuthOwner owner)
     {
+        var policy = settings.AutomaticCompaction;
+        if (policy is not null) ValidatePolicy(policy);
+        var scoped = policy?.TokenLimitScope == CodexAutoCompactTokenLimitScope.BodyAfterPrefix;
+        var prefill = scoped ? MatchPrefill(settings, checkpoint, owner, history, observation?.Prefill) : null;
         if (observation is not null && (observation.ScopeSha256 != ScopeHash(settings, checkpoint) ||
             observation.AuthOwnerSha256 != AuthHash(owner) ||
             observation.HistoryItemCount < 0 || observation.HistoryItemCount > history.Count ||
             observation.HistorySha256 != HistoryHash(history, observation.HistoryItemCount)))
             observation = null;
 
+        // Rust uses the latest individual response and estimates unsampled suffixes.
+        // Never use aggregate billing totals as active context, and label this fallback as an estimate.
+        long? responseEstimate = scoped && observation?.SampledInputTokens is { } sampledInput &&
+            observation.SampledOutputTokens is { } sampledOutput ? Add(sampledInput, sampledOutput) : null;
+        var baseline = observation?.UsedTokens ?? responseEstimate;
+        var prefillAnchored = baseline is null && prefill is not null;
+        var prefixCount = baseline is not null ? observation!.HistoryItemCount :
+            prefillAnchored ? prefill!.HistoryItemCount : 0;
         long estimated;
-        if (observation?.UsedTokens is not null)
+        if (baseline is not null || prefillAnchored)
         {
             long bytes = 0;
-            for (var index = observation.HistoryItemCount; index < history.Count; index++)
+            for (var index = prefixCount; index < history.Count; index++)
                 bytes += Encoding.UTF8.GetByteCount(history[index].GetRawText());
             estimated = (bytes + 3) / 4;
         }
         else estimated = CodexThreadCompaction.EstimateTokens(settings, history);
 
-        var observed = observation?.UsedTokens ?? 0;
-        var projected = observed > long.MaxValue - estimated ? long.MaxValue : observed + estimated;
-        var policy = settings.AutomaticCompaction;
-        if (policy is not null) ValidatePolicy(policy);
+        var projected = Add(baseline ?? (prefillAnchored ? prefill!.InputTokens : 0), estimated);
+        var scopeTokens = scoped ? prefill is null ? 0 : Math.Max(0, projected - prefill.InputTokens) : projected;
         var capacity = observation?.ModelContextWindow;
         if (policy?.ContextWindowTokens is { } configured)
             capacity = capacity is { } measured ? Math.Min(measured, configured) : configured;
         long? limit = capacity is { } window
             ? Math.Max(1, (long)((decimal)window * (policy?.EffectiveContextWindowPercent ?? 100) / 100))
             : null;
-        var hard = limit is { } hardLimit && projected >= hardLimit ||
-            policy is not null && projected >= policy.TokenThreshold;
+        var full = limit is { } hardLimit && projected >= hardLimit;
+        var hard = full || policy is not null && scopeTokens >= policy.TokenThreshold;
+        long? scopeRemaining = policy is null ? null : Math.Max(0, policy.TokenThreshold - scopeTokens);
+        long? fullRemaining = limit is { } fullLimit ? Math.Max(0, fullLimit - projected) : null;
+        var remaining = scopeRemaining is { } body && fullRemaining is { } all ? Math.Min(body, all) :
+            scopeRemaining ?? fullRemaining;
         return new()
         {
             Observation = observation, EstimatedAdditionalTokens = estimated,
             ProjectedActiveTokens = projected, EffectiveContextLimit = limit,
+            Prefill = prefill, ResponseUsageContextEstimate = responseEstimate, PrefillAnchoredEstimate = prefillAnchored,
+            AutoCompactScopeTokens = scopeTokens, AutoCompactScopeLimit = policy?.TokenThreshold,
+            BaseWindowTokensRemaining = remaining, FullContextWindowLimitReached = full,
             TokenLimitReached = hard,
-            BackgroundThresholdReached = !hard && policy?.BackgroundTokenThreshold is { } lower && projected >= lower,
+            BackgroundThresholdReached = !hard && policy?.BackgroundTokenThreshold is { } lower && scopeTokens >= lower,
         };
     }
 
     internal static void ValidatePolicy(CodexThreadCompactionOptions policy)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(policy.TokenThreshold);
-        if (policy.ContextWindowTokens is <= 0 || policy.EffectiveContextWindowPercent is < 1 or > 100)
+        if (!Enum.IsDefined(policy.TokenLimitScope) || policy.ContextWindowTokens is <= 0 ||
+            policy.EffectiveContextWindowPercent is < 1 or > 100)
             throw new ArgumentOutOfRangeException(nameof(policy), "Invalid effective context-window policy.");
     }
 
     // The journal's raw inference receipt remains authoritative. Invalid derived metadata
     // is ignored when reading old or externally supplied snapshots, not used as a trigger.
-    internal static CodexStoredContextWindowObservation? ReadObservation(CodexStoredTurn? turn)
+    internal static CodexStoredContextWindowObservation? ReadObservation(CodexStoredTurn? turn, CodexThreadDocument? document = null)
     {
         if (turn?.ContextWindowObservation is not { } observation) return null;
         try { Validate(turn, observation); }
         catch (InvalidDataException) { return null; }
+        if (observation.Prefill is { } prefill &&
+            !(document?.Turns ?? [turn]).SelectMany(item => item.Dispatches)
+                .Any(receipt => MatchesPrefillReceipt(prefill, receipt)))
+            observation = observation with { Prefill = null };
         return observation;
+    }
+
+    private static long Add(long left, long right) => left > long.MaxValue - right ? long.MaxValue : left + right;
+
+    private static long? Count(JsonElement value, string property) =>
+        value.ValueKind == JsonValueKind.Object && value.TryGetProperty(property, out var counter) &&
+        counter.ValueKind == JsonValueKind.Number && counter.TryGetInt64(out var number) && number >= 0 ? number : null;
+
+    private static bool MatchesPrefillReceipt(CodexContextWindowPrefill prefill, CodexStoredDispatch receipt)
+    {
+        if (receipt.CallId != prefill.RequestId || receipt.Kind != "inference" || receipt.State != "succeeded" ||
+            receipt.Result is not { ValueKind: JsonValueKind.Object } response ||
+            CodexRealtimeProtocol.Text(response, "id") != prefill.ResponseId) return false;
+        if (prefill.IsEstimated) return true;
+        var usage = response.TryGetProperty("usage", out var counters) ? counters : default;
+        // The terminal may have event-level usage independent of the stored nested response.
+        return Count(usage, "input_tokens") is not { } reported || reported == prefill.InputTokens;
     }
 
     internal static void Validate(CodexStoredTurn turn, CodexStoredContextWindowObservation observation)
@@ -181,15 +293,27 @@ internal static class CodexContextWindow
             !Hash(observation.HistorySha256) || observation.HistoryItemCount is < 0 or > MaximumPrefixItems ||
             observation.ObservedAt == default || observation.UsedTokens is < 0 ||
             observation.ModelContextWindow is <= 0 || observation.RemainingTokens is < 0 ||
-            observation.UsedTokens is null && observation.ModelContextWindow is null && observation.RemainingTokens is null ||
+            observation.SampledInputTokens is < 0 || observation.SampledOutputTokens is < 0 ||
+            observation.UsedTokens is null && observation.ModelContextWindow is null && observation.RemainingTokens is null &&
+                observation.Prefill is null ||
             receipt?.Result is not { ValueKind: JsonValueKind.Object } response ||
             CodexRealtimeProtocol.Text(response, "id") != observation.ResponseId)
             throw new InvalidDataException("Native context-window observation is invalid or has no matching inference receipt.");
         // Counters in the persisted nested response must agree with the derived observation.
         // Event-level counters may exist independently of that nested receipt.
-        static long? Count(JsonElement value, string property) =>
-            value.ValueKind == JsonValueKind.Object && value.TryGetProperty(property, out var counter) &&
-            counter.ValueKind == JsonValueKind.Number && counter.TryGetInt64(out var number) && number >= 0 ? number : null;
+        if (observation.Prefill is { } prefill &&
+            (prefill.InputTokens < 0 || prefill.HistoryItemCount is < 0 or > MaximumPrefixItems ||
+                prefill.HistoryItemCount > observation.HistoryItemCount ||
+                prefill.RequestId is not { Length: > 0 and <= 512 } ||
+                prefill.ResponseId is not { Length: > 0 and <= 512 } ||
+                !Hash(prefill.ScopeSha256) || !Hash(prefill.HistorySha256) || !Hash(prefill.AuthOwnerSha256) ||
+                prefill.AuthOwnerSha256 != observation.AuthOwnerSha256 ||
+                prefill.RequestId == observation.RequestId && !MatchesPrefillReceipt(prefill, receipt!)))
+            throw new InvalidDataException("Native prefill baseline is invalid.");
+        var counters = response.TryGetProperty("usage", out var sample) ? sample : default;
+        if (observation.SampledInputTokens is { } input && Count(counters, "input_tokens") is { } actualInput && input != actualInput ||
+            observation.SampledOutputTokens is { } output && Count(counters, "output_tokens") is { } actualOutput && output != actualOutput)
+            throw new InvalidDataException("Native response token estimate disagrees with its inference receipt.");
         var context = response.TryGetProperty("context_window", out var window) ? window : default;
         if (Count(context, "used_tokens") is { } used && used != observation.UsedTokens ||
             Count(context, "remaining_tokens") is { } remaining && remaining != observation.RemainingTokens ||

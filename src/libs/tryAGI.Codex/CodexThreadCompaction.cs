@@ -6,11 +6,22 @@ using System.Text.Json.Serialization;
 
 namespace tryAGI.Codex;
 
+/// <summary>Which part of the active context is counted against the auto-compaction threshold.</summary>
+public enum CodexAutoCompactTokenLimitScope
+{
+    /// <summary>Count the entire active context.</summary>
+    Total,
+    /// <summary>Count growth after the initial request-input baseline; the full model limit still applies.</summary>
+    BodyAfterPrefix,
+}
+
 /// <summary>Explicit automatic compaction policy for native thread execution; the default is disabled.</summary>
 public sealed record CodexThreadCompactionOptions
 {
-    /// <summary>Host-selected context threshold, evaluated against observed or estimated active context.</summary>
+    /// <summary>Host-selected threshold in the configured scope, evaluated against observed or estimated context.</summary>
     public required long TokenThreshold { get; init; }
+    /// <summary>Count either full active context or growth after the first input of this window.</summary>
+    public CodexAutoCompactTokenLimitScope TokenLimitScope { get; init; }
     /// <summary>Optional host-known model capacity; a smaller explicit provider capacity takes precedence.</summary>
     public long? ContextWindowTokens { get; init; }
     /// <summary>Percentage of the known model context window usable before forced compaction (1–100).</summary>
@@ -19,7 +30,7 @@ public sealed record CodexThreadCompactionOptions
     public CodexRetainedContextOptions? Retention { get; init; }
     /// <summary>Maximum additional compaction attempts during an active turn, zero disables inline compaction.</summary>
     public int MaximumInlineCompactions { get; init; } = 4;
-    /// <summary>Optional lower context threshold for speculative compaction between inference steps and after a turn.
+    /// <summary>Optional lower threshold in the configured scope for speculative compaction between inference steps and after a turn.
     /// Requires a host-owned <see cref="CodexThreadCompactionScheduler"/>; must be below TokenThreshold.</summary>
     public long? BackgroundTokenThreshold { get; init; }
 }
@@ -130,10 +141,12 @@ public static class CodexThreadCompaction
         IReadOnlyList<JsonElement> upcomingInput, CodexThreadCompactionOptions policy)
     {
         CodexContextWindow.ValidatePolicy(policy);
-        var threshold = policy.ContextWindowTokens is { } capacity
-            ? Math.Min(policy.TokenThreshold, Math.Max(1, (long)((decimal)capacity * policy.EffectiveContextWindowPercent / 100)))
-            : policy.TokenThreshold;
-        return closedPrefix.Count != 0 && EstimateTokens(settings, [.. closedPrefix, .. upcomingInput]) >= threshold;
+        if (closedPrefix.Count == 0) return false;
+        var estimate = EstimateTokens(settings, [.. closedPrefix, .. upcomingInput]);
+        // Without a captured prefill, body growth is unknown, not the entire prompt.
+        return policy.ContextWindowTokens is { } capacity &&
+            estimate >= Math.Max(1, (long)((decimal)capacity * policy.EffectiveContextWindowPercent / 100)) ||
+            policy.TokenLimitScope == CodexAutoCompactTokenLimitScope.Total && estimate >= policy.TokenThreshold;
     }
 
     internal static string ScopeHash(CodexResponseOptions settings) => Hash(writer =>

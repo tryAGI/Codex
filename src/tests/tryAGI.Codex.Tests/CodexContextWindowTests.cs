@@ -116,6 +116,91 @@ public sealed class CodexContextWindowTests
         Assert.NotNull(CodexContextWindow.Evaluate(settings, [reformatted, Answer], observed, null, Owner).Observation);
     }
 
+    private static CodexResponseOptions BodySettings(Guid thread, Guid turn) => Settings(thread, turn) with
+    {
+        AutomaticCompaction = new()
+        {
+            TokenThreshold = 200, BackgroundTokenThreshold = 100, ContextWindowTokens = 3000,
+            TokenLimitScope = CodexAutoCompactTokenLimitScope.BodyAfterPrefix,
+        },
+    };
+
+    [Fact]
+    public void BodyScopeCountsOnlyGrowthAndFullWindowRemainsIndependent()
+    {
+        var settings = BodySettings(Guid.NewGuid(), Guid.NewGuid());
+        var sample = CodexContextWindow.Capture(settings, null, Owner, [User],
+            Terminal(settings, ""","usage":{"input_tokens":1200,"output_tokens":40,"total_tokens":999999},"context_window":{"used_tokens":1240,"total_tokens":3000}"""))!;
+        var status = CodexContextWindow.Evaluate(settings, [User, Answer], sample, null, Owner);
+        Assert.Equal(1200, status.Prefill!.InputTokens);
+        Assert.False(status.Prefill.IsEstimated);
+        Assert.Equal(40, status.AutoCompactScopeTokens);
+        Assert.Equal(160, status.BaseWindowTokensRemaining);
+        Assert.False(status.TokenLimitReached);
+        Assert.False(status.BackgroundThresholdReached);
+        var next = CodexContextWindow.Capture(settings, null, Owner, [User, Answer, User],
+            Terminal(settings, ""","usage":{"input_tokens":1280,"output_tokens":140,"total_tokens":999999}"""), sample)!;
+        status = CodexContextWindow.Evaluate(settings, [User, Answer, User, Answer], next, null, Owner);
+        Assert.Equal(sample.Prefill, next.Prefill);
+        Assert.Null(status.Observation!.UsedTokens);
+        Assert.Equal(1420, status.ResponseUsageContextEstimate);
+        Assert.Equal(220, status.AutoCompactScopeTokens);
+        Assert.True(status.TokenLimitReached);
+        Assert.False(status.FullContextWindowLimitReached);
+        var smallWindow = settings with
+        {
+            AutomaticCompaction = settings.AutomaticCompaction! with { ContextWindowTokens = 1300, TokenThreshold = 5000 },
+        };
+        status = CodexContextWindow.Evaluate(smallWindow, [User, Answer, User, Answer], next, null, Owner);
+        Assert.True(status.FullContextWindowLimitReached);
+        Assert.True(status.TokenLimitReached);
+        Assert.Equal(0, status.BaseWindowTokensRemaining);
+    }
+
+    [Fact]
+    public void FirstObservedPrefillReplacesEstimateThenNeverMovesWithinWindow()
+    {
+        var settings = BodySettings(Guid.NewGuid(), Guid.NewGuid()) with { RequiredFirstFunction = "read" };
+        var initial = CodexContextWindow.Capture(settings, null, Owner, [User], Terminal(settings, ""))!;
+        Assert.True(initial.Prefill!.IsEstimated);
+        var status = CodexContextWindow.Evaluate(settings, [User, Answer], initial, null, Owner);
+        Assert.True(status.PrefillAnchoredEstimate);
+        Assert.Equal(status.EstimatedAdditionalTokens, status.AutoCompactScopeTokens);
+        var laterSettings = settings with { RequiredFirstFunction = null };
+        var measured = CodexContextWindow.Capture(laterSettings, null, Owner, [User, Answer, User],
+            Terminal(laterSettings, ""","usage":{"input_tokens":400,"output_tokens":30}"""), initial)!;
+        Assert.False(measured.Prefill!.IsEstimated);
+        Assert.Equal(400, measured.Prefill.InputTokens);
+        var omitted = CodexContextWindow.Capture(laterSettings, null, Owner, [User, Answer, User, Answer],
+            Terminal(laterSettings, ""","usage":{"total_tokens":999999}"""), measured)!;
+        Assert.Equal(measured.Prefill, omitted.Prefill);
+        status = CodexContextWindow.Evaluate(laterSettings, [User, Answer, User, Answer, Answer], omitted, null, Owner);
+        Assert.True(status.PrefillAnchoredEstimate);
+        Assert.Null(status.ResponseUsageContextEstimate);
+        Assert.Null(status.Observation!.UsedTokens);
+        Assert.True(status.ProjectedActiveTokens < 1000);
+    }
+
+    [Fact]
+    public void BodyBaselineIsFencedByWindowOwnerCheckpointAndExactPrefix()
+    {
+        var settings = BodySettings(Guid.NewGuid(), Guid.NewGuid());
+        var sample = CodexContextWindow.Capture(settings, null, Owner, [User],
+            Terminal(settings, ""","usage":{"input_tokens":1200,"output_tokens":40}"""))!;
+        var nextWindow = settings with { Identity = settings.Identity! with { ContextWindowId = "window-2" } };
+        var status = CodexContextWindow.Evaluate(nextWindow, [User, Answer], sample, null, Owner);
+        Assert.Null(status.Prefill);
+        Assert.Equal(0, status.AutoCompactScopeTokens);
+        Assert.Null(CodexContextWindow.Evaluate(settings, [Answer, User], sample, null, Owner).Prefill);
+        Assert.Null(CodexContextWindow.Evaluate(settings, [User, Answer], sample, null, Owner with { UserId = "other" }).Prefill);
+        Assert.False(CodexThreadCompaction.ShouldCompact(settings, [User], [Answer], settings.AutomaticCompaction!));
+        var next = CodexContextWindow.Capture(nextWindow, null, Owner, [User],
+            Terminal(nextWindow, ""","usage":{"input_tokens":0,"output_tokens":20}"""), sample)!;
+        Assert.False(next.Prefill!.IsEstimated);
+        Assert.Equal(0, next.Prefill.InputTokens);
+        Assert.Equal(20, CodexContextWindow.Evaluate(nextWindow, [User, Answer], next, null, Owner).AutoCompactScopeTokens);
+    }
+
     private sealed class Credentials : ICodexCredentialProvider
     {
         public ValueTask<CodexCredentials> GetCredentialsAsync(CancellationToken ct = default)
@@ -131,12 +216,13 @@ public sealed class CodexContextWindowTests
         public Task IncompleteAsync(string id, string model, CancellationToken ct) => Task.CompletedTask;
     }
 
-    private sealed class Server(bool toolFirst = false, bool billingOnly = false)
+    private sealed class Server(bool toolFirst = false, bool billingOnly = false, bool scopedUsage = false)
     {
         internal List<JsonElement> Requests { get; } = [];
         private int inferenceCount;
         private bool ToolFirst => toolFirst;
         private bool BillingOnly => billingOnly;
+        private bool ScopedUsage => scopedUsage;
         internal HttpMessageHandler Handler() => new Transport(this);
 
         private sealed class Transport(Server owner) : HttpMessageHandler
@@ -156,11 +242,17 @@ public sealed class CodexContextWindowTests
                     var items = owner.ToolFirst && number == 1
                         ? """[{"type":"function_call","call_id":"read-once","name":"read","arguments":"{}"}]"""
                         : "[" + Answer.GetRawText() + "]";
-                    var context = number == 1 && !owner.BillingOnly
+                    var context = number == 1 && !owner.BillingOnly && !owner.ScopedUsage
                         ? ""","context_window":{"used_tokens":1500,"total_tokens":2000,"remaining_tokens":500}"""
                         : "";
+                    var usage = owner.ScopedUsage ? number switch
+                    {
+                        1 => """{"input_tokens":1200,"output_tokens":40,"total_tokens":1240}""",
+                        2 => """{"input_tokens":1280,"output_tokens":140,"total_tokens":1420}""",
+                        _ => """{"input_tokens":300,"output_tokens":20,"total_tokens":320}""",
+                    } : """{"total_tokens":999999}""";
                     result = "{\"type\":\"response.completed\",\"response\":{\"id\":\"r" + number + "\",\"model\":\"model\",\"output\":" +
-                        items + context + ",\"usage\":{\"total_tokens\":999999}}}";
+                        items + context + ",\"usage\":" + usage + "}}";
                 }
                 return new(HttpStatusCode.OK) { Content = new StringContent("data: " + result + "\n\n", Encoding.UTF8, "text/event-stream") };
             }
@@ -195,6 +287,46 @@ public sealed class CodexContextWindowTests
         Assert.Null(result.ContextWindow!.Observation); // The latest terminal omitted context; never reuse stale compaction usage.
         Assert.Null(result.Thread.Turns[^1].ContextWindowObservation);
         Assert.False(result.ContextWindow.TokenLimitReached);
+    }
+
+    [Fact]
+    public async Task BodyBaselineSurvivesRestartAndNewCompactionWindowStartsWithFreshInput()
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var budget = new Budget();
+        var server = new Server(scopedUsage: true);
+        async Task<CodexThreadAgentResult> Run(CodexThreadDocument prior)
+        {
+            // A fresh runner and store read on every turn prove the baseline is durable.
+            var journal = new CodexThreadStore(storage, "account");
+            var turn = Guid.NewGuid();
+            var settings = BodySettings(prior.Id, turn);
+            settings = settings with { AutomaticCompaction = settings.AutomaticCompaction! with { BackgroundTokenThreshold = null } };
+            var agent = new CodexThreadAgent(journal, new Credentials(), budget,
+                clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage));
+            var reloaded = await journal.ReadAsync(prior.Id, Ct);
+            return await agent.RunAsync(prior.Id, reloaded.Revision, turn, "owner", settings, [User],
+                (_, _) => throw new InvalidOperationException("No tools"), cancellationToken: Ct);
+        }
+        var first = await Run(thread);
+        Assert.Equal(1200, first.ContextWindow!.Prefill!.InputTokens);
+        Assert.Equal(40, first.ContextWindow.AutoCompactScopeTokens);
+        Assert.Null(first.Thread.CompactionCheckpoint);
+        var second = await Run(first.Thread);
+        Assert.Equal(first.ContextWindow.Prefill, second.ContextWindow!.Prefill);
+        Assert.Equal(220, second.ContextWindow.AutoCompactScopeTokens);
+        Assert.Null(second.Thread.CompactionCheckpoint);
+        var reloadedSecond = await store.ReadAsync(thread.Id, Ct);
+        var persisted = CodexContextWindow.ReadObservation(reloadedSecond.Turns[^1], reloadedSecond)!;
+        Assert.Equal(first.ContextWindow.Prefill, persisted.Prefill);
+        var third = await Run(second.Thread);
+        Assert.Equal("compact", third.Thread.CompactionCheckpoint!.ResponseId);
+        Assert.Equal(300, third.ContextWindow!.Prefill!.InputTokens);
+        Assert.Equal(20, third.ContextWindow.AutoCompactScopeTokens);
+        Assert.Equal("r3", third.ContextWindow.Prefill.ResponseId);
+        Assert.Equal(4, budget.Completed);
     }
 
     [Fact]
