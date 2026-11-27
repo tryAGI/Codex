@@ -1086,32 +1086,52 @@
     "crate:codex-rs/rmcp-client/Cargo.toml:codex-rmcp-client": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
         "ownerIssue": 74,
         "scope": "native-behavior",
-        "rationale": "Component evidence only: native handshake, correlation, tools, resource/prompt handling and refresh. Entire Rust crate, OAuth/enterprise credential lifecycle, actual host routing and new protocol features remain unverified.",
+        "rationale": "Component-level native MCP tests cover legacy handshake and correlation, modern stateless discovery and explicit downgrade, input-required distinction and authentication failure. OAuth/enterprise lifecycle, actual host integration, remaining Rust crate behavior, provider/real-server acceptance are not certified.",
         "implementation": [
-          "src/libs/tryAGI.Codex/CodexMcpClient.cs::CodexMcpClient"
+          "src/libs/tryAGI.Codex/CodexMcpClient.cs::CodexMcpClient",
+          "src/libs/tryAGI.Codex/CodexMcpClient.Modern.cs::NegotiateAsync"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.NegotiatesOnceAndCorrelatesConcurrentResponsesOutOfOrder",
           "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.AuthorizationIsIndependentOfToolDiscoveryAndPreservesExactArguments",
           "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.CancellationCorrelatesWireIdAndLateResultCannotCompleteAnotherRequest",
           "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.RefreshUsesPaginationAndInvalidationInTransportOrder",
-          "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.ResourcesAndPromptsRetainRawResultsAndRpcErrors"
+          "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.ResourcesAndPromptsRetainRawResultsAndRpcErrors",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpModernTests.cs::CodexMcpModernTests.ModernDiscoverUsesSelfContainedMetadataWithoutInitializeOrSession",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpModernTests.cs::CodexMcpModernTests.ExplicitLegacyEvidenceFallsBackOnceAndUsesNegotiatedHeaders",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpModernTests.cs::CodexMcpModernTests.UnprovenOrUncorrelatedDowngradeDoesNotSendInitialize",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpModernTests.cs::CodexMcpModernTests.AuthenticationFailureCannotDowngradeOrRetry",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpModernTests.cs::CodexMcpModernTests.ModernInputRequiredDoesNotMasqueradeAsCompletedToolResult",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpModernTests.cs::CodexMcpModernTests.StdioRequiresExplicitModernMarkerAndOptIn"
         ],
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
-          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
-          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
           "cases": [
             "tryAGI.Codex.Tests.CodexMcpClientTests.AuthorizationIsIndependentOfToolDiscoveryAndPreservesExactArguments",
             "tryAGI.Codex.Tests.CodexMcpClientTests.CancellationCorrelatesWireIdAndLateResultCannotCompleteAnotherRequest",
             "tryAGI.Codex.Tests.CodexMcpClientTests.NegotiatesOnceAndCorrelatesConcurrentResponsesOutOfOrder",
             "tryAGI.Codex.Tests.CodexMcpClientTests.RefreshUsesPaginationAndInvalidationInTransportOrder",
-            "tryAGI.Codex.Tests.CodexMcpClientTests.ResourcesAndPromptsRetainRawResultsAndRpcErrors"
+            "tryAGI.Codex.Tests.CodexMcpClientTests.ResourcesAndPromptsRetainRawResultsAndRpcErrors",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.AuthenticationFailureCannotDowngradeOrRetry",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.ExplicitLegacyEvidenceFallsBackOnceAndUsesNegotiatedHeaders(reason: \"method\")",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.ExplicitLegacyEvidenceFallsBackOnceAndUsesNegotiatedHeaders(reason: \"unsupported\")",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.ExplicitLegacyEvidenceFallsBackOnceAndUsesNegotiatedHeaders(reason: \"versions\")",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.ModernDiscoverUsesSelfContainedMetadataWithoutInitializeOrSession(sse: False)",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.ModernDiscoverUsesSelfContainedMetadataWithoutInitializeOrSession(sse: True)",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.ModernInputRequiredDoesNotMasqueradeAsCompletedToolResult",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.StdioRequiresExplicitModernMarkerAndOptIn",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.UnprovenOrUncorrelatedDowngradeDoesNotSendInitialize(response: \"{\\\"code\\\":-32022,\\\"message\\\":\\\"unsupported\\\",\\\"data\\\":{\\\"su\"···, error: True, unrelated: False)",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.UnprovenOrUncorrelatedDowngradeDoesNotSendInitialize(response: \"{\\\"code\\\":-32601,\\\"message\\\":\\\"method not found\\\"}\", error: True, unrelated: True)",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.UnprovenOrUncorrelatedDowngradeDoesNotSendInitialize(response: \"{\\\"resultType\\\":\\\"complete\\\",\\\"supportedVersions\\\":[\\\"202\"···, error: False, unrelated: False) [testId:22d841d0-01ba-f722-fc1d-1ba494144542]",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.UnprovenOrUncorrelatedDowngradeDoesNotSendInitialize(response: \"{\\\"resultType\\\":\\\"complete\\\",\\\"supportedVersions\\\":[\\\"202\"···, error: False, unrelated: False) [testId:ee54a4c2-aaff-8615-4a21-ac0a5fd89317]",
+            "tryAGI.Codex.Tests.CodexMcpModernTests.UnprovenOrUncorrelatedDowngradeDoesNotSendInitialize(response: \"{\\\"resultType\\\":\\\"complete\\\",\\\"supportedVersions\\\":[],\\\"c\"···, error: False, unrelated: False)"
           ]
         }
       }
@@ -2143,6 +2163,236 @@
           "cases": [
             "tryAGI.Codex.Tests.CodexFileSearchTests.SessionFailureDoesNotEmitSuccessfulCompletion",
             "tryAGI.Codex.Tests.CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot"
+          ]
+        }
+      }
+    },
+    "crate:codex-rs/skills/Cargo.toml:codex-skills": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 75,
+        "scope": "native-behavior",
+        "rationale": "Component-level ordered skill discovery and instruction selection, authority fencing, ambiguity rejection and metadata parsing verified. Filesystem authority and real instruction loading are host-owned; the entire Rust crate, skills RPC dispatcher and live extension effects remain unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexSkillCatalog.cs::DiscoverAsync",
+          "src/libs/tryAGI.Codex/CodexSkillCatalog.cs::ReadInstructionsAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.RootOrderDeduplicationAndDisabledRootsDoNotLoad",
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.StructuredAndLinkedPathsWinOverPlainNamesInRustOrder",
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.AmbiguousNamesAndConnectorConflictsRequireExactPaths",
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.DisabledAndMissingStructuredSelectionNeverFallsBackByName",
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.SamePathDifferentFilesystemsCannotAliasWithoutExplicitResolver",
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.InstructionsRequireCurrentAuthorityAndNoImplicitInvocationWhenDisabled",
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.InFlightDiscoveryAndReadCannotPublishAfterInvalidation",
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.NewAuthorityFencesPreviousScanBeforeWaitingForItsCompletion",
+          "src/tests/tryAGI.Codex.Tests/CodexSkillCatalogTests.cs::CodexSkillCatalogTests.FrontmatterExtractsOnlyLeadingYamlAndNormalizesDecodedScalars"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.AmbiguousNamesAndConnectorConflictsRequireExactPaths",
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.DisabledAndMissingStructuredSelectionNeverFallsBackByName",
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.FrontmatterExtractsOnlyLeadingYamlAndNormalizesDecodedScalars",
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.InFlightDiscoveryAndReadCannotPublishAfterInvalidation",
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.InstructionsRequireCurrentAuthorityAndNoImplicitInvocationWhenDisabled",
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.NewAuthorityFencesPreviousScanBeforeWaitingForItsCompletion",
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.RootOrderDeduplicationAndDisabledRootsDoNotLoad",
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.SamePathDifferentFilesystemsCannotAliasWithoutExplicitResolver",
+            "tryAGI.Codex.Tests.CodexSkillCatalogTests.StructuredAndLinkedPathsWinOverPlainNamesInRustOrder"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/add": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Durable submission ID, deduplicated client identity, metadata and capacity fences. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::AddQueuedSubmissionAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
+          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/update": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Durable queued input and metadata update across a recreated host. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::UpdateQueuedSubmissionAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
+          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/delete": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Deletion preserves remaining submission identity. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::DeleteQueuedSubmissionAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
+          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/reorder": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Explicit reorder and persistent page ordering. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::ReorderQueuedSubmissionsAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
+          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/list": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Feature-gated listing and pagination of durable queued identities. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
+          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/start": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Atomic admission and consumption, busy-thread fencing and no replay after lost commit acknowledgement. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::StartAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueStartConsumesSelectedSubmissionWithTurnAdmissionAndBusyPreservesRemaining",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAdmissionLostAcknowledgmentDoesNotReplayProviderOrConsumeAnotherSubmission",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
+          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAdmissionLostAcknowledgmentDoesNotReplayProviderOrConsumeAnotherSubmission",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueStartConsumesSelectedSubmissionWithTurnAdmissionAndBusyPreservesRemaining"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/queue/changed": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Observed correlated queue change notifications. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::NotifyQueueChangedAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
+          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
           ]
         }
       }
