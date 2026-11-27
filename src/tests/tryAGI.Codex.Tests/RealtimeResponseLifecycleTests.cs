@@ -41,6 +41,44 @@ public sealed class RealtimeResponseLifecycleTests
     private static JsonObject Create() => new() { ["type"] = "response.create" };
 
     [Theory]
+    [InlineData("v1", "user", "input_text")]
+    [InlineData("v1", "developer", "input_text")]
+    [InlineData("v1", "assistant", "output_text")]
+    [InlineData("v2", "user", "input_text")]
+    [InlineData("v2", "developer", "input_text")]
+    [InlineData("v2", "assistant", "output_text")]
+    public async Task NativeLegacyTextDispatchPreservesPinnedRoleAndContentType(string protocol, string role, string contentType)
+    {
+        var socket = new Socket();
+        await using var connection = new CodexRealtimeConnection(socket, 8192, protocol);
+        var ct = TestContext.Current.CancellationToken;
+        await connection.AppendRoleTextAsync("text", role, ct);
+        var message = socket.Sent[0];
+        Assert.Equal("conversation.item.create", message.GetProperty("type").GetString());
+        var item = message.GetProperty("item");
+        Assert.Equal(role, item.GetProperty("role").GetString());
+        var content = item.GetProperty("content")[0];
+        Assert.Equal(contentType, content.GetProperty("type").GetString());
+        Assert.Equal("text", content.GetProperty("text").GetString());
+        Assert.Equal(protocol == "v2" && role == "user" ? 1 : 0, socket.Creates);
+    }
+
+    [Theory]
+    [InlineData("v1")]
+    [InlineData("v2")]
+    public async Task NativeBackingItemFeedbackPreservesDeveloperRole(string protocol)
+    {
+        var socket = new Socket();
+        await using var connection = new CodexRealtimeConnection(socket, 8192, protocol);
+        var ct = TestContext.Current.CancellationToken;
+        Assert.True(await connection.SendReasoningFeedbackAsync(connection.CaptureFeedbackAdmission(),
+            CodexRealtimeFeedbackKind.Item, "artifact", "handoff", null, null, ct));
+        var item = Assert.Single(socket.Sent).GetProperty("item");
+        Assert.Equal("developer", item.GetProperty("role").GetString());
+        Assert.Equal("input_text", item.GetProperty("content")[0].GetProperty("type").GetString());
+    }
+
+    [Theory]
     [InlineData("speakable", false)]
     [InlineData("commentary", false)]
     [InlineData("speakable", true)]

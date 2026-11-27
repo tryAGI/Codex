@@ -33,7 +33,7 @@ internal static class CodexRealtimeFeedbackWire
             return (CodexRealtimeProtocol.Context(text, kind is CodexRealtimeFeedbackKind.Speech or CodexRealtimeFeedbackKind.Item ? null : id,
                 kind == CodexRealtimeFeedbackKind.Speech ? "speakable" : kind == CodexRealtimeFeedbackKind.Status ? "commentary" : channel), false, false);
         if (protocol == "v2")
-            return ([CodexRealtimeGaProtocol.Message(kind == CodexRealtimeFeedbackKind.Item ? "developer" : "user", text)],
+            return ([CodexRealtimeGaProtocol.Message(kind == CodexRealtimeFeedbackKind.Item ? "developer" : "user", text, preserveDeveloperRole: true)],
                 kind == CodexRealtimeFeedbackKind.Speech || id is null && kind is CodexRealtimeFeedbackKind.Progress or CodexRealtimeFeedbackKind.Final, false);
         if (kind == CodexRealtimeFeedbackKind.Item)
             return ([CodexRealtimeGaProtocol.Message("developer", text, preserveDeveloperRole: true)], false, false);

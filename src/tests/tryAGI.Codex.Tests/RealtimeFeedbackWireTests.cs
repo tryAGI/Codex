@@ -40,7 +40,10 @@ public sealed class RealtimeFeedbackWireTests
         Assert.Equal(CodexRealtimeFeedbackWire.CompleteAck, Assert.Single(complete.Messages)["item"]!["output"]!.GetValue<string>());
         var item = CodexRealtimeFeedbackWire.Build("v2", CodexRealtimeFeedbackKind.Item, "answer", "call", null, "prefix");
         Assert.False(item.CreateResponse);
-        Assert.Equal("prefix\n\n[BACKEND] answer", Assert.Single(item.Messages)["item"]!["content"]![0]!["text"]!.GetValue<string>());
+        var itemMessage = Assert.Single(item.Messages)["item"]!;
+        Assert.Equal("developer", itemMessage["role"]!.GetValue<string>());
+        Assert.Equal("input_text", itemMessage["content"]![0]!["type"]!.GetValue<string>());
+        Assert.Equal("prefix\n\n[BACKEND] answer", itemMessage["content"]![0]!["text"]!.GetValue<string>());
         var ack = CodexRealtimeFeedbackWire.Build("v2", CodexRealtimeFeedbackKind.Complete, "", "call", null);
         Assert.False(ack.CreateResponse);
         Assert.Equal("", Assert.Single(ack.Messages)["item"]!["output"]!.GetValue<string>());

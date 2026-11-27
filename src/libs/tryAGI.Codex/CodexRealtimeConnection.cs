@@ -358,7 +358,8 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     internal Task AppendRoleTextAsync(string text, string role, CancellationToken ct)
     {
         if (role == "user" || protocol == "v3") return AppendUserTextAsync(text, ct);
-        return SendAsync(CodexRealtimeGaProtocol.Message(role, text, preserveDeveloperRole: protocol == "v1"), ct);
+        // Both pinned legacy adapters preserve the native conversation role.
+        return SendAsync(CodexRealtimeGaProtocol.Message(role, text, preserveDeveloperRole: true), ct);
     }
 
     /// <summary>Asks the provider to end the session gracefully.</summary>
