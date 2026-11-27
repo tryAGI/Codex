@@ -3620,14 +3620,25 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -3644,14 +3655,25 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -3668,14 +3690,25 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -3692,14 +3725,25 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -3736,14 +3780,25 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -3860,14 +3915,25 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -3884,14 +3950,25 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -3908,11 +3985,20 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
-      "evidence": null,
-      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+      "status": "passed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation"
+        ]
+      },
+      "rationale": "Pinned optional sequential_cutoff delivery: explicit feature plus summary, present in prewarm/turn and absent when disabled. WS request assertion only; SSE conditional coverage is separate."
     },
     {
       "id": "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.text",
@@ -4008,11 +4094,15 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesInterruption.cs::CodexResponsesInterruption.ReadAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.CancelBeforeDispatchKeepsUnusedSocketAndReleasesReservation",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.DrainReturnsCompletedItemsButDiscardsPartialOutput"
+      ],
       "evidence": null,
-      "rationale": "Pinned Responses WebSocket interrupt contract is missing, tracked in #55."
+      "rationale": "Rust response identity, discard_partial_items and cancellation/drain acknowledgement lifecycle implemented in #55. Exact local offline run r9 passed; published-revision evidence required."
     },
     {
       "id": "rust-field:codex-api/src/common.rs:ResponseStream.routing_affinity",
@@ -4128,10 +4218,19 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -4308,10 +4407,19 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -4328,10 +4436,19 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -4348,11 +4465,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs::CodexResponsesIdentityTests.OpenAiSummaryDeliveryRequiresExplicitFeatureAndSummary",
       "evidence": null,
-      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+      "rationale": "SSE request options require explicit feature and a non-none summary; include every theory case in the next exact receipt."
     },
     {
       "id": "rust-field:codex-api/src/common.rs:ResponsesApiRequest.text",
@@ -4528,11 +4645,20 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
-      "evidence": null,
-      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+      "status": "passed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation"
+        ]
+      },
+      "rationale": "Pinned optional sequential_cutoff delivery: explicit feature plus summary, present in prewarm/turn and absent when disabled. WS request assertion only; SSE conditional coverage is separate."
     },
     {
       "id": "rust-field:codex-api/src/common.rs:TextControls.format",
@@ -4648,10 +4774,21 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.DelegationAckFillerSetting",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates(ack: False)",
+          "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates(ack: True)",
+          "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates(ack: null)"
+        ]
+      },
       "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
@@ -4688,10 +4825,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.InitialItems",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions"
+        ]
+      },
       "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
@@ -4728,10 +4874,23 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Model",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeModelRouteTests.cs::RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: False, model: \"gpt-realtime-1.5\", voice: \"cove\")",
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: True, model: \"gpt-realtime-1.5\", voice: \"cove\")",
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v2\", chatGptCall: False, model: \"gpt-realtime-1.5\", voice: \"marin\")",
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v3\", chatGptCall: False, model: \"gpt-live-1.1-codex\", voice: \"marin\")",
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v3\", chatGptCall: True, model: \"gpt-live-1.1-codex\", voice: \"cove\")"
+        ]
+      },
       "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
@@ -4768,10 +4927,20 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.SessionId",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot(protocol: \"v1\")",
+          "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot(protocol: \"v2\")"
+        ]
+      },
       "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
@@ -4808,10 +4977,23 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Voice",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeModelRouteTests.cs::RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: False, model: \"gpt-realtime-1.5\", voice: \"cove\")",
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: True, model: \"gpt-realtime-1.5\", voice: \"cove\")",
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v2\", chatGptCall: False, model: \"gpt-realtime-1.5\", voice: \"marin\")",
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v3\", chatGptCall: False, model: \"gpt-live-1.1-codex\", voice: \"marin\")",
+          "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v3\", chatGptCall: True, model: \"gpt-live-1.1-codex\", voice: \"cove\")"
+        ]
+      },
       "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
@@ -15331,7 +15513,7 @@
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
       "evidence": null
     },
     {
@@ -15960,16 +16142,21 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "divergent",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponseOutputValidation.cs::CodexResponseOutputValidation.Event",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion",
       "evidence": {
         "lane": "offline",
-        "outcome": "failed",
-        "receipt": "codex-parity-sparse-r1-20261127",
-        "detail": "Both exact sparse completion cases (SSE and WebSocket) fail invalid_output_array; 15 passed, 2 failed, 0 skipped in the full fixture run. Shared working-tree diagnostic, not revision-bound evidence."
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion(websocket: False)",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion(websocket: True)"
+        ]
       },
-      "rationale": "Exact pinned Rust two-message + id-only response.completed fixture; both native reasoning transports reject it."
+      "rationale": "Exact pinned Rust two-message/id-only terminal fixture passes on both native transports after #58; raw terminal receipt remains unchanged."
     },
     {
       "id": "rust-test:codex-api/src/sse/responses.rs:parses_reasoning_summary_done",
@@ -20492,10 +20679,19 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")"
+        ]
+      },
       "rationale": "Independent Rust-prefix replay matched both request frames and raw response sequence in diagnostic run; revision-bound receipt pending."
     },
     {
@@ -27554,11 +27750,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation",
       "evidence": null,
-      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+      "rationale": "Pinned optional sequential_cutoff delivery: explicit feature plus summary, present in prewarm/turn and absent when disabled. WS request assertion only; SSE conditional coverage is separate."
     },
     {
       "id": "rust-type:codex-api/src/common.rs:ResponseCreateWsRequest",
@@ -27634,11 +27830,14 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesInterruption.cs::CodexResponsesInterruption.ReadAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.DrainReturnsCompletedItemsButDiscardsPartialOutput"
+      ],
       "evidence": null,
-      "rationale": "Pinned Responses WebSocket interrupt contract is missing, tracked in #55."
+      "rationale": "Rust response identity, discard_partial_items and cancellation/drain acknowledgement lifecycle implemented in #55. Exact local offline run r9 passed; published-revision evidence required."
     },
     {
       "id": "rust-type:codex-api/src/common.rs:ResponseStream",
@@ -27774,11 +27973,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation",
       "evidence": null,
-      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+      "rationale": "Pinned optional sequential_cutoff delivery: explicit feature plus summary, present in prewarm/turn and absent when disabled. WS request assertion only; SSE conditional coverage is separate."
     },
     {
       "id": "rust-type:codex-api/src/common.rs:TextControls",
@@ -28934,14 +29133,18 @@
         "src/tests/tryAGI.Codex.Tests/ThreadAgentTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeCoordinator.cs::CodexRealtimeCoordinator",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityLifecycleTests.cs::RustParityLifecycleTests.AudioDelegationToolFeedbackFollowupAndStandaloneSpeechStayOnOneThread",
       "evidence": {
         "lane": "offline",
-        "outcome": "diagnostic-passed",
-        "receipt": "codex-parity-coordinator-r5-20261127",
-        "detail": "3 lifecycle tests passed, 0 failed/skipped. Native coordinator with synthetic PCM, sideband/Responses transport, actual local harmless tool callback, durable follow-up turn, and standalone speech request. No provider media or playback; shared tree is not revision-bound acceptance."
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityLifecycleTests.AudioDelegationToolFeedbackFollowupAndStandaloneSpeechStayOnOneThread"
+        ]
       },
       "rationale": "Independent V3 mock cycle includes ongoing input/output PCM while tool is blocked, exact feedback delegation identity, opaque reasoning/tool receipt continuity, and second turn on the same thread. Live and interruption remain separate."
     },
@@ -28959,14 +29162,18 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeCoordinator.cs::CodexRealtimeCoordinator",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityLifecycleTests.cs::RustParityLifecycleTests.AudioDelegationToolFeedbackFollowupAndStandaloneSpeechStayOnOneThread",
       "evidence": {
         "lane": "offline",
-        "outcome": "diagnostic-passed",
-        "receipt": "codex-parity-coordinator-r5-20261127",
-        "detail": "3 lifecycle tests passed, 0 failed/skipped. Native coordinator with synthetic PCM, sideband/Responses transport, actual local harmless tool callback, durable follow-up turn, and standalone speech request. No provider media or playback; shared tree is not revision-bound acceptance."
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityLifecycleTests.AudioDelegationToolFeedbackFollowupAndStandaloneSpeechStayOnOneThread"
+        ]
       },
       "rationale": "Explicit standalone speech request creates a speakable session context without a new user message or reasoning request, then receives synthetic audio. Actual provider speech/playback is unverified."
     },
@@ -29222,14 +29429,18 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
       "evidence": {
         "lane": "offline",
-        "outcome": "diagnostic-passed",
-        "receipt": "codex-parity-independent-r5-20261127",
-        "detail": "Earlier fixture run r2 failed typed V2 input delta; after #31 the expanded offline suite passed 216 cases, zero failed or skipped. Shared build inputs changed, so this is not revision-bound acceptance."
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")"
+        ]
       },
       "rationale": "The original divergence was not reproduced after #31; the diagnostic pass still requires revision-bound evidence."
     },
@@ -29667,10 +29878,19 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")"
+        ]
+      },
       "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
     },
     {
@@ -29687,12 +29907,21 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")"
+        ]
+      },
       "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
@@ -29709,13 +29938,23 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendUserTextAsync",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+        ]
+      },
       "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
@@ -29732,12 +29971,21 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+        ]
+      },
       "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
@@ -29754,12 +30002,21 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendAudioAsync",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+        ]
+      },
       "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
@@ -29776,13 +30033,23 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendAudioAsync",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+        ]
+      },
       "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
@@ -29799,12 +30066,21 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+        ]
+      },
       "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
@@ -29821,13 +30097,23 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.CloseSessionAsync",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+        ]
+      },
       "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
@@ -29844,12 +30130,21 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+        ]
+      },
       "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
@@ -29866,10 +30161,21 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.UpdateSessionAsync",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeSocketParityTests.cs::RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents(protocol: \"v1\", type: \"quicksilver\", audioType: \"input_audio_buffer.append\")",
+          "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents(protocol: \"v2\", type: \"realtime\", audioType: \"input_audio_buffer.append\")",
+          "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents(protocol: \"v3\", type: null, audioType: \"input_audio.append\")"
+        ]
+      },
       "rationale": "Session update compared at the adapter level; mode-specific fields remain separate."
     },
     {
@@ -29906,10 +30212,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadDelegation",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")"
+        ]
+      },
       "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
@@ -29926,10 +30241,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"error\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"error\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -29946,10 +30270,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadTranscript",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")"
+        ]
+      },
       "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
@@ -29966,10 +30299,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadAudio",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")"
+        ]
+      },
       "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
@@ -29986,10 +30328,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"output_transcript.added\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"output_transcript.added\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30006,10 +30357,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.started\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.started\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30026,10 +30386,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.updated\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.updated\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30046,10 +30415,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadTranscript",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")"
+        ]
+      },
       "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
@@ -30066,10 +30444,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.handoff.requested\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.handoff.requested\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30086,10 +30473,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30106,10 +30502,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.turn_marked\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.turn_marked\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30126,10 +30531,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.added\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.added\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30146,10 +30560,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.done\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.done\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30186,10 +30609,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30206,10 +30638,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_audio.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_audio.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30226,10 +30667,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_transcript.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_transcript.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30246,10 +30696,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"error\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"error\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30266,10 +30725,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30286,10 +30754,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.done\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.done\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30306,10 +30783,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_text.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_text.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30326,10 +30812,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"session.updated\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"session.updated\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30346,10 +30841,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.added\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.added\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30366,10 +30870,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.created\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.created\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30386,10 +30899,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.done\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.done\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30426,14 +30948,18 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
       "evidence": {
         "lane": "offline",
-        "outcome": "diagnostic-passed",
-        "receipt": "codex-parity-independent-r5-20261127",
-        "detail": "Earlier fixture run r2 failed typed V2 input delta; after #31 the expanded offline suite passed 216 cases, zero failed or skipped. Shared build inputs changed, so this is not revision-bound acceptance."
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")"
+        ]
       },
       "rationale": "The original divergence was not reproduced after #31; the diagnostic pass still requires revision-bound evidence."
     },
@@ -30451,10 +30977,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"error\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"error\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30471,10 +31006,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"input_audio_buffer.speech_started\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"input_audio_buffer.speech_started\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30491,10 +31035,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.audio.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.audio.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30511,10 +31064,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.cancelled\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.cancelled\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30531,10 +31093,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.created\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.created\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30551,10 +31122,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.done\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.done\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30571,10 +31151,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30591,10 +31180,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.delta\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.delta\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30611,10 +31209,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.done\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.done\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30631,10 +31238,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")"
+        ]
+      },
       "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
@@ -30651,10 +31267,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_text.done\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_text.done\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30671,10 +31296,19 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
       "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"session.updated\")",
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"session.updated\")"
+        ]
+      },
       "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
@@ -30711,14 +31345,25 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
       "test": [
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
         "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
       ],
-      "evidence": null,
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+        ]
+      },
       "rationale": "Exact Rust create and prefix/previous_response_id behavior, checked by the independent synthetic WebSocket fixtures."
     },
     {
@@ -30755,11 +31400,14 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesInterruption.cs::CodexResponsesInterruption.ReadAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.DrainReturnsCompletedItemsButDiscardsPartialOutput"
+      ],
       "evidence": null,
-      "rationale": "Rust sends an ID-bound response.interrupt after response.created and fences accepted/failed acknowledgement; inspected C# transport has no corresponding send/ack lifecycle."
+      "rationale": "Rust response identity, discard_partial_items and cancellation/drain acknowledgement lifecycle implemented in #55. Exact local offline run r9 passed; published-revision evidence required."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.interrupt.accepted",
@@ -30775,11 +31423,14 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesInterruption.cs::CodexResponsesInterruption.ReadAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.LateDrainAckCannotSettleNextResponseAndContinuationIsPreserved"
+      ],
       "evidence": null,
-      "rationale": "Rust sends an ID-bound response.interrupt after response.created and fences accepted/failed acknowledgement; inspected C# transport has no corresponding send/ack lifecycle."
+      "rationale": "Rust response identity, discard_partial_items and cancellation/drain acknowledgement lifecycle implemented in #55. Exact local offline run r9 passed; published-revision evidence required."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.interrupt.failed",
@@ -30795,11 +31446,13 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "missing",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesInterruption.cs::CodexResponsesInterruption.ReadAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesInterruptionTests.cs::CodexResponsesInterruptionTests.FailedOrLostAckRetiresSocketButPreservesTerminalUsage"
+      ],
       "evidence": null,
-      "rationale": "Rust sends an ID-bound response.interrupt after response.created and fences accepted/failed acknowledgement; inspected C# transport has no corresponding send/ack lifecycle."
+      "rationale": "Rust response identity, discard_partial_items and cancellation/drain acknowledgement lifecycle implemented in #55. Exact local offline run r9 passed; published-revision evidence required."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.output_text.delta",
@@ -30855,16 +31508,21 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "divergent",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexResponseOutputValidation.cs::CodexResponseOutputValidation.Event",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion",
       "evidence": {
         "lane": "offline",
-        "outcome": "failed",
-        "receipt": "codex-parity-sparse-r1-20261127",
-        "detail": "Both exact sparse completion cases (SSE and WebSocket) fail invalid_output_array; 15 passed, 2 failed, 0 skipped in the full fixture run. Shared working-tree diagnostic, not revision-bound evidence."
+        "outcome": "passed",
+        "csharpCommit": "c125acf75fbd2a0d8358b8ca9e05c617a230f72f",
+        "receipt": "docs/realtime-parity-evidence/ci-c125acf-45940696532.json",
+        "receiptSha256": "09b3ac278b429b5ef64d6d77e67cdcba5b125400262bb10ff16886d909e27a98",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion(websocket: False)",
+          "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion(websocket: True)"
+        ]
       },
-      "rationale": "Exact pinned Rust two-message + id-only response.completed fixture; both native reasoning transports reject it."
+      "rationale": "Exact pinned Rust two-message/id-only terminal fixture passes on both native transports after #58; raw terminal receipt remains unchanged."
     },
     {
       "id": "wire-symbol:codex-api/src/sse/responses.rs:response.content_part.added",
@@ -31420,7 +32078,7 @@
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
       "applicability": "applicable",
-      "status": "divergent",
+      "status": "unverified",
       "implementation": "src/libs/tryAGI.Codex/CodexResponseOutputValidation.cs::CodexResponseOutputValidation.Event",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion",
       "evidence": {
@@ -31429,7 +32087,7 @@
         "receipt": "codex-parity-sparse-r1-20261127",
         "detail": "Both exact sparse completion cases (SSE and WebSocket) fail invalid_output_array; 15 passed, 2 failed, 0 skipped in the full fixture run. Shared working-tree diagnostic, not revision-bound evidence."
       },
-      "rationale": "Pinned logging test uses id-only response.completed. Current regression fixture confirms rejection; separate log privacy assertion remains to be reviewed."
+      "rationale": "Sparse completion is now accepted on SSE and WS; exact log privacy behavior still requires independent review."
     }
   ]
 }

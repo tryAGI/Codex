@@ -32,6 +32,10 @@ OFFLINE_CLASSES = (
     "NativeProtocolTests", "RealtimeModelRouteTests", "RealtimeHistoryTests",
     "RustParityLifecycleTests", "RealtimeHandoffAdmissionTests", "RealtimeDelegationInputTests",
     "RealtimeSessionControllerTests", "RealtimeResponseLifecycleTests", "ThreadCompactionCheckpointTests",
+    "CodexResponsesIdentityTests", "CodexResponseDiagnosticTests", "CodexResponseErrorTests",
+    "CodexSilentResponseValidationTests", "CodexCompactionTests", "RealtimeBoundedQueueTests",
+    "RealtimeFeedbackWireTests", "RealtimeStartupContextTests", "RealtimeModelIdentityTests",
+    "ThreadAgentTests", "ThreadRpcTests", "CodexResponsesInterruptionTests",
 )
 TRX_NS = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 HEX40 = re.compile(r"[a-f0-9]{40}")
@@ -76,19 +80,36 @@ def parse_trx(raw):
         if not class_name.startswith(NAMESPACE) or class_name[len(NAMESPACE):] not in OFFLINE_CLASSES or not method_name:
             raise ValueError(f"Unexpected test in offline receipt: {class_name}.{method_name}")
         definitions[test.get("id")] = class_name + "." + method_name
-    cases = {}
+    # xUnit truncates long theory display names. Use the distinct TRX test identity
+    # to preserve every case when names collide; never let a name-only mapping
+    # accidentally certify an arbitrary member of an ambiguous group.
+    from collections import Counter
+    records = []
+    seen_test_ids = set()
     for result in root.findall("t:Results/t:UnitTestResult", TRX_NS):
-        method = definitions.get(result.get("testId"))
+        test_id = result.get("testId")
+        method = definitions.get(test_id)
         name = result.get("testName", "")
-        if not method or not name or name in cases:
-            raise ValueError("Missing or duplicate TRX case")
-        # Display names include the arguments of each xUnit theory case.
+        if not method or not name or test_id in seen_test_ids:
+            raise ValueError("Missing or duplicate TRX test identity")
+        seen_test_ids.add(test_id)
         if name != method and not name.startswith(method + "("):
             raise ValueError(f"Unexpected case identity: {name}")
         outcome = result.get("outcome", "")
         if not outcome:
             raise ValueError(f"Case has no outcome: {name}")
-        cases[name] = {"method": method, "outcome": outcome}
+        records.append((name, method, outcome, test_id))
+    counts = Counter(name for name, _, _, _ in records)
+    cases = {}
+    for name, method, outcome, test_id in records:
+        case = {"method": method, "outcome": outcome}
+        key = name
+        if counts[name] > 1:
+            key = f"{name} [testId:{test_id}]"
+            case.update(displayName=name, testId=test_id)
+        if key in cases:
+            raise ValueError(f"Duplicate canonical TRX case: {key}")
+        cases[key] = case
     if not cases or len(cases) != int(summary.get("total", "-1")):
         raise ValueError("TRX case count does not match total")
     if sum(c["outcome"] == "Passed" for c in cases.values()) != int(summary.get("passed", "-1")):
@@ -204,6 +225,26 @@ def self_test():
           <ResultSummary><Counters total="{total}" passed="{int(outcome == 'Passed')}"/></ResultSummary></TestRun>""".encode()
     assert list(parse_trx(document("Passed")).values())[0]["outcome"] == "Passed"
     assert list(parse_trx(document("NotExecuted")).values())[0]["outcome"] == "NotExecuted"
+    collision = f"""<TestRun xmlns="{TRX_NS['t']}">
+      <Results>
+        <UnitTestResult testId="a" testName="{NAMESPACE}RustParityFixtureTests.Example(arg: truncated)" outcome="Passed"/>
+        <UnitTestResult testId="b" testName="{NAMESPACE}RustParityFixtureTests.Example(arg: truncated)" outcome="NotExecuted"/>
+      </Results>
+      <TestDefinitions>
+        <UnitTest id="a"><TestMethod className="{NAMESPACE}RustParityFixtureTests" name="Example"/></UnitTest>
+        <UnitTest id="b"><TestMethod className="{NAMESPACE}RustParityFixtureTests" name="Example"/></UnitTest>
+      </TestDefinitions>
+      <ResultSummary><Counters total="2" passed="1"/></ResultSummary></TestRun>""".encode()
+    collided = parse_trx(collision)
+    assert len(collided) == 2 and {case["testId"] for case in collided.values()} == {"a", "b"}
+    assert {case["outcome"] for case in collided.values()} == {"Passed", "NotExecuted"}
+    assert all(case["displayName"] not in collided for case in collided.values())
+    try:
+        parse_trx(collision.replace(b'testId="b"', b'testId="a"'))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Duplicate test identity was accepted")
     try:
         parse_trx(document("Passed", total=2))
     except ValueError:

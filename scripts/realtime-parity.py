@@ -196,11 +196,12 @@ def live_rows():
                          "clean-shutdown"):
             yield row(path, 1, "live-scenario", f"{route}.{scenario}", "live", issue, "applicable")
 
-def apply_reviews(data):
+def apply_reviews(data, review=None):
     """Overlay reviewed, exact row dispositions without inventing evidence."""
-    if not REVIEWS.exists():
-        return data
-    review = json.loads(REVIEWS.read_text(encoding="utf-8"))
+    if review is None:
+        if not REVIEWS.exists():
+            return data
+        review = json.loads(REVIEWS.read_text(encoding="utf-8"))
     if review.get("schemaVersion") != 1 or review.get("upstreamCommit") != PIN:
         raise ValueError("Review file does not match the pinned matrix")
     rows = {r["id"]: r for r in data["rows"]}
@@ -386,10 +387,89 @@ def self_test(data):
     assert not report(sample)["releaseReady"]
     print("Checker self-test: invalid evidence, duplicate IDs, N/A and skipped cases rejected.")
 
+def accept_offline_rows(data, receipt_path, row_ids, dry_run=False):
+    """Record only explicitly selected, already reviewed rows from one exact CI receipt."""
+    import copy
+
+    path = (ROOT / receipt_path).resolve()
+    location = path.relative_to(ROOT).as_posix()
+    raw = path.read_bytes()
+    receipt = json.loads(raw)
+    commit, tree = source_revision(receipt["csharpCommit"])
+    if commit != receipt["csharpCommit"] or tree != receipt["sourceTree"]:
+        raise ValueError("Receipt does not identify the exact committed source tree")
+    if not row_ids or len(row_ids) != len(set(row_ids)):
+        raise ValueError("Select explicit unique reviewed row IDs")
+    rows = {row["id"]: row for row in data["rows"]}
+    review = json.loads(REVIEWS.read_text(encoding="utf-8"))
+    scenarios = {"scenario:" + item["id"]: item for item in review["scenarios"]}
+    blobs = {}
+    for rid in row_ids:
+        row = rows.get(rid)
+        if (row is None or row["status"] not in {"source-reviewed", "passed"}
+                or row["applicability"] != "applicable" or row["lane"] == "live"
+                or not row.get("implementation") or not row.get("test")):
+            raise ValueError(f"Row is not independently source-reviewed for offline acceptance: {rid}")
+        for key in ("implementation", "test"):
+            references = row[key] if isinstance(row[key], list) else [row[key]]
+            for reference in references:
+                source, _, symbol = reference.partition("::")
+                if source not in blobs:
+                    blobs[source] = subprocess.check_output(
+                        ["git", "show", f"{commit}:{source}"], cwd=ROOT, text=True, encoding="utf-8-sig")
+                name = symbol.split("(")[0].rsplit(".", 1)[-1]
+                if not name or not re.search(r"\b" + re.escape(name) + r"\b", blobs[source]):
+                    raise ValueError(f"Mapped symbol absent from tested revision: {rid}: {reference}")
+        refs = row["test"] if isinstance(row["test"], list) else [row["test"]]
+        cases = set()
+        for reference in refs:
+            method = reference.partition("::")[2]
+            if not method.startswith("tryAGI.Codex.Tests."):
+                method = "tryAGI.Codex.Tests." + method
+            if "(" in method:
+                matched = {method} if method in receipt["cases"] else set()
+            else:
+                matched = {name for name, case in receipt["cases"].items() if case["method"] == method}
+            if not matched:
+                raise ValueError(f"No exact case in receipt: {rid}: {reference}")
+            cases.update(matched)
+        evidence = {
+            "lane": "offline", "outcome": "passed", "csharpCommit": commit,
+            "receipt": location, "receiptSha256": hashlib.sha256(raw).hexdigest(),
+            "cases": sorted(cases),
+        }
+        validate_receipt(row, evidence)
+        target = scenarios.get(rid) if rid.startswith("scenario:") else review["rows"].get(rid)
+        if target is None:
+            raise ValueError(f"Missing explicit review overlay: {rid}")
+        target.update(status="passed", evidence=evidence)
+    result = apply_reviews(copy.deepcopy(data), review)
+    validate(result)
+    if not dry_run:
+        # The generated matrix and authoritative review overlay must agree.
+        REVIEWS.write_text(json.dumps(review, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        write_matrix(result)
+    print(json.dumps({"acceptedRows": len(row_ids), "testedCommit": commit,
+                      "testedSourceTree": tree, "dryRun": dry_run}, sort_keys=True))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("refresh", "review", "check", "report", "gate", "self-test"))
+    parser.add_argument("command", choices=("refresh", "review", "check", "report", "gate", "self-test", "accept"))
+    parser.add_argument("--receipt")
+    parser.add_argument("--row", action="append", default=[])
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    if args.command == "accept":
+        if not args.receipt or not args.row:
+            parser.error("accept requires --receipt and explicit --row arguments")
+        data = validate(json.loads(MATRIX.read_text(encoding="utf-8")))
+        if data != apply_reviews(json.loads(MATRIX.read_text(encoding="utf-8"))):
+            raise ValueError("Review mappings changed; run review first")
+        accept_offline_rows(data, args.receipt, args.row, args.dry_run)
+        return 0
+    if args.receipt or args.row or args.dry_run:
+        parser.error("Evidence options require accept")
     if args.command == "refresh":
         refresh()
     if args.command == "review":
