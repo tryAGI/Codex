@@ -81,6 +81,9 @@ public sealed record CodexStoredTurn(
 
     /// <summary>Last matching context-window observation of the completed reasoning turn.</summary>
     public CodexStoredContextWindowObservation? ContextWindowObservation { get; init; }
+
+    /// <summary>Host-observed canonical backing items that are not model continuation input.</summary>
+    public CodexStoredNativeBackingArtifact[]? NativeBackingArtifacts { get; init; }
 }
 
 /// <summary>Request digest binds a call ID to its exact input bytes. Unknown outcomes remain

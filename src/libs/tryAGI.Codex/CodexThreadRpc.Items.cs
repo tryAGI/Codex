@@ -31,8 +31,7 @@ public sealed partial class CodexThreadRpc
             {
                 ct.ThrowIfCancellationRequested();
                 if (item["id"]?.GetValue<string>() is not { } id || !selected.Contains(id)) continue;
-                data.Add((JsonNode)new JsonObject { ["turnId"] = storedTurn.Id.ToString(), ["item"] = item,
-                    ["startedAtMs"] = null, ["completedAtMs"] = null });
+                data.Add((JsonNode)ItemEnvelope(storedTurn, item));
             }
         }
 

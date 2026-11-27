@@ -68,6 +68,8 @@ internal static class CodexRealtimePresentation
             }
             else if (type is "function_call" or "custom_tool_call")
             {
+                if (turn.NativeBackingArtifacts?.Any(a => a.ItemId == itemId && CodexThreadStore.IsNativeMcpArtifact(a)) == true)
+                    continue;
                 var call = CodexRealtimeProtocol.Text(item, "call_id");
                 // Do not promote an unknown dispatch, an unsuccessful tool or a bare receipt.
                 var receipt = turn.Dispatches.SingleOrDefault(d => d.Kind == "tool" && d.CallId == call);
@@ -77,6 +79,16 @@ internal static class CodexRealtimePresentation
                     (!result.TryGetProperty("success", out var success) || success.ValueKind == JsonValueKind.True))
                     yield return new(session, turn.Id, itemId, "wholeItem");
             }
+        }
+        foreach (var artifact in turn.NativeBackingArtifacts ?? [])
+        {
+            var type = CodexRealtimeProtocol.Text(artifact.Item, "type");
+            if (type == "imageGeneration" ||
+                artifact.Stage == CodexNativeArtifactStage.Completed &&
+                (type == "subAgentActivity" && CodexRealtimeProtocol.Text(artifact.Item, "kind") == "started" ||
+                    type == "mcpToolCall" && CodexRealtimeProtocol.Text(artifact.Item, "server") == "codex_app" &&
+                    CodexRealtimeProtocol.Text(artifact.Item, "status") == "completed"))
+                yield return new(session, turn.Id, artifact.ItemId, "wholeItem");
         }
     }
 
@@ -118,7 +130,11 @@ public sealed partial class CodexThreadStore
         {
             if (prior.Contains(promotion) || !observed.Add(Key(promotion))) continue;
             var active = PresentationSession(document);
-            if (promotion.Presentation == "wholeItem" && active is null) continue;
+            var native = after.NativeBackingArtifacts?.SingleOrDefault(a => a.ItemId == promotion.ItemId);
+            // Image generation (including the canonical projection of its extension item)
+            // and sub-agent start activity may be presented after voice closure.
+            if (promotion.Presentation == "wholeItem" && active is null &&
+                (native is null || CodexThreadStore.IsNativeMcpArtifact(native))) continue;
             // Late artifacts keep the original session attribution; the latest session owns
             // the split boundary and physical append position, even if that session ended.
             var carrier = document.RealtimeSessions![^1];

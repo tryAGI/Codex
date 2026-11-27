@@ -341,11 +341,13 @@ public sealed partial class CodexThreadRpc
         {
             var id = item["id"] is JsonValue identity && identity.TryGetValue<string>(out var text)
                 ? text : throw Invalid("Item identity is required.");
+            var observed = turn.NativeBackingArtifacts?.SingleOrDefault(a => a.ItemId == id);
             if (running.StartedItems.Add(id)) await EmitAsync("item/started", new JsonObject
-            { ["threadId"] = threadId.ToString(), ["turnId"] = running.Id.ToString(), ["item"] = item.DeepClone(), ["startedAtMs"] = null }).ConfigureAwait(false);
-            if (item["status"]?.GetValue<string>() != "inProgress" && running.CompletedItems.Add(id))
+            { ["threadId"] = threadId.ToString(), ["turnId"] = running.Id.ToString(), ["item"] = item.DeepClone(), ["startedAtMs"] = observed?.StartedAtMs }).ConfigureAwait(false);
+            if ((observed is not null ? observed.Stage == CodexNativeArtifactStage.Completed :
+                item["status"]?.GetValue<string>() != "inProgress") && running.CompletedItems.Add(id))
                 await EmitAsync("item/completed", new JsonObject { ["threadId"] = threadId.ToString(), ["turnId"] = running.Id.ToString(),
-                    ["item"] = item.DeepClone(), ["completedAtMs"] = null }).ConfigureAwait(false);
+                    ["item"] = item.DeepClone(), ["completedAtMs"] = observed?.CompletedAtMs }).ConfigureAwait(false);
         }
     }
 

@@ -72,7 +72,7 @@ public sealed partial class CodexThreadRpc
             var entries = thread.Turns.Where(t => turnId is null || t.Id == turnId).SelectMany(turn => Items(turn).Select(item =>
                 (turn.Id + ":" + (item["id"] is JsonValue identity && identity.TryGetValue<string>(out var text)
                     ? text : throw Invalid("Missing item identity.")),
-                (JsonNode?)new JsonObject { ["turnId"] = turn.Id.ToString(), ["item"] = item, ["startedAtMs"] = null, ["completedAtMs"] = null }))).ToArray();
+                (JsonNode?)ItemEnvelope(turn, item)))).ToArray();
             if (Direction(p, "asc") == "desc") Array.Reverse(entries);
             string? anchor = null;
             if (p.TryGetProperty("cursor", out var cursor) && cursor.ValueKind == JsonValueKind.Object)
@@ -193,12 +193,34 @@ public sealed partial class CodexThreadRpc
             ["durationMs"] = turn.CompletedAt is { } end ? (long?)(end - turn.StartedAt).TotalMilliseconds : null };
     }
 
+    private static JsonObject ItemEnvelope(CodexStoredTurn turn, JsonObject item)
+    {
+        var observed = turn.NativeBackingArtifacts?.SingleOrDefault(a => a.ItemId == (string?)item["id"]);
+        return new JsonObject
+        {
+            ["turnId"] = turn.Id.ToString(), ["item"] = item,
+            ["startedAtMs"] = observed?.StartedAtMs, ["completedAtMs"] = observed?.CompletedAtMs,
+        };
+    }
+
     private static JsonObject[] Items(CodexStoredTurn turn)
     {
         var result = new List<JsonObject>(); var index = 0; var userIndex = 0;
+        var native = turn.NativeBackingArtifacts ?? [];
+        var separate = native.Where(a => !CodexThreadStore.IsNativeMcpArtifact(a)).ToArray();
+        var overrides = native.Where(CodexThreadStore.IsNativeMcpArtifact).ToDictionary(a => a.ItemId, StringComparer.Ordinal);
+        var initialInputCount = turn.Input.Length - (turn.RealtimeSteeringInputIndices?.Length ?? 0);
+        var nativeIndex = 0;
         foreach (var item in CodexThreadStore.RealtimeTimeline(turn, true))
         {
+            while (nativeIndex < separate.Length && initialInputCount + separate[nativeIndex].OutputBoundary <= index)
+                result.Add(CodexThreadStore.NativeArtifactItem(separate[nativeIndex++]));
             var id = Text(item, "id") ?? turn.Id + ":" + index; index++;
+            if (overrides.TryGetValue(id, out var observed))
+            {
+                result.Add(CodexThreadStore.NativeArtifactItem(observed));
+                continue;
+            }
             var type = Text(item, "type"); var role = Text(item, "role");
             // Native realtime mode context is not a visible backing-agent artifact.
             if (CodexRealtimeModeContext.IsModeFragment(item)) continue;
@@ -248,6 +270,7 @@ public sealed partial class CodexThreadRpc
             }
             else throw new CodexThreadRpcException(-32601, "Native history variant is not projected; refusing incomplete success.");
         }
+        while (nativeIndex < separate.Length) result.Add(CodexThreadStore.NativeArtifactItem(separate[nativeIndex++]));
         return result.ToArray();
     }
 

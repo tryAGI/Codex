@@ -342,6 +342,7 @@ public sealed partial class CodexThreadStore
                     !active && receipt.State == "dispatching" || turn.Status == "completed" && receipt.State == "unknown")
                     throw new InvalidDataException("Native dispatch history is invalid.");
             }
+            ValidateNativeBackingArtifacts(turn);
         }
         ValidateRealtimeHandoffTurnInputs(value);
         ValidateRealtimePromotions(value);

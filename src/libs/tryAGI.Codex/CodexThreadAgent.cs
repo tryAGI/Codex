@@ -326,8 +326,15 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 settings.Model, CodexThreadCompaction.ScopeHash(settings), current.Turns.Length, firstTurnIndex, turnId, currentInput);
         }
 
-        // Only independent realtime journal writes may advance the revision behind this executor.
-        // Any change to turn input, output, settings, ownership or dispatches remains a hard fence.
+        // Only independent realtime and public native-item observations may advance the
+        // revision behind this executor. Model history, settings, owners and receipts remain fenced.
+        private static JsonElement ExecutionSnapshot(CodexThreadDocument document) =>
+            CodexThreadStore.Encode(document with
+            {
+                RealtimeSessions = null, Revision = 1, UpdatedAt = default,
+                Turns = document.Turns.Select(t => t with { NativeBackingArtifacts = null }).ToArray(),
+            });
+
         private async Task<T> JournalAsync<T>(Func<CodexThreadDocument, Task<T>> mutate,
             Func<T, CodexThreadDocument> snapshot, CancellationToken ct)
         {
@@ -342,11 +349,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 catch (CodexThreadConflictException) when (attempt < 3)
                 {
                     var actual = await store.ReadAsync(Current.Id, ct).ConfigureAwait(false);
-                    if (actual.RealtimeSessions is null ||
-                        !JsonElement.DeepEquals(CodexThreadStore.Encode(Current with
-                        { RealtimeSessions = null, Revision = 1, UpdatedAt = default }),
-                        CodexThreadStore.Encode(actual with
-                        { RealtimeSessions = null, Revision = 1, UpdatedAt = default })))
+                    if (actual.RealtimeSessions is null && actual.Turns.All(t => t.NativeBackingArtifacts is null) ||
+                        !JsonElement.DeepEquals(ExecutionSnapshot(Current), ExecutionSnapshot(actual)))
                         throw;
                     Current = actual;
                 }
