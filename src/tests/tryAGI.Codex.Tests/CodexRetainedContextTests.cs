@@ -155,6 +155,118 @@ public sealed class CodexRetainedContextTests
         Assert.True(JsonElement.DeepEquals(mail.Item, projection[2].Item));
     }
 
+    private static CodexRetainedContextEntry OriginalImage(string mime, byte[] header) =>
+        new(Json(new JsonObject
+        {
+            ["type"] = "message", ["role"] = "user", ["content"] = new JsonArray(new JsonObject
+            {
+                ["type"] = "input_image", ["detail"] = "original",
+                ["image"] = new JsonObject { ["image_url"] = "DATA:" + mime + ";charset=binary;BASE64," + Convert.ToBase64String(header) },
+            }),
+        }.ToJsonString()));
+
+    [Theory]
+    [InlineData("image/jpeg", "FFD8FFC0000B080021004101010000", 6)]
+    [InlineData("image/gif", "47494638396141002100", 6)]
+    [InlineData("image/webp", "524946461600000057454250565038580A00000000000000400000200000", 6)]
+    [InlineData("image/webp", "5249464612000000574542505650384C050000002F40000800", 6)]
+    [InlineData("image/webp", "524946461600000057454250565038200A0000000000009D012A41002100", 6)]
+    public void OriginalDetailCommonImageHeadersUsePatchDimensions(string mime, string hex, int expected)
+    {
+        var header = Convert.FromHexString(hex);
+        var image = OriginalImage(mime, header);
+        var selection = CodexRetainedContext.Select([image], new() { ChargeImages = true, MaximumTokens = expected });
+        Assert.Single(selection.Entries);
+        Assert.Equal(expected, selection.BudgetedTokens);
+        Assert.Empty(CodexRetainedContext.Select([image], new() { ChargeImages = true, MaximumTokens = expected - 1 }).Entries);
+    }
+
+    [Fact]
+    public void JpegMetadataBeyondInitialHeaderIsScannedWithinBound()
+    {
+        var metadata = new byte[2048];
+        byte[] frame = Convert.FromHexString("FFC2000B080021004101010000");
+        var jpeg = new byte[6 + metadata.Length + frame.Length];
+        jpeg[0] = 0xff;
+        jpeg[1] = 0xd8;
+        jpeg[2] = 0xff;
+        jpeg[3] = 0xe1;
+        BinaryPrimitives.WriteUInt16BigEndian(jpeg.AsSpan(4, 2), (ushort)(metadata.Length + 2));
+        frame.CopyTo(jpeg, 6 + metadata.Length);
+        var image = OriginalImage("image/jpeg", jpeg);
+        Assert.Equal(6, CodexRetainedContext.Select([image], new() { ChargeImages = true }).BudgetedTokens);
+        var malformed = OriginalImage("image/jpeg", jpeg[..100]);
+        Assert.Equal(1844, CodexRetainedContext.Select([malformed], new() { ChargeImages = true }).BudgetedTokens);
+    }
+
+    [Fact]
+    public void BmpDimensionsAreSignedAndPatchCountsAreCapped()
+    {
+        var header = new byte[54];
+        header[0] = (byte)'B';
+        header[1] = (byte)'M';
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(14, 4), 40);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(18, 4), 65);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(22, 4), -33);
+        var image = OriginalImage("image/bmp", header);
+        Assert.Equal(6, CodexRetainedContext.Select([image], new() { ChargeImages = true }).BudgetedTokens);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(18, 4), int.MaxValue);
+        BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(22, 4), int.MaxValue);
+        Assert.Equal(10_000, CodexRetainedContext.Select([OriginalImage("image/bmp", header)], new() { ChargeImages = true }).BudgetedTokens);
+    }
+
+    [Theory]
+    [InlineData(null, 12000)]
+    [InlineData(0, 12000)]
+    [InlineData(-1, 12000)]
+    [InlineData(15000, 12000)]
+    [InlineData(25, 25)]
+    public void FileAudioReservesTrustedDurationOrFullUpstreamBudget(int? reported, int expected)
+    {
+        var entry = new CodexRetainedContextEntry(Json("""
+            {"type":"message","role":"user","content":[{"type":"input_audio","audio":{"file_id":"audio"}}]}
+            """));
+        var options = new CodexRetainedContextOptions
+        {
+            FileAudioTokens = reported is { } value ? new Dictionary<string, int> { ["audio"] = value } : null,
+            MaximumTokens = expected + 1,
+        };
+        var history = new[] { Message("user", "old"), entry, Message("user", "new") };
+        foreach (var charge in new[] { false, true })
+        {
+            var selection = CodexRetainedContext.Select(history, options with { ChargeImages = charge });
+            Assert.Equal(expected + 1, selection.BudgetedTokens);
+            Assert.Equal(2, selection.Entries.Count);
+            Assert.True(JsonElement.DeepEquals(entry.Item, selection.Entries[0].Item));
+            var tooSmall = CodexRetainedContext.Select(history, options with { ChargeImages = charge, MaximumTokens = expected });
+            Assert.Equal("new", Text(Assert.Single(tooSmall.Entries)));
+        }
+    }
+
+    [Fact]
+    public void FileAudioCutoffDoesNotBackfillOlderUnchargedMedia()
+    {
+        var entry = new CodexRetainedContextEntry(Json("""
+            {"type":"message","role":"user","content":[
+              {"type":"input_image","image_url":"data:image/png;base64,older"},
+              {"type":"input_audio","audio":{"audio_url":"data:audio/wav;base64,older"}},
+              {"type":"input_text","text":"<audio>"},
+              {"type":"input_audio","audio":{"file_id":"audio"}},
+              {"type":"input_text","text":"</audio>"},
+              {"type":"input_text","text":"after"}],
+             "internal_chat_message_metadata_passthrough":{"content_item_kinds":["image","audio","label","file","label","text"]}}
+            """), Json("""{"retained_source":{"complete":true}}"""));
+        var selection = CodexRetainedContext.Select([Message("user", "old"), entry], new() { MaximumTokens = 12000 });
+        var retained = Assert.Single(selection.Entries);
+        Assert.Equal("after", Text(retained));
+        Assert.Equal(0, selection.RetainedImageCount);
+        Assert.Equal("text", Assert.Single(retained.Item.GetProperty("internal_chat_message_metadata_passthrough")
+            .GetProperty("content_item_kinds").EnumerateArray()).GetString());
+        Assert.False(retained.Metadata!.Value.GetProperty("retained_source").GetProperty("complete").GetBoolean());
+        Assert.True(entry.Metadata!.Value.GetProperty("retained_source").GetProperty("complete").GetBoolean());
+        Assert.Equal(6, entry.Item.GetProperty("content").GetArrayLength());
+    }
+
     [Fact]
     public void OriginalDetailPngUsesPatchEstimateAndFileReferenceUsesMaximum()
     {

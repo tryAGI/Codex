@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -23,9 +22,10 @@ public sealed record CodexRetainedContextOptions
     public bool RetainClientToolOutputs { get; init; }
     /// <summary>Last known sampled history sequence, if the host tracks pending agent mail.</summary>
     public long? SampledThroughSequence { get; init; }
-    /// <summary>Optional known image token estimate, for original-detail image formats not decoded by the SDK.</summary>
+    /// <summary>Optional host image-token estimator, including formats not recognized by the bounded SDK header reader.</summary>
     public Func<JsonElement, int?>? EstimateImageTokens { get; init; }
-    /// <summary>Known file audio token estimates by file ID.</summary>
+    /// <summary>Trusted positive file audio token estimates by file ID. Missing or invalid estimates
+    /// reserve the maximum 20-minute budget (12,000 tokens); known estimates are capped at that limit.</summary>
     public IReadOnlyDictionary<string, int>? FileAudioTokens { get; init; }
 }
 
@@ -228,8 +228,13 @@ public static class CodexRetainedContext
         if (PartText(part) is { } text) return Tokens(text);
         if (Type(part) == "input_image") return chargeImages ? ImageTokens(part, options) : 0;
         if (Type(part) == "input_audio")
-            return FileId(part) is { } id && options.FileAudioTokens?.TryGetValue(id, out var tokens) == true
-                ? Math.Max(0, tokens) : 0;
+        {
+            // Inline message audio is free in the retained-message budget. File audio
+            // without a trusted duration reserves the full upstream 20-minute allowance.
+            if (FileId(part) is not { } id) return 0;
+            return options.FileAudioTokens?.TryGetValue(id, out var tokens) == true && tokens > 0
+                ? Math.Min(12_000, tokens) : 12_000;
+        }
         return Tokens(part.GetRawText());
     }
 
@@ -240,20 +245,7 @@ public static class CodexRetainedContext
         if (FileId(image) is not null || Property(image, "image") is { ValueKind: JsonValueKind.Object } reference &&
             FileId(reference) is not null) return 10_000;
         var url = Text(image, "image_url") ?? (Property(image, "image") is { ValueKind: JsonValueKind.Object } nested ? Text(nested, "image_url") : null);
-        const string png = "data:image/png;base64,";
-        if (url?.StartsWith(png, StringComparison.Ordinal) == true && url.Length >= png.Length + 32)
-        {
-            Span<byte> header = stackalloc byte[24];
-            if (Convert.TryFromBase64Chars(url.AsSpan(png.Length, 32), header, out var count) && count == 24 &&
-                header[..8].SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }))
-            {
-                var width = BinaryPrimitives.ReadUInt32BigEndian(header[16..20]);
-                var height = BinaryPrimitives.ReadUInt32BigEndian(header[20..24]);
-                if (width != 0 && height != 0)
-                    return (int)Math.Min(10_000L, ((width + 31L) / 32) * ((height + 31L) / 32));
-            }
-        }
-        return 1844; // Same fallback as upstream when dimensions cannot be decoded.
+        return CodexRetainedImageDimensions.EstimateOriginalTokens(url) ?? 1844; // Upstream resized-image fallback.
     }
 
     private static int ContentTokens(JsonElement item, bool chargeImages, CodexRetainedContextOptions options) =>
