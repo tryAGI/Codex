@@ -29,27 +29,14 @@ public sealed partial class CodexThreadRpc
             if (defaults.TryGetProperty(target, out var initial)) settings[target] = JsonNode.Parse(initial.GetRawText());
         }
         var sources = new JsonArray();
-        var raw = new JsonObject();
         if (snapshot is not null)
         {
-            if (string.IsNullOrWhiteSpace(snapshot.Revision) || snapshot.Revision.Length > 512 || snapshot.Revision.Any(char.IsControl) || snapshot.Layers.Count > 32)
-                throw Invalid("Invalid configuration snapshot.");
-            var previous = CodexConfigurationLayerKind.Package;
-            var bytes = 0;
-            foreach (var layer in snapshot.Layers.ToArray())
-            {
-                if (!Enum.IsDefined(layer.Kind) || (int)layer.Kind < (int)previous || string.IsNullOrWhiteSpace(layer.Name) || layer.Name.Length > 512 || layer.Name.Any(char.IsControl))
-                    throw Invalid("Configuration layers must be bounded and ordered by precedence.");
-                previous = layer.Kind;
-                if (!layer.Trusted && layer.Kind != CodexConfigurationLayerKind.Project)
-                    throw Invalid("Only project configuration can be disabled by project trust.");
+            var effective = CodexConfigurationResolver.Resolve(snapshot);
+            foreach (var layer in snapshot.Layers)
                 sources.Add((JsonNode)new JsonObject { ["kind"] = layer.Kind.ToString(), ["name"] = layer.Name, ["enabled"] = layer.Trusted });
-                if (!layer.Trusted) continue;
-                bytes = checked(bytes + Encoding.UTF8.GetByteCount(layer.Config.GetRawText()));
-                if (bytes > 1_048_576) throw Invalid("Configuration layers exceed their aggregate bound.");
-                MergeConfiguration(raw, layer.Config, 0);
-            }
-            ApplyConfig(settings, Element(new JsonObject { ["config"] = raw }));
+            // Only keys with native consumers can affect thread execution. Raw configuration
+            // and feature provenance are available to the host through the resolver.
+            ApplyConfig(settings, Element(new JsonObject { ["config"] = JsonNode.Parse(effective.Config.GetRawText()) }));
             settings["nativeConfigurationRevision"] = snapshot.Revision;
             settings.Remove("nativeConfigurationRequirements");
             if (snapshot.Requirements is { } managed) settings["nativeConfigurationRequirements"] = JsonNode.Parse(managed.GetRawText());
@@ -83,22 +70,6 @@ public sealed partial class CodexThreadRpc
         validateOptions?.Invoke(Apply(new CodexResponseOptions(Text(Element(resolved), "model") ?? throw Invalid("Missing model."), ThreadInstructions(Element(resolved))), Element(resolved)));
         ct.ThrowIfCancellationRequested();
         return Element(resolved);
-    }
-
-    private static void MergeConfiguration(JsonObject target, JsonElement source, int depth)
-    {
-        if (source.ValueKind != JsonValueKind.Object || depth > 32) throw Invalid("Invalid configuration layer object.");
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var field in source.EnumerateObject())
-        {
-            if (!seen.Add(field.Name)) throw Invalid("Duplicate configuration setting.");
-            if (field.Value.ValueKind == JsonValueKind.Object)
-            {
-                if (target[field.Name] is not JsonObject nested) { nested = new(); target[field.Name] = nested; }
-                MergeConfiguration(nested, field.Value, depth + 1);
-            }
-            else target[field.Name] = JsonNode.Parse(field.Value.GetRawText());
-        }
     }
 
     private static void ValidateConfigurationRequirements(JsonElement settings, JsonElement? requirements)

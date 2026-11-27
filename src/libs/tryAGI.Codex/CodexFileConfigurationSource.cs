@@ -171,6 +171,11 @@ public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions o
                 };
                 if (item.Value is not JsonArray allowed || allowed.Count is < 1 or > 64 || allowed.Any(value => value is not JsonValue scalar || !scalar.TryGetValue<string>(out _)))
                     throw Invalid("Invalid managed allowed values.");
+                // A malformed host constraint must not disappear when a later source is merged.
+                if (requirements.TryGetPropertyValue(name, out var existing) &&
+                    (existing is not JsonArray prior || prior.Count is < 1 or > 64 ||
+                    prior.Any(value => value is not JsonValue scalar || !scalar.TryGetValue<string>(out _))))
+                    throw Invalid("Invalid host managed allowed values.");
                 var previous = requirements[name] as JsonArray;
                 var intersection = new JsonArray(allowed.Where(value => previous is null || previous.Any(old => JsonNode.DeepEquals(old, value))).Select(value => value?.DeepClone()).ToArray());
                 if (intersection.Count == 0) throw Invalid("Managed requirements have no common allowed value.");
