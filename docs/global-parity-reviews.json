@@ -1389,6 +1389,763 @@
           ]
         }
       }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:account/read": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 85,
+        "scope": "native-behavior",
+        "rationale": "Managed account shape and explicit refresh selection; non-subscription kinds do not dispatch usage. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAccountRpc.cs::InvokeAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexAccountRpcTests.cs::CodexAccountRpcTests.AccountReadPreservesWireShapeAndOnlyRefreshesManagedAuth",
+          "src/tests/tryAGI.Codex.Tests/CodexAccountRpcTests.cs::CodexAccountRpcTests.AccountReadDoesNotDispatchUsageForNonSubscriptionAccounts"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.AccountReadDoesNotDispatchUsageForNonSubscriptionAccounts(type: \"amazonBedrock\", kind: AmazonBedrock)",
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.AccountReadDoesNotDispatchUsageForNonSubscriptionAccounts(type: \"apiKey\", kind: ApiKey)",
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.AccountReadDoesNotDispatchUsageForNonSubscriptionAccounts(type: \"gcp\", kind: Gcp)",
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.AccountReadPreservesWireShapeAndOnlyRefreshesManagedAuth"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:account/rateLimits/read": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 85,
+        "scope": "native-behavior",
+        "rationale": "Verified rate buckets and account/selection epoch fences; unknown fields remain null. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAccountRpc.cs::InvokeAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexAccountRpcTests.cs::CodexAccountRpcTests.RateLimitsUseVerifiedIndependentBucketsAndKeepUnknownMetadataNull",
+          "src/tests/tryAGI.Codex.Tests/CodexAccountRpcTests.cs::CodexAccountRpcTests.RejectsStaleObservationAndSwitchDuringReadEvenIfUserAndAccountAreSame"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.RateLimitsUseVerifiedIndependentBucketsAndKeepUnknownMetadataNull",
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.RejectsStaleObservationAndSwitchDuringReadEvenIfUserAndAccountAreSame"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:account/usage/read": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 85,
+        "scope": "native-behavior",
+        "rationale": "Preserves observed token/dollar/credit amounts without inventing entitlements or switching account types. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAccountRpc.cs::InvokeAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexAccountRpcTests.cs::CodexAccountRpcTests.TokenUsagePreservesNativeDollarAndCreditAmountsWithoutInvention",
+          "src/tests/tryAGI.Codex.Tests/CodexAccountRpcTests.cs::CodexAccountRpcTests.AccountReadDoesNotDispatchUsageForNonSubscriptionAccounts"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.AccountReadDoesNotDispatchUsageForNonSubscriptionAccounts(type: \"amazonBedrock\", kind: AmazonBedrock)",
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.AccountReadDoesNotDispatchUsageForNonSubscriptionAccounts(type: \"apiKey\", kind: ApiKey)",
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.AccountReadDoesNotDispatchUsageForNonSubscriptionAccounts(type: \"gcp\", kind: Gcp)",
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.TokenUsagePreservesNativeDollarAndCreditAmountsWithoutInvention"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:account/rateLimits/updated": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 85,
+        "scope": "native-behavior",
+        "rationale": "Only verified scoped rate-limit observations publish; stale owner rejected. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAccountRpc.cs::NotifyRateLimitsUpdatedAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexAccountRpcTests.cs::CodexAccountRpcTests.NotificationPublishesOnlyObservedBucketAndRejectsStaleOwner"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.NotificationPublishesOnlyObservedBucketAndRejectsStaleOwner"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:account/updated": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 85,
+        "scope": "native-behavior",
+        "rationale": "Account notification uses current owner and rejects stale observations. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAccountRpc.cs::NotifyAccountUpdatedAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexAccountRpcTests.cs::CodexAccountRpcTests.NotificationPublishesOnlyObservedBucketAndRejectsStaleOwner"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexAccountRpcTests.NotificationPublishesOnlyObservedBucketAndRejectsStaleOwner"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:config/read": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 83,
+        "scope": "native-behavior",
+        "rationale": "Effective public configuration with exact origins and layers; rejects invalid metadata and avoids leaking raw secrets. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexConfigurationReadRpc.cs::InvokeAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexConfigurationReadRpcTests.cs::CodexConfigurationReadRpcTests.ReturnsEffectivePublicConfigAndExactOriginsWithoutRawSecrets",
+          "src/tests/tryAGI.Codex.Tests/CodexConfigurationReadRpcTests.cs::CodexConfigurationReadRpcTests.RequiresExactAuthenticLayerMetadata",
+          "src/tests/tryAGI.Codex.Tests/CodexConfigurationReadRpcTests.cs::CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"config/read\", json: \"{\\\"cwd\\\":\\\"relative\\\"}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"config/read\", json: \"{\\\"includeLayers\\\":true,\\\"includeLayers\\\":false}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"config/value/write\", json: \"{}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"configRequirements/read\", json: \"{\\\"cwd\\\":\\\"relative\\\"}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"experimentalFeature/list\", json: \"{\\\"threadId\\\":\\\"unknown\\\"}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RequiresExactAuthenticLayerMetadata",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.ReturnsEffectivePublicConfigAndExactOriginsWithoutRawSecrets"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:configRequirements/read": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 83,
+        "scope": "native-behavior",
+        "rationale": "Supported requirements projection preserves unknown speed state. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexConfigurationReadRpc.cs::InvokeAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexConfigurationReadRpcTests.cs::CodexConfigurationReadRpcTests.ReadsOnlySupportedManagedRequirementsAndRetainsUnknownSpeedState"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.ReadsOnlySupportedManagedRequirementsAndRetainsUnknownSpeedState"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:experimentalFeature/list": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 83,
+        "scope": "native-behavior",
+        "rationale": "Lists actual registered feature state and applies selected loaded-thread scope. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexConfigurationReadRpc.cs::ListFeaturesAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexConfigurationReadRpcTests.cs::CodexConfigurationReadRpcTests.FeatureListUsesActualNativeRegistryAndLoadedThreadScope",
+          "src/tests/tryAGI.Codex.Tests/CodexConfigurationReadRpcTests.cs::CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.FeatureListUsesActualNativeRegistryAndLoadedThreadScope",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"config/read\", json: \"{\\\"cwd\\\":\\\"relative\\\"}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"config/read\", json: \"{\\\"includeLayers\\\":true,\\\"includeLayers\\\":false}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"config/value/write\", json: \"{}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"configRequirements/read\", json: \"{\\\"cwd\\\":\\\"relative\\\"}\")",
+            "tryAGI.Codex.Tests.CodexConfigurationReadRpcTests.RejectsUnsupportedOrMalformedRequestsBeforeAccess(method: \"experimentalFeature/list\", json: \"{\\\"threadId\\\":\\\"unknown\\\"}\")"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverRequests:item/commandExecution/requestApproval": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 80,
+        "scope": "native-behavior",
+        "rationale": "Durable correlation, reviewer identity, replay and expiry protection; only separate consumption may admit command execution. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexApprovalRpcBridge.cs::AdmitAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.NumericAndStringIdsDoNotAliasAndExactDuplicateAdmitsOnce",
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.ChangedPayloadMethodDeadlineAndActionCannotRebindTransportIdentity",
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.ExactReviewerResponseCommitsButOnlyStoreConsumptionAdmitsDispatch",
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.BroaderCommandDecisionsAreNotTranslatedIntoAccept",
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.DisconnectCancellationAndExpiredRequestsCannotBeRevived"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.BroaderCommandDecisionsAreNotTranslatedIntoAccept(variant: \"acceptForSession\")",
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.BroaderCommandDecisionsAreNotTranslatedIntoAccept(variant: \"acceptWithExecpolicyAmendment\")",
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.BroaderCommandDecisionsAreNotTranslatedIntoAccept(variant: \"applyNetworkPolicyAmendment\")",
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.ChangedPayloadMethodDeadlineAndActionCannotRebindTransportIdentity",
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.DisconnectCancellationAndExpiredRequestsCannotBeRevived",
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.ExactReviewerResponseCommitsButOnlyStoreConsumptionAdmitsDispatch",
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.NumericAndStringIdsDoNotAliasAndExactDuplicateAdmitsOnce"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverRequests:item/fileChange/requestApproval": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 80,
+        "scope": "native-behavior",
+        "rationale": "File-change approval remains correlated and cancellation does not authorize writes. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexApprovalRpcBridge.cs::RespondAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.FileApprovalCancellationDoesNotGrantWrites",
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.ChangedPayloadMethodDeadlineAndActionCannotRebindTransportIdentity"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.ChangedPayloadMethodDeadlineAndActionCannotRebindTransportIdentity",
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.FileApprovalCancellationDoesNotGrantWrites"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverRequests:item/permissions/requestApproval": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 80,
+        "scope": "native-behavior",
+        "rationale": "Permissions grant requires separate enforcement; unknown or empty grant does not authorize action. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexApprovalRpcBridge.cs::RespondAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.PermissionGrantNeedsSeparateEnforcementAndEmptyTurnGrantDenies",
+          "src/tests/tryAGI.Codex.Tests/CodexApprovalRpcBridgeTests.cs::CodexApprovalRpcBridgeTests.OfferedChoicesAreEnforcedAndUnknownDecisionsFailClosed"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.OfferedChoicesAreEnforcedAndUnknownDecisionsFailClosed",
+            "tryAGI.Codex.Tests.CodexApprovalRpcBridgeTests.PermissionGrantNeedsSeparateEnforcementAndEmptyTurnGrantDenies"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:review/start": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 82,
+        "scope": "native-behavior",
+        "rationale": "Inline review requires durable correlated journal turn and authenticated adapter; unsupported targets/delivery fail closed. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexReviewRpc.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.ReviewStartRequiresCommittedCorrelatedInlineTurn",
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.InvalidTargetsCannotReachAdapter",
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.SeparateDeliveryAndUnauthenticatedCallerAreRejected",
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.MissingJournalTurnCannotBeReportedAsStarted",
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.CancellationPropagatesBeforeAnyReviewDispatch"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.CancellationPropagatesBeforeAnyReviewDispatch",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.InvalidTargetsCannotReachAdapter(target: \"{\\\"type\\\":\\\"baseBranch\\\",\\\"branch\\\":\\\"\\\"}\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.InvalidTargetsCannotReachAdapter(target: \"{\\\"type\\\":\\\"commit\\\",\\\"sha\\\":\\\"\\\"}\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.InvalidTargetsCannotReachAdapter(target: \"{\\\"type\\\":\\\"custom\\\",\\\"instructions\\\":\\\" \\\"}\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.InvalidTargetsCannotReachAdapter(target: \"{\\\"type\\\":\\\"uncommittedChanges\\\",\\\"branch\\\":\\\"main\\\"}\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.InvalidTargetsCannotReachAdapter(target: \"{\\\"type\\\":\\\"unknown\\\"}\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.MissingJournalTurnCannotBeReportedAsStarted",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.ReviewStartRequiresCommittedCorrelatedInlineTurn(target: \"{\\\"type\\\":\\\"baseBranch\\\",\\\"branch\\\":\\\"main\\\"}\", type: \"baseBranch\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.ReviewStartRequiresCommittedCorrelatedInlineTurn(target: \"{\\\"type\\\":\\\"commit\\\",\\\"sha\\\":\\\"abc\\\",\\\"title\\\":\\\"Commit\\\"}\", type: \"commit\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.ReviewStartRequiresCommittedCorrelatedInlineTurn(target: \"{\\\"type\\\":\\\"custom\\\",\\\"instructions\\\":\\\"Review changes\\\"}\", type: \"custom\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.ReviewStartRequiresCommittedCorrelatedInlineTurn(target: \"{\\\"type\\\":\\\"uncommittedChanges\\\"}\", type: \"uncommittedChanges\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.SeparateDeliveryAndUnauthenticatedCallerAreRejected"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/guardianReview": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 82,
+        "scope": "native-behavior",
+        "rationale": "Guardian assessment remains correlated advisory data, never direct approval. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexReviewRpc.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.GuardianAssessmentIsCorrelatedAdvisoryAndDoesNotApprove",
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.NullAssessmentAndUnknownOrForeignAssessmentNeverGrantAuthority"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.GuardianAssessmentIsCorrelatedAdvisoryAndDoesNotApprove(outcome: \"allow\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.GuardianAssessmentIsCorrelatedAdvisoryAndDoesNotApprove(outcome: \"deny\")",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.NullAssessmentAndUnknownOrForeignAssessmentNeverGrantAuthority"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/approveGuardianDeniedAction": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 82,
+        "scope": "native-behavior",
+        "rationale": "Escalation requires prior recorded denial, exact action identity and separate consumption. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexReviewRpc.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.EscalationRequiresRecordedDenialExactActionAndSeparateConsumption",
+          "src/tests/tryAGI.Codex.Tests/CodexReviewRpcTests.cs::CodexReviewRpcTests.UnknownOrAlreadyDeniedActionCannotBeEscalated"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.EscalationRequiresRecordedDenialExactActionAndSeparateConsumption",
+            "tryAGI.Codex.Tests.CodexReviewRpcTests.UnknownOrAlreadyDeniedActionCannotBeEscalated"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/goal/set": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Goal mutations require explicit host authorization and generation/revision fencing; no automatic execution. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Goal.cs::GoalAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadGoalTests.cs::ThreadGoalTests.GoalRequiresExplicitHostAuthorityAndDoesNotTreatOriginAsConsent",
+          "src/tests/tryAGI.Codex.Tests/ThreadGoalTests.cs::ThreadGoalTests.GoalBudgetAndUsageAreFencedByGenerationAndStableReceipt",
+          "src/tests/tryAGI.Codex.Tests/ThreadGoalTests.cs::ThreadGoalTests.GoalAuthorityCannotCommitAgainstChangedSnapshot"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadGoalTests.GoalAuthorityCannotCommitAgainstChangedSnapshot",
+            "tryAGI.Codex.Tests.ThreadGoalTests.GoalBudgetAndUsageAreFencedByGenerationAndStableReceipt",
+            "tryAGI.Codex.Tests.ThreadGoalTests.GoalRequiresExplicitHostAuthorityAndDoesNotTreatOriginAsConsent"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/goal/get": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Scoped goal reads before authorization and after goal mutation/clear. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Goal.cs::GoalAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadGoalTests.cs::ThreadGoalTests.GoalRequiresExplicitHostAuthorityAndDoesNotTreatOriginAsConsent",
+          "src/tests/tryAGI.Codex.Tests/ThreadGoalTests.cs::ThreadGoalTests.GoalBudgetAndUsageAreFencedByGenerationAndStableReceipt"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadGoalTests.GoalBudgetAndUsageAreFencedByGenerationAndStableReceipt",
+            "tryAGI.Codex.Tests.ThreadGoalTests.GoalRequiresExplicitHostAuthorityAndDoesNotTreatOriginAsConsent"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/goal/clear": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Goal clear tested against durable receipt/generation handling. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Goal.cs::GoalAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadGoalTests.cs::ThreadGoalTests.GoalBudgetAndUsageAreFencedByGenerationAndStableReceipt"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadGoalTests.GoalBudgetAndUsageAreFencedByGenerationAndStableReceipt"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/goal/updated": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "One goal update event after authorized durable mutation. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Goal.cs::GoalAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadGoalTests.cs::ThreadGoalTests.GoalRequiresExplicitHostAuthorityAndDoesNotTreatOriginAsConsent"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadGoalTests.GoalRequiresExplicitHostAuthorityAndDoesNotTreatOriginAsConsent"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/goal/cleared": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Goal-cleared event observed after clear. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Goal.cs::GoalAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadGoalTests.cs::ThreadGoalTests.GoalBudgetAndUsageAreFencedByGenerationAndStableReceipt"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadGoalTests.GoalBudgetAndUsageAreFencedByGenerationAndStableReceipt"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:hook/started": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 77,
+        "scope": "native-behavior",
+        "rationale": "Ordered correlated hook start notifications and readmission of rewritten input through synthetic executor. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexHookRuntime.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexHookRuntimeTests.cs::CodexHookRuntimeTests.OrderedHooksPublishCorrelatedLifecycleAndReadmitRewrittenInput"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexHookRuntimeTests.OrderedHooksPublishCorrelatedLifecycleAndReadmitRewrittenInput"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:hook/completed": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 77,
+        "scope": "native-behavior",
+        "rationale": "Ordered completion notification and cancellation semantics through synthetic hook adapter. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexHookRuntime.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexHookRuntimeTests.cs::CodexHookRuntimeTests.OrderedHooksPublishCorrelatedLifecycleAndReadmitRewrittenInput",
+          "src/tests/tryAGI.Codex.Tests/CodexHookRuntimeTests.cs::CodexHookRuntimeTests.CancelledHookPublishesStoppedAndNeverReturnsSuccess"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexHookRuntimeTests.CancelledHookPublishesStoppedAndNeverReturnsSuccess",
+            "tryAGI.Codex.Tests.CodexHookRuntimeTests.OrderedHooksPublishCorrelatedLifecycleAndReadmitRewrittenInput"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fuzzyFileSearch": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Local stable filesystem fixture and synthetic source: bounded matching, grapheme positions, traversal authorization and link exclusion. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSearch.cs::OneShotAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.RealStableSourceReturnsPinnedWireFieldsAndSkipsIgnoredAndExternalLinks",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.SourceAuthorizationPrecedesTraversalAndUnauthorizedRootsAreNotInspected",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.ResultsAreBoundedStableAndUseGraphemePositions",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.EscapingSourcePathsAndScanBudgetFailClosed"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSearchTests.EscapingSourcePathsAndScanBudgetFailClosed",
+            "tryAGI.Codex.Tests.CodexFileSearchTests.RealStableSourceReturnsPinnedWireFieldsAndSkipsIgnoredAndExternalLinks",
+            "tryAGI.Codex.Tests.CodexFileSearchTests.ResultsAreBoundedStableAndUseGraphemePositions",
+            "tryAGI.Codex.Tests.CodexFileSearchTests.SourceAuthorizationPrecedesTraversalAndUnauthorizedRootsAreNotInspected"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fuzzyFileSearch/sessionStart": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Separate session identity and duplicate admission rejection. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSearch.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fuzzyFileSearch/sessionUpdate": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Query replacement, current authorization, independent sessions and empty result update. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSearch.cs::RunSessionAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.RevokedRootCannotBeReusedByExistingSession",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.NewQueryCancelsAndDrainsOldTraversalBeforePublishing"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSearchTests.NewQueryCancelsAndDrainsOldTraversalBeforePublishing",
+            "tryAGI.Codex.Tests.CodexFileSearchTests.RevokedRootCannotBeReusedByExistingSession",
+            "tryAGI.Codex.Tests.CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fuzzyFileSearch/sessionStop": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Session stop drains notifications and rejects foreign connection control. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSearch.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.StopDrainsInFlightNotificationAndForeignConnectionCannotControlSession",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot",
+            "tryAGI.Codex.Tests.CodexFileSearchTests.StopDrainsInFlightNotificationAndForeignConnectionCannotControlSession"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:fuzzyFileSearch/sessionUpdated": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Correlated query updates, result boundaries and stale traversal suppression. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSearch.cs::RunSessionAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.NewQueryCancelsAndDrainsOldTraversalBeforePublishing"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSearchTests.NewQueryCancelsAndDrainsOldTraversalBeforePublishing",
+            "tryAGI.Codex.Tests.CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:fuzzyFileSearch/sessionCompleted": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Correlated completion and rejection of false successful completion. This is component-level credential-free evidence; actual provider, production storage, real host authority, platform behavior and complete Rust semantics remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSearch.cs::RunSessionAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSearchTests.cs::CodexFileSearchTests.SessionFailureDoesNotEmitSuccessfulCompletion"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "265abc9079ec8eb9043d3cc6c9bd9854d46bfd99",
+          "receipt": "docs/global-parity-evidence/ci-265abc9-45962268012.json",
+          "receiptSha256": "2c48b532d9cc611f2e254a883c25245bd28f3ca9e78163de18ccd7d4a64dd764",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSearchTests.SessionFailureDoesNotEmitSuccessfulCompletion",
+            "tryAGI.Codex.Tests.CodexFileSearchTests.SessionUpdatesAreIndependentAndClearSendsEmptySnapshot"
+          ]
+        }
+      }
     }
   }
 }
