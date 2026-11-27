@@ -15,7 +15,7 @@ public sealed record CodexThreadCompactionOptions
     public CodexRetainedContextOptions? Retention { get; init; }
     /// <summary>Maximum additional compaction attempts during an active turn, zero disables inline compaction.</summary>
     public int MaximumInlineCompactions { get; init; } = 4;
-    /// <summary>Optional lower context threshold for speculative post-turn compaction.
+    /// <summary>Optional lower context threshold for speculative compaction between inference steps and after a turn.
     /// Requires a host-owned <see cref="CodexThreadCompactionScheduler"/>; must be below TokenThreshold.</summary>
     public long? BackgroundTokenThreshold { get; init; }
 }

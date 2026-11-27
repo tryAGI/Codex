@@ -142,9 +142,9 @@ public sealed class ThreadCompactionCheckpointTests
     private sealed class Budget : ICodexUsageObserver
     {
         internal int Reserved, Completed, Incomplete;
-        public Task ReserveAsync(string id, string model, CancellationToken ct) { Reserved++; return Task.CompletedTask; }
-        public Task CompleteAsync(string id, string model, JsonElement response, CancellationToken ct) { Completed++; return Task.CompletedTask; }
-        public Task IncompleteAsync(string id, string model, CancellationToken ct) { Incomplete++; return Task.CompletedTask; }
+        public Task ReserveAsync(string id, string model, CancellationToken ct) { Interlocked.Increment(ref Reserved); return Task.CompletedTask; }
+        public Task CompleteAsync(string id, string model, JsonElement response, CancellationToken ct) { Interlocked.Increment(ref Completed); return Task.CompletedTask; }
+        public Task IncompleteAsync(string id, string model, CancellationToken ct) { Interlocked.Increment(ref Incomplete); return Task.CompletedTask; }
     }
 
     private sealed class Server(bool incomplete = false, bool midTurn = false, int toolRounds = 1)
@@ -161,7 +161,7 @@ public sealed class ThreadCompactionCheckpointTests
             protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
             {
                 var payload = Json(await request.Content!.ReadAsStringAsync(ct));
-                owner.Requests.Add(payload);
+                lock (owner.Requests) owner.Requests.Add(payload);
                 var compacting = payload.GetProperty("input").EnumerateArray().Any(item =>
                     item.TryGetProperty("type", out var type) && type.GetString() == "compaction_trigger");
                 if (compacting && owner.ReleaseCompaction is { } release)
@@ -375,6 +375,128 @@ public sealed class ThreadCompactionCheckpointTests
         Assert.True(JsonElement.DeepEquals(Encrypted, projected[^1]));
         await Assert.ThrowsAsync<CodexThreadConflictException>(() =>
             store.InstallBackgroundCompactionAsync(candidate, Result(candidate), settings, installed.Revision, cancellationToken: Ct));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SpeculativeActivePrefixPreservesAppendedOutputAtSafeBoundary(bool closeTurn)
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var turnId = Guid.NewGuid();
+        var settings = Settings(thread.Id, turnId);
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turnId, "owner", [User("first")], cancellationToken: Ct);
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turnId, "owner", [Encrypted], Ct);
+        var candidate = CodexThreadStore.CaptureActiveCompaction(thread, turnId, "owner", settings)!;
+        var suffix = Json("""{"type":"message","role":"assistant","content":[{"type":"output_text","text":"suffix"}]}""");
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turnId, "owner", [Encrypted, suffix], Ct);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => store.InstallBackgroundCompactionAsync(
+            candidate, Result(candidate), settings, thread.Revision, cancellationToken: Ct));
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => store.InstallActiveBackgroundCompactionAsync(
+            candidate, Result(candidate), settings, thread.Revision, turnId, "other-owner", null, Ct));
+        if (closeTurn)
+        {
+            thread = await store.CompleteAsync(thread.Id, thread.Revision, turnId, "owner", "completed", [Encrypted, suffix], Ct);
+            thread = await store.InstallBackgroundCompactionAsync(candidate, Result(candidate), settings, thread.Revision, cancellationToken: Ct);
+        }
+        else
+        {
+            thread = await store.InstallActiveBackgroundCompactionAsync(candidate, Result(candidate), settings,
+                thread.Revision, turnId, "owner", null, Ct);
+        }
+        Assert.Equal(2, Assert.Single(thread.Turns).Output.Length);
+        Assert.Equal(turnId, thread.CompactionCheckpoint!.ActiveBoundary!.TurnId);
+        Assert.Equal(1, thread.CompactionCheckpoint.ActiveBoundary.OutputCount);
+        var observed = await new CodexThreadStore(storage, "account").ReadAsync(thread.Id, Ct);
+        var projected = CodexThreadCompaction.Project(observed, observed.CompactionCheckpoint, settings.Model,
+            CodexThreadCompaction.ScopeHash(settings), observed.Turns.Length, currentTurnId: turnId, includeActiveOutput: true);
+        Assert.Single(projected, item => CodexRealtimeProtocol.Text(item, "type") == "compaction");
+        Assert.True(JsonElement.DeepEquals(suffix, projected[^1]));
+        Assert.DoesNotContain(projected, item => JsonElement.DeepEquals(Encrypted, item));
+    }
+
+    [Fact]
+    public async Task ActiveSpeculationWaitsForDurableSteeringCaptureAndPreservesItExactlyOnce()
+    {
+        var (_, store, thread, attachment) = await RealtimeHistoryTests.Setup();
+        Task<CodexThreadDocument> Observe(CodexThreadDocument before, string id) =>
+            RealtimeHistoryTests.Observe(store, before, attachment, "obs-" + id,
+                $$$"""{"type":"delegation.created","item":{"type":"delegation","target":"client","id":"{{{id}}}","content":[{"type":"input_text","text":"task {{{id}}}"}]}}""");
+        thread = await Observe(thread, "one");
+        var first = CodexThreadStore.PrepareRealtimeHandoffInput(RealtimeHistoryTests.Session(thread), "one")!.Text;
+        var turn = Guid.NewGuid();
+        thread = (await store.AdmitRealtimeHandoffAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, "one", turn, null, "runner", first, Ct)).Thread;
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [Encrypted], Ct);
+        var settings = Settings(thread.Id, turn);
+        var candidate = CodexThreadStore.CaptureActiveCompaction(thread, turn, "runner", settings)!;
+        thread = await Observe(thread, "two");
+        var second = CodexThreadStore.PrepareRealtimeHandoffInput(RealtimeHistoryTests.Session(thread), "two")!.Text;
+        thread = (await store.AdmitRealtimeHandoffAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, "two", Guid.NewGuid(), turn, "runner", second, Ct)).Thread;
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => store.InstallActiveBackgroundCompactionAsync(
+            candidate, Result(candidate), settings, thread.Revision, turn, "runner", null, Ct));
+        var captured = Assert.Single(thread.Turns).Input[1];
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [Encrypted, captured], Ct);
+        thread = await store.InstallActiveBackgroundCompactionAsync(candidate, Result(candidate), settings,
+            thread.Revision, turn, "runner", null, Ct);
+        var projected = CodexThreadCompaction.Project(thread, thread.CompactionCheckpoint, settings.Model,
+            CodexThreadCompaction.ScopeHash(settings), thread.Turns.Length, currentTurnId: turn, includeActiveOutput: true);
+        Assert.Single(projected, item => JsonElement.DeepEquals(item, captured));
+        Assert.True(JsonElement.DeepEquals(captured, projected[^1]));
+        Assert.Equal(2, Assert.Single(thread.Turns).Input.Length);
+        Assert.Equal(2, Assert.Single(thread.Turns).Output.Length);
+        Assert.Equal(2, RealtimeHistoryTests.Session(thread).HandoffAdmissions!.Length);
+    }
+
+    [Fact]
+    public async Task ActiveSpeculationOverlapsNextInferenceAndReusesCandidateWithToolSuffix()
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var budget = new Budget();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var server = new Server(midTurn: true, toolRounds: 2) { CompactionEntered = entered, ReleaseCompaction = release };
+        await using var scheduler = new CodexThreadCompactionScheduler();
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage))
+        { BackgroundCompactions = scheduler };
+        var turn = Guid.NewGuid();
+        var settings = Settings(thread.Id, turn) with
+        {
+            Tools = [Json("""{"type":"function","name":"read","parameters":{"type":"object","properties":{}}}""")],
+            AutomaticCompaction = new() { TokenThreshold = 1000, BackgroundTokenThreshold = 600 },
+        };
+        var effects = 0;
+        var result = await agent.RunAsync(thread.Id, thread.Revision, turn, "owner", settings, [User("first")],
+            async (_, ct) =>
+            {
+                if (++effects == 1) return new CodexToolOutput(new string('a', 2800));
+                // The second foreground tool executes while speculative compaction is awaiting its response.
+                await entered.Task.WaitAsync(ct);
+                Assert.Equal(0, scheduler.Completed);
+                release.TrySetResult();
+                return new CodexToolOutput(new string('b', 1600));
+            }, cancellationToken: Ct);
+        Assert.Equal(2, effects);
+        Assert.Equal(4, budget.Completed);
+        Assert.Equal(1, scheduler.Started);
+        Assert.Equal(1, scheduler.Completed);
+        var checkpoint = result.Thread.CompactionCheckpoint!;
+        Assert.Equal(turn, checkpoint.ActiveBoundary!.TurnId);
+        Assert.Equal(3, checkpoint.ActiveBoundary.OutputCount);
+        var stored = Assert.Single(result.Thread.Turns);
+        Assert.Equal(7, stored.Output.Length);
+        Assert.Equal(new[] { "executed", "executed-2" }, CodexThreadStore.DispatchedToolCallIds(result.Thread));
+        var continuation = server.Requests[^1].GetProperty("input").EnumerateArray().ToArray();
+        Assert.Single(continuation, item => CodexRealtimeProtocol.Text(item, "type") == "compaction");
+        Assert.DoesNotContain(continuation, item => CodexRealtimeProtocol.Text(item, "call_id") == "executed");
+        Assert.Equal(2, continuation.Count(item => CodexRealtimeProtocol.Text(item, "call_id") == "executed-2"));
+        Assert.Equal(4, server.Requests.Count);
     }
 
     [Fact]

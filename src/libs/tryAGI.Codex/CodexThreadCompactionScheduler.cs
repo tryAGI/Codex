@@ -61,6 +61,7 @@ public sealed class CodexThreadCompactionScheduler : IAsyncDisposable
                 if (!prior.Task.IsCompleted || !prior.Consumed || prior.Claimed) return false;
                 if (ReferenceEquals(prior.Store, store) && ReferenceEquals(prior.Budget, budget) && prior.Owner == owner &&
                     prior.Candidate.HistorySha256 == candidate.HistorySha256 &&
+                    prior.Candidate.ActiveBoundary == candidate.ActiveBoundary &&
                     prior.Candidate.ScopeSha256 == candidate.ScopeSha256 &&
                     prior.Candidate.PriorCheckpointRevision == candidate.PriorCheckpointRevision &&
                     prior.Candidate.PriorCheckpointResponseId == candidate.PriorCheckpointResponseId &&
@@ -100,7 +101,8 @@ public sealed class CodexThreadCompactionScheduler : IAsyncDisposable
     }
 
     internal async Task<Ready?> TakeAsync(CodexThreadStore store, ICodexUsageObserver budget, AuthOwner owner,
-        CodexThreadDocument current, CodexResponseOptions settings, bool wait, CancellationToken ct)
+        CodexThreadDocument current, CodexResponseOptions settings, bool wait, CancellationToken ct,
+        Guid? activeTurnId = null, string? executionOwner = null)
     {
         Slot slot;
         lock (gate)
@@ -109,7 +111,7 @@ public sealed class CodexThreadCompactionScheduler : IAsyncDisposable
                 return null;
             slot = found;
             if (!ReferenceEquals(slot.Store, store) || !ReferenceEquals(slot.Budget, budget) || slot.Owner != owner ||
-                !CodexThreadStore.CanAdoptBackgroundCompaction(current, slot.Candidate, settings))
+                !CodexThreadStore.CanAdoptBackgroundCompaction(current, slot.Candidate, settings, activeTurnId, executionOwner))
             {
                 slot.Consumed = true;
                 Interlocked.Increment(ref discarded);
@@ -135,6 +137,7 @@ public sealed class CodexThreadCompactionScheduler : IAsyncDisposable
     }
 
     internal void RecordPreparationFailure() => Interlocked.Increment(ref failed);
+    internal void RecordDiscard() => Interlocked.Increment(ref discarded);
 
     internal Task WaitForPendingAsync(Guid threadId, CancellationToken ct)
     {

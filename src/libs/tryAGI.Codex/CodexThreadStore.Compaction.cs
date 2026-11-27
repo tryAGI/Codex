@@ -91,20 +91,31 @@ public sealed partial class CodexThreadStore
         return await PublishAsync(before.Revision, next, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Adopt a speculative closed-prefix compaction at an idle turn boundary.
-    /// Appended turns are preserved. Changed captured history, effective settings, account,
-    /// or an intervening checkpoint invalidate the candidate. A live execution must not be displaced.</summary>
-    public async Task<CodexThreadDocument> InstallBackgroundCompactionAsync(CodexThreadCompactionCandidate candidate,
+    /// <summary>Adopt a speculative compaction at an idle turn boundary. Appended turns
+    /// are preserved. Changed history, settings, account or an intervening checkpoint
+    /// invalidate the candidate. A live execution must not be displaced.</summary>
+    public Task<CodexThreadDocument> InstallBackgroundCompactionAsync(CodexThreadCompactionCandidate candidate,
         CodexCompactionResult result, CodexResponseOptions currentSettings, long expectedRevision,
         CodexRetainedContextOptions? retention = null, CancellationToken cancellationToken = default)
+        => InstallBackgroundCompactionCoreAsync(candidate, result, currentSettings, expectedRevision,
+            retention, cancellationToken);
+
+    // Only the current runner can adopt while a turn is active. This is called between
+    // requests, after the captured output and all preceding effects have been settled.
+    internal Task<CodexThreadDocument> InstallActiveBackgroundCompactionAsync(CodexThreadCompactionCandidate candidate,
+        CodexCompactionResult result, CodexResponseOptions settings, long expectedRevision, Guid turnId, string owner,
+        CodexRetainedContextOptions? retention, CancellationToken ct)
+        => InstallBackgroundCompactionCoreAsync(candidate, result, settings, expectedRevision, retention, ct, turnId, owner);
+
+    private async Task<CodexThreadDocument> InstallBackgroundCompactionCoreAsync(CodexThreadCompactionCandidate candidate,
+        CodexCompactionResult result, CodexResponseOptions currentSettings, long expectedRevision,
+        CodexRetainedContextOptions? retention, CancellationToken cancellationToken, Guid? activeTurnId = null, string? owner = null)
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(currentSettings);
-        if (candidate.ActiveBoundary is not null)
-            throw new ArgumentException("Background adoption requires a closed prefix.", nameof(candidate));
         var before = await CurrentAsync(candidate.ThreadId, expectedRevision, cancellationToken).ConfigureAwait(false);
-        if (!CanAdoptBackgroundCompaction(before, candidate, currentSettings))
+        if (!CanAdoptBackgroundCompaction(before, candidate, currentSettings, activeTurnId, owner))
             throw new CodexThreadConflictException();
         var now = time.GetUtcNow();
         var checkpoint = CodexThreadCompaction.BuildCheckpoint(candidate, result, retention, now);
@@ -115,19 +126,47 @@ public sealed partial class CodexThreadStore
     }
 
     internal static bool CanAdoptBackgroundCompaction(CodexThreadDocument before, CodexThreadCompactionCandidate candidate,
-        CodexResponseOptions currentSettings)
+        CodexResponseOptions currentSettings, Guid? activeTurnId = null, string? owner = null)
     {
-        if (candidate.ActiveBoundary is not null || before.Id != candidate.ThreadId ||
-            before.Revision < candidate.Revision || before.AccountId != candidate.AccountId ||
-            before.Turns.Any(turn => turn.Status == "inProgress") ||
-            !JsonElement.DeepEquals(before.Settings, candidate.CapturedSettings) ||
+        var active = before.Turns.LastOrDefault(turn => turn.Status == "inProgress");
+        if (activeTurnId is { } running)
+        {
+            if (active?.Id != running || active.OwnerId != owner ||
+                CodexThreadCompaction.CaptureActiveBoundary(before, running, active.OwnerId) is null)
+                return false;
+        }
+        else if (active is not null) return false;
+        if (before.Id != candidate.ThreadId || before.Revision < candidate.Revision ||
+            before.AccountId != candidate.AccountId || !JsonElement.DeepEquals(before.Settings, candidate.CapturedSettings) ||
             currentSettings.Model != candidate.Model || CodexThreadCompaction.ScopeHash(currentSettings) != candidate.ScopeSha256 ||
             before.CompactionCheckpoint?.SourceRevision != candidate.PriorCheckpointRevision ||
             before.CompactionCheckpoint?.ResponseId != candidate.PriorCheckpointResponseId ||
-            !CodexThreadCompaction.MatchesPrefix(before, candidate.ThroughTurnCount, candidate.HistorySha256, null))
+            !CodexThreadCompaction.MatchesPrefix(before, candidate.ThroughTurnCount, candidate.HistorySha256, candidate.ActiveBoundary))
             return false;
-        var actual = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, candidate.Model,
-            candidate.ScopeSha256, candidate.ThroughTurnCount);
+
+        if (candidate.ActiveBoundary is not { } boundary)
+        {
+            var closed = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, candidate.Model,
+                candidate.ScopeSha256, candidate.ThroughTurnCount);
+            return SameHistory(closed, candidate.History);
+        }
+
+        // Reconstruct the exact captured prefix, not the current (possibly longer) turn.
+        // An interrupted/failed captured turn has different continuation semantics.
+        var captured = before.Turns[candidate.ThroughTurnCount];
+        if (captured.Status != "completed" && captured.Id != activeTurnId) return false;
+        var prefix = captured with
+        {
+            Status = "inProgress", CompletedAt = null,
+            Input = captured.Input.Take(boundary.InputCount).ToArray(),
+            Output = captured.Output.Take(boundary.OutputCount).ToArray(),
+            Dispatches = captured.Dispatches.Take(boundary.DispatchCount).ToArray(),
+            RealtimeSteeringInputIndices = captured.RealtimeSteeringInputIndices?
+                .Where(index => index < boundary.InputCount).ToArray(),
+        };
+        var snapshot = before with { Turns = [.. before.Turns.Take(candidate.ThroughTurnCount), prefix] };
+        var actual = CodexThreadCompaction.Project(snapshot, snapshot.CompactionCheckpoint, candidate.Model,
+            candidate.ScopeSha256, snapshot.Turns.Length, currentTurnId: boundary.TurnId, includeActiveOutput: true);
         return SameHistory(actual, candidate.History);
     }
 

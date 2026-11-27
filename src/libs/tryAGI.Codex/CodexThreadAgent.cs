@@ -107,6 +107,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         var guard = new AccountCredentials(credentials, before.AccountId);
         var authOwner = CodexThreadCompactionScheduler.AuthOwner.From(
             await guard.GetCredentialsAsync(cancellationToken).ConfigureAwait(false));
+        if (options.AutomaticCompaction?.BackgroundTokenThreshold is not null)
+            guard = new AccountCredentials(credentials, before.AccountId, authOwner);
         if (historyTurnLimit is null && options.AutomaticCompaction is { } compaction && before.Turns.Length != 0 &&
             before.Turns.All(turn => turn.Status != "inProgress"))
         {
@@ -182,7 +184,13 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             var runner = new CodexAgent(client)
             {
                 PrepareNativeHistory = historyTurnLimit is null && journalProjection is null && options.AutomaticCompaction is not null
-                    ? (settings, history, ct) => execution.PrepareWireHistoryAsync(client, settings, history, observeDiagnostics, ct)
+                    ? (settings, history, ct) => execution.PrepareWireHistoryAsync(client, settings, history, observeDiagnostics, ct,
+                        BackgroundCompactions, authOwner, guard,
+                        (candidate, effective) =>
+                        {
+                            if (BackgroundCompactions is { } scheduler)
+                                ScheduleBackground(scheduler, candidate, effective, authOwner);
+                        })
                     : null,
             };
             var result = await runner.RunWithToolsAsync(options, execution.Seed,
@@ -221,6 +229,10 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
 
     private void ScheduleBackground(CodexThreadCompactionScheduler scheduler, CodexThreadDocument current,
         CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner owner)
+        => ScheduleBackground(scheduler, CodexThreadStore.CaptureCompaction(current, settings), settings, owner);
+
+    private void ScheduleBackground(CodexThreadCompactionScheduler scheduler, CodexThreadCompactionCandidate candidate,
+        CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner owner)
     {
         if (settings.AutomaticCompaction is not { BackgroundTokenThreshold: { } lower } policy ||
             lower <= 0 || lower >= policy.TokenThreshold) return;
@@ -232,12 +244,11 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             OutputSchema = settings.OutputSchema?.Clone(), RequiredFirstFunction = null,
             WebSocketSession = null, PrewarmWebSocket = false, WebSocketDrain = default,
         };
-        var candidate = CodexThreadStore.CaptureCompaction(current, snapshot);
         var estimate = CodexThreadCompaction.EstimateTokens(snapshot, candidate.History);
         if (estimate < lower || estimate >= policy.TokenThreshold) return;
         scheduler.TrySchedule(store, budget, owner, candidate, async ct =>
         {
-            var guard = new AccountCredentials(credentials, current.AccountId, owner);
+            var guard = new AccountCredentials(credentials, candidate.AccountId, owner);
             await guard.GetCredentialsAsync(ct).ConfigureAwait(false);
             using var compactor = clientFactory is null ? new CodexClient(guard, endpoints, usageObserver: budget)
                 : clientFactory(guard, budget);
@@ -276,6 +287,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private CodexThreadCompactionCandidate? inlineCandidate;
         private string? inlineCallId;
         private int inlineAttempts;
+        private bool changedWireProjection;
         private readonly SemaphoreSlim gate = new(1, 1);
         private readonly ConcurrentDictionary<string, JsonElement> observed = new(StringComparer.Ordinal);
         internal CodexThreadDocument Current { get; private set; }
@@ -365,9 +377,14 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
 
         internal async Task<IReadOnlyList<JsonElement>> PrepareWireHistoryAsync(CodexClient client,
             CodexResponseOptions settings, IReadOnlyList<JsonElement> originalHistory,
-            Action<CodexResponseDiagnostic>? observeDiagnostics, CancellationToken ct)
+            Action<CodexResponseDiagnostic>? observeDiagnostics, CancellationToken ct,
+            CodexThreadCompactionScheduler? scheduler, CodexThreadCompactionScheduler.AuthOwner authOwner,
+            ICodexCredentialProvider credentialGuard,
+            Action<CodexThreadCompactionCandidate, CodexResponseOptions> schedule)
         {
             CodexThreadCompactionCandidate? candidate = null;
+            CodexThreadDocument? captured = null;
+            var hardThresholdReached = false;
             LastEffectiveSettings = settings;
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
@@ -381,8 +398,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
                 var scope = CodexThreadCompaction.ScopeHash(settings);
                 var checkpoint = Current.CompactionCheckpoint;
-                var wireHistory = checkpoint?.ActiveBoundary?.TurnId == turnId &&
-                    checkpoint.Model == settings.Model && checkpoint.ScopeSha256 == scope
+                var wireHistory = changedWireProjection || checkpoint?.ActiveBoundary?.TurnId == turnId
                     ? CodexThreadCompaction.Project(Current, checkpoint, settings.Model, scope, Current.Turns.Length,
                         currentTurnId: turnId, includeActiveOutput: true)
                     : originalHistory;
@@ -391,27 +407,78 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 {
                     if (policy.MaximumInlineCompactions is < 0 or > 32)
                         throw new ArgumentOutOfRangeException(nameof(policy.MaximumInlineCompactions));
-                    if (inlineAttempts < policy.MaximumInlineCompactions &&
-                        Turn.Output.Length > 0 &&
-                        (checkpoint?.ActiveBoundary?.TurnId != turnId ||
-                            Turn.Output.Length > checkpoint.ActiveBoundary.OutputCount) &&
-                        CodexThreadCompaction.ShouldCompact(settings, preparedWireHistory, [], policy))
+                    hardThresholdReached = CodexThreadCompaction.ShouldCompact(settings, preparedWireHistory, [], policy);
+                    var speculative = policy.BackgroundTokenThreshold is { } lower && scheduler is not null &&
+                        CodexThreadCompaction.EstimateTokens(settings, preparedWireHistory) >= lower;
+                    if (Turn.Output.Length > 0 && (hardThresholdReached || speculative))
                     {
-                        candidate = CodexThreadStore.CaptureActiveCompaction(Current, turnId, owner, settings);
-                        if (candidate is not null && !CodexThreadStore.SameHistory(candidate.History, preparedWireHistory))
-                            candidate = null; // Raw prompt and durable history must agree before an attempt.
-                        if (candidate is not null)
+                        captured = Current;
+                        if (checkpoint?.ActiveBoundary?.TurnId != turnId ||
+                            Turn.Output.Length > checkpoint.ActiveBoundary.OutputCount)
                         {
-                            inlineAttempts++;
-                            inlineCandidate = candidate;
-                            inlineCallId = null;
+                            candidate = CodexThreadStore.CaptureActiveCompaction(Current, turnId, owner, settings);
+                            if (candidate is not null && !CodexThreadStore.SameHistory(candidate.History, preparedWireHistory))
+                                candidate = null; // Raw prompt and durable history must agree before an attempt.
                         }
                     }
                 }
             }
             finally { gate.Release(); }
 
-            if (candidate is null) return preparedWireHistory!;
+            // Do not wait on a speculative request while holding the journal gate:
+            // realtime steering must be able to append input during the wait.
+            if (captured is not null && candidate is not null && scheduler is not null &&
+                settings.AutomaticCompaction is { BackgroundTokenThreshold: not null } backgroundPolicy)
+            {
+                var ready = await scheduler.TakeAsync(store, budget, authOwner, captured, settings,
+                    hardThresholdReached, ct, turnId, owner).ConfigureAwait(false);
+                if (ready is not null)
+                {
+                    if (CodexThreadCompactionScheduler.AuthOwner.From(await credentialGuard.GetCredentialsAsync(ct)
+                        .ConfigureAwait(false)) != authOwner)
+                        throw new CodexProtocolException("Background compaction auth owner changed; adoption refused.");
+                    await gate.WaitAsync(ct).ConfigureAwait(false);
+                    try
+                    {
+                        try
+                        {
+                            Current = await store.InstallActiveBackgroundCompactionAsync(ready.Candidate, ready.Result,
+                                settings, Current.Revision, turnId, owner, backgroundPolicy.Retention, ct).ConfigureAwait(false);
+                            changedWireProjection = true;
+                            preparedWireHistory = Array.AsReadOnly(CodexThreadCompaction.Project(Current,
+                                Current.CompactionCheckpoint, settings.Model, CodexThreadCompaction.ScopeHash(settings),
+                                Current.Turns.Length, currentTurnId: turnId, includeActiveOutput: true).ToArray());
+                            return preparedWireHistory;
+                        }
+                        catch (CodexThreadConflictException)
+                        {
+                            // A speculative result is never installed over concurrent journal changes.
+                            // Its provider accounting is already settled by the background client.
+                            scheduler.RecordDiscard();
+                        }
+                    }
+                    finally { gate.Release(); }
+                }
+                if (!hardThresholdReached && !ct.IsCancellationRequested)
+                {
+                    try { schedule(candidate, settings); }
+                    catch (Exception error) when (error is not OutOfMemoryException)
+                    { scheduler.RecordPreparationFailure(); }
+                }
+            }
+
+            if (!hardThresholdReached || candidate is null || settings.AutomaticCompaction is not { } inlinePolicy ||
+                inlineAttempts >= inlinePolicy.MaximumInlineCompactions)
+                return preparedWireHistory!;
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (Current.Revision != candidate.Revision) return preparedWireHistory!;
+                inlineAttempts++;
+                inlineCandidate = candidate;
+                inlineCallId = null;
+            }
+            finally { gate.Release(); }
             try
             {
                 var result = await client.CompactAsync(settings with
@@ -427,6 +494,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                         Current = await store.InstallActiveCompactionAsync(candidate, result,
                             inlineCallId ?? throw new CodexProtocolException("Missing compaction inference receipt."),
                             owner, settings.AutomaticCompaction!.Retention, ct).ConfigureAwait(false);
+                        changedWireProjection = true;
                         preparedWireHistory = Array.AsReadOnly(Current.CompactionCheckpoint!.Projection
                             .Select(item => item.Clone()).ToArray());
                     }
