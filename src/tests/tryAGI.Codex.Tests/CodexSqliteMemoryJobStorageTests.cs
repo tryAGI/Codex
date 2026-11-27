@@ -522,6 +522,184 @@ public sealed class CodexSqliteMemoryJobStorageTests
         Assert.Equal(7L, (await reopened.ReadAsync(Key(completedThread), Ct)).OutputWatermark);
     }
 
+    private static CodexMemoryStartupPolicy StartupPolicy(int scanLimit = 20, int maximumClaims = 8) =>
+        new(["cli", "vscode"], TimeSpan.FromDays(30), TimeSpan.FromHours(1), maximumClaims, scanLimit);
+
+    private static CodexMemorySourceUpdate Discover(Clock clock, Guid thread, long generation,
+        double ageHours, string kind = "cli", bool enabled = true, bool archived = false) =>
+        new(thread, generation, enabled, new(clock.GetUtcNow().AddHours(-ageHours), kind, archived));
+
+    [Fact]
+    public async Task StartupFiltersBeforeScanLimitAndProbesOnlySelectedCandidates()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var current = Guid.NewGuid();
+        var upToDate = Guid.NewGuid();
+        var older = Guid.NewGuid();
+        var accesses = new List<CodexMemoryJobStorageAccess>();
+        await using var storage = await fixture.Open(clock, true, (access, _) =>
+        {
+            accesses.Add(access);
+            return ValueTask.CompletedTask;
+        });
+        await Extract(storage, clock, upToDate, 1, "already extracted");
+        Assert.True(await storage.PublishSourceAsync(Discover(clock, upToDate, 1, 2), Ct));
+        Assert.True(await storage.PublishSourceAsync(Discover(clock, older, 2, 3, "vscode"), Ct));
+        Assert.True(await storage.PublishSourceAsync(Discover(clock, current, 1, 1.1), Ct));
+        Assert.True(await storage.PublishSourceAsync(Discover(clock, Guid.NewGuid(), 1, 0.5), Ct));
+        Assert.True(await storage.PublishSourceAsync(Discover(clock, Guid.NewGuid(), 1, 1.2, "subagent"), Ct));
+        Assert.True(await storage.PublishSourceAsync(Discover(clock, Guid.NewGuid(), 1, 1.3, enabled: false), Ct));
+        Assert.True(await storage.PublishSourceAsync(Discover(clock, Guid.NewGuid(), 1, 1.4, archived: true), Ct));
+        Assert.True(await storage.PublishSourceAsync(Discover(clock, Guid.NewGuid(), 1, 31 * 24), Ct));
+        Assert.True(await storage.PublishSourceAsync(new(Guid.NewGuid(), 1, true), Ct));
+
+        accesses.Clear();
+        var startup = new CodexMemoryStartup(Scope, Jobs(storage, clock), storage, clock);
+        var first = await startup.ClaimAsync(current, StartupPolicy(1), Ct);
+        Assert.Equal(1, first.Scanned);
+        Assert.Equal(1, first.Probed);
+        Assert.Empty(first.Claims);
+        Assert.Equal(upToDate, Assert.Single(accesses, x => x.Operation == "read").Key.ThreadId);
+
+        accesses.Clear();
+        var next = await startup.ClaimAsync(current, StartupPolicy(2), Ct);
+        Assert.Equal(2, next.Scanned);
+        Assert.Equal(2, next.Probed);
+        var granted = Assert.Single(next.Claims);
+        Assert.Equal(older, granted.Candidate.ThreadId);
+        Assert.Equal(current, granted.Change.Next.WorkerId);
+        Assert.Equal(2L, granted.CreateAdmission(Guid.NewGuid()).ClaimedWatermark);
+        Assert.Equal(2, accesses.Count(x => x.Operation == "read"));
+        Assert.DoesNotContain(accesses, x => x.Operation == "read_output");
+    }
+
+    [Fact]
+    public async Task StartupCandidateMetadataIsGenerationFencedAndSurvivesReopen()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        var current = Guid.NewGuid();
+        var source = Discover(clock, thread, 8, 2);
+        var scan = new CodexMemoryStartupScan(Scope, current, clock.GetUtcNow().AddDays(-30),
+            clock.GetUtcNow().AddHours(-1), ["cli"], 10);
+        await using (var first = await fixture.Open(clock, true))
+        {
+            Assert.True(await first.PublishSourceAsync(source, Ct));
+            Assert.True(await first.PublishSourceAsync(source, Ct));
+            Assert.True(await first.PublishSourceAsync(source with { Discovery = null }, Ct));
+            Assert.False(await first.PublishSourceAsync(source with { Discovery = source.Discovery! with { Archived = true } }, Ct));
+            Assert.Equal(thread, Assert.Single(await first.ScanStartupAsync(scan, Ct)).ThreadId);
+        }
+        await using var second = await fixture.Open(clock);
+        Assert.Equal(8L, Assert.Single(await second.ScanStartupAsync(scan, Ct)).Watermark);
+        Assert.True(await second.PublishSourceAsync(source with { Watermark = 9, Discovery = null }, Ct));
+        Assert.Empty(await second.ScanStartupAsync(scan, Ct));
+        Assert.False(await second.PublishSourceAsync(source, Ct));
+        Assert.True(await second.PublishSourceAsync(source with { Watermark = 9 }, Ct));
+        Assert.Single(await second.ScanStartupAsync(scan, Ct));
+        Assert.True(await second.PublishSourceAsync(source with { Watermark = 10, Enabled = false }, Ct));
+        Assert.Empty(await second.ScanStartupAsync(scan, Ct));
+    }
+
+    [Fact]
+    public async Task SourceGenerationChangedAfterDiscoveryCannotBeClaimed()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        await using var storage = await fixture.Open(clock, true);
+        await using var publisher = await fixture.Open(clock);
+        var original = Discover(clock, thread, 1, 2);
+        Assert.True(await publisher.PublishSourceAsync(original, Ct));
+        var source = new AfterScan(storage, async ct =>
+        {
+            Assert.True(await publisher.PublishSourceAsync(original with { Watermark = 2 }, ct));
+        });
+        var startup = new CodexMemoryStartup(Scope, Jobs(storage, clock), source, clock);
+        var result = await startup.ClaimAsync(Guid.NewGuid(), StartupPolicy(), Ct);
+        Assert.Equal(1, result.Scanned);
+        Assert.Equal(1, result.Probed);
+        Assert.Empty(result.Claims);
+        Assert.Null((await storage.ReadAsync(Key(thread), Ct)).State);
+    }
+
+    [Fact]
+    public async Task ConcurrentStartupsRespectGlobalCapAndDoNotReadOriginalHistory()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        await using var first = await fixture.Open(clock, true);
+        await using var second = await fixture.Open(clock);
+        for (var i = 0; i < 4; i++)
+            Assert.True(await first.PublishSourceAsync(Discover(clock, Guid.NewGuid(), 1, 2 + i), Ct));
+        var a = new CodexMemoryStartup(Scope, Jobs(first, clock), first, clock);
+        var b = new CodexMemoryStartup(Scope, Jobs(second, clock), second, clock);
+        var policy = StartupPolicy(maximumClaims: 2);
+        var results = await Task.WhenAll(a.ClaimAsync(Guid.NewGuid(), policy, Ct), b.ClaimAsync(Guid.NewGuid(), policy, Ct));
+        var claims = results.SelectMany(x => x.Claims).ToArray();
+        Assert.Equal(2, claims.Length);
+        Assert.Equal(2, claims.Select(x => x.Candidate.ThreadId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task ZeroStartupLimitsAndUnapprovedSourcesRequireNoStorageProbe()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var accesses = new List<CodexMemoryJobStorageAccess>();
+        await using var storage = await fixture.Open(clock, true, (access, _) =>
+        {
+            accesses.Add(access);
+            return ValueTask.CompletedTask;
+        });
+        var startup = new CodexMemoryStartup(Scope, Jobs(storage, clock), storage, clock);
+        Assert.Equal(0, (await startup.ClaimAsync(Guid.NewGuid(), StartupPolicy(0), Ct)).Scanned);
+        Assert.Equal(0, (await startup.ClaimAsync(Guid.NewGuid(), StartupPolicy(maximumClaims: 0), Ct)).Scanned);
+        Assert.Equal(0, (await startup.ClaimAsync(Guid.NewGuid(), StartupPolicy() with { AllowedSources = [] }, Ct)).Scanned);
+        Assert.Empty(accesses);
+    }
+
+    [Fact]
+    public async Task Schema2UpgradeBackfillsDiscoveryOnlyFromAuthoritativeMetadata()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        CodexMemoryJobChange completed;
+        await using (var storage = await fixture.Open(clock, true))
+            completed = await Extract(storage, clock, thread, 9, "legacy extraction");
+        await fixture.MakeLegacySchemaAsync(2);
+        await Assert.ThrowsAsync<InvalidDataException>(() => fixture.Open(clock));
+        await using var upgraded = await fixture.Upgrade(clock);
+        var scan = new CodexMemoryStartupScan(Scope, Guid.NewGuid(), clock.GetUtcNow().AddDays(-30),
+            clock.GetUtcNow().AddHours(-1), ["cli"], 10);
+        Assert.Empty(await upgraded.ScanStartupAsync(scan, Ct));
+        Assert.Equal("legacy extraction", (await upgraded.ReadExtractionAsync(new(thread, 9), Ct))!.RawMemory);
+        Assert.Equal(CodexMemoryJobSettlement.Applied,
+            (await upgraded.ReadReceiptAsync(Key(thread), completed.OperationId, Ct))!.Settlement);
+        Assert.True(await upgraded.PublishSourceAsync(Discover(clock, thread, 9, 2), Ct));
+        Assert.Equal(thread, Assert.Single(await upgraded.ScanStartupAsync(scan, Ct)).ThreadId);
+    }
+
+    private sealed class AfterScan(ICodexMemoryStartupSource inner, Func<CancellationToken, Task> change) : ICodexMemoryStartupSource
+    {
+        public async ValueTask<IReadOnlyList<CodexMemoryStartupCandidate>> ScanStartupAsync(
+            CodexMemoryStartupScan scan, CancellationToken ct)
+        {
+            var result = await inner.ScanStartupAsync(scan, ct);
+            await change(ct);
+            return result;
+        }
+    }
+
     private sealed class LoseSamplingAcknowledgment(ICodexMemorySamplingStorage inner) : ICodexMemorySamplingStorage
     {
         public async ValueTask<bool> TryAdmitSamplingAsync(CodexMemorySamplingAdmission admission, CancellationToken ct)
@@ -551,12 +729,17 @@ public sealed class CodexSqliteMemoryJobStorageTests
             CodexMacOsSqliteMemoryJobStorage.UpgradeLegacyAsync(DatabasePath, Scope,
                 (_, _) => ValueTask.CompletedTask, clock, Ct);
 
-        internal async Task MakeLegacySchemaAsync()
+        internal async Task MakeLegacySchemaAsync(int version = 1)
         {
+            var sql = version switch
+            {
+                1 => "BEGIN IMMEDIATE; DROP TABLE discovery; DROP TABLE sampling; PRAGMA user_version=1; COMMIT;",
+                2 => "BEGIN IMMEDIATE; DROP TABLE discovery; PRAGMA user_version=2; COMMIT;",
+                _ => throw new ArgumentOutOfRangeException(nameof(version)),
+            };
             using var process = Process.Start(new ProcessStartInfo("/usr/bin/sqlite3")
             {
-                ArgumentList = { "-batch", "-bail", DatabasePath,
-                    "BEGIN IMMEDIATE; DROP TABLE sampling; PRAGMA user_version=1; COMMIT;" },
+                ArgumentList = { "-batch", "-bail", DatabasePath, sql },
                 UseShellExecute = false,
                 RedirectStandardError = true,
             }) ?? throw new InvalidOperationException("SQLite fixture process failed to start.");

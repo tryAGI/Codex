@@ -10,7 +10,9 @@ namespace tryAGI.Codex;
 /// <param name="ThreadId">Logical native thread.</param>
 /// <param name="Watermark">Monotonic source generation, including permission changes.</param>
 /// <param name="Enabled">Whether extraction is permitted and the source is not polluted.</param>
-public sealed record CodexMemorySourceUpdate(Guid ThreadId, long Watermark, bool Enabled);
+/// <param name="Discovery">Optional authoritative startup metadata; a new generation without it is not discoverable.</param>
+public sealed record CodexMemorySourceUpdate(Guid ThreadId, long Watermark, bool Enabled,
+    CodexMemorySourceDiscovery? Discovery = null);
 
 /// <summary>Authorization context for one local memory job database operation.</summary>
 /// <param name="Key">Authenticated account/version and job identity.</param>
@@ -20,9 +22,11 @@ public sealed record CodexMemorySourceUpdate(Guid ThreadId, long Watermark, bool
 /// <param name="OperationId">Receipt lookup identity, when applicable.</param>
 /// <param name="Watermark">Exact requested extraction snapshot, when applicable.</param>
 /// <param name="Sampling">Exact sampling admission, when applicable.</param>
+/// <param name="StartupScan">Exact bounded metadata query, when applicable.</param>
 public sealed record CodexMemoryJobStorageAccess(CodexMemoryJobKey Key, string Operation,
     CodexMemoryJobChange? Change = null, CodexMemorySourceUpdate? Source = null,
-    Guid? OperationId = null, long? Watermark = null, CodexMemorySamplingAdmission? Sampling = null);
+    Guid? OperationId = null, long? Watermark = null, CodexMemorySamplingAdmission? Sampling = null,
+    CodexMemoryStartupScan? StartupScan = null);
 
 /// <summary>Current verified consolidation pointer and historical maximum successful coverage.</summary>
 /// <param name="ArtifactRevision">Immutable artifact revision, or null if no safe artifact is published.</param>
@@ -39,10 +43,11 @@ public sealed record CodexMemoryConsolidationState(string? ArtifactRevision, uin
 /// The authorization callback authenticates the exact worker/mutation and verifies any immutable
 /// consolidation artifact before commit. It must not treat a model claim as authorization.
 /// </summary>
-public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobStorage, ICodexMemorySamplingStorage, IAsyncDisposable
+public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobStorage, ICodexMemorySamplingStorage,
+    ICodexMemoryStartupSource, IAsyncDisposable
 {
     private const int ApplicationId = 1129137485;
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
     private const string SamplingSchema = """
         CREATE TABLE sampling(claim BLOB PRIMARY KEY NOT NULL, attempt BLOB NOT NULL UNIQUE,
             thread BLOB NOT NULL, worker BLOB NOT NULL, watermark INTEGER NOT NULL) WITHOUT ROWID;
@@ -79,8 +84,8 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
         OpenValidatedAsync(path, scope, authorize, createNew, false, timeProvider, cancellationToken);
 
     /// <summary>
-    /// Explicitly upgrades a schema-1 job database to durable sampling admission. The host
-    /// must stop all legacy writers first; migration refuses any unexpired running claim.
+    /// Explicitly upgrades a schema-1 or schema-2 job database to the current schema.
+    /// The host must stop all legacy writers first; migration refuses any unexpired running claim.
     /// Already upgraded databases are reopened without further writes.
     /// </summary>
     public static Task<CodexMacOsSqliteMemoryJobStorage> UpgradeLegacyAsync(string path, CodexMemoryScope scope,
@@ -142,7 +147,7 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
             if (!createNew)
             {
                 var version = ScalarNumber(db, "PRAGMA user_version;");
-                Verify(db, scope, upgradeLegacy && version == 1 ? 1 : SchemaVersion);
+                Verify(db, scope, upgradeLegacy && version is 1 or 2 ? (int)version : SchemaVersion);
             }
             if (ScalarText(db, "PRAGMA journal_mode=DELETE;") != "delete")
                 throw new IOException("Could not establish SQLite rollback journal mode.");
@@ -169,9 +174,10 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
                             artifact BLOB);
                         INSERT INTO progress(id,max_count,artifact) VALUES(1,0,NULL);
                         PRAGMA application_id=1129137485;
-                        PRAGMA user_version=2;
+                        PRAGMA user_version=3;
                         """);
                     Execute(db, SamplingSchema);
+                    Execute(db, DiscoverySchema);
                     using var identity = Prepare(db, "INSERT INTO identity(id,body) VALUES(1,?1);");
                     identity.Bind(1, Serialize(scope, CodexMemoryStorageJson.Default.CodexMemoryScope));
                     identity.Done();
@@ -180,8 +186,10 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
             else if (upgradeLegacy)
                 Transaction(db, true, ct, () =>
                 {
-                    if (ScalarNumber(db, "PRAGMA user_version;") == SchemaVersion) return true;
-                    Verify(db, scope, 1);
+                    var version = checked((int)ScalarNumber(db, "PRAGMA user_version;"));
+                    if (version == SchemaVersion) return true;
+                    if (version is not (1 or 2)) throw new InvalidDataException("Unsupported memory schema upgrade.");
+                    Verify(db, scope, version);
                     using (var active = Prepare(db, "SELECT 1 FROM job WHERE status=?1 AND lease_until>?2 LIMIT 1;"))
                     {
                         active.Bind(1, (long)CodexMemoryJobStatus.Running);
@@ -189,8 +197,9 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
                         if (active.Next())
                             throw new InvalidOperationException("Stop legacy memory workers before upgrading live leases.");
                     }
-                    Execute(db, SamplingSchema);
-                    Execute(db, "PRAGMA user_version=2;");
+                    if (version == 1) Execute(db, SamplingSchema);
+                    Execute(db, DiscoverySchema);
+                    Execute(db, "PRAGMA user_version=3;");
                     return true;
                 });
             Verify(db, scope);
@@ -221,10 +230,15 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
             FROM source s,job j,extraction e,receipt r,selected k,progress p LIMIT 0;
             """);
         schema.Done();
-        if (expectedVersion == SchemaVersion)
+        if (expectedVersion >= 2)
         {
             using var sampling = Prepare(db, "SELECT claim,attempt,thread,worker,watermark FROM sampling LIMIT 0;");
             sampling.Done();
+        }
+        if (expectedVersion >= 3)
+        {
+            using var discovery = Prepare(db, "SELECT thread,watermark,updated_at,kind,archived,eligible FROM discovery LIMIT 0;");
+            discovery.Done();
         }
     }
 
@@ -277,6 +291,7 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
         var key = new CodexMemoryJobKey(scope, update.ThreadId);
         CheckKey(key);
         ArgumentOutOfRangeException.ThrowIfNegative(update.Watermark);
+        update.Discovery?.Validate();
         await AuthorizeAsync(new(key, "publish_source", Source: update), cancellationToken).ConfigureAwait(false);
         return await RunAsync(() => Transaction(database, true, cancellationToken, () =>
         {
@@ -284,8 +299,10 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
             if (before is { } prior && (update.Watermark < prior.Watermark ||
                 update.Watermark == prior.Watermark && update.Enabled != prior.Enabled))
                 return false;
-            if (before is { } same && update.Watermark == same.Watermark) return true;
             var thread = update.ThreadId.ToByteArray();
+            if (before is { } same && update.Watermark == same.Watermark)
+                return PublishDiscovery(update, thread, sameGeneration: true);
+            PublishDiscovery(update, thread, sameGeneration: false);
             using (var statement = Prepare(database, """
                 INSERT INTO source(thread,watermark,enabled) VALUES(?1,?2,?3)
                 ON CONFLICT(thread) DO UPDATE SET watermark=excluded.watermark,enabled=excluded.enabled;
