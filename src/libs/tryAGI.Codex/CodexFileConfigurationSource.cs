@@ -95,7 +95,7 @@ public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions o
                         if (value is JsonObject incoming && discovery[key] is JsonObject existing) MergeDiscovery(existing, incoming, 0);
                         else discovery[key] = value?.DeepClone();
                     }
-            foreach (var key in new[] { "projects", "project_root_markers", "profile", "profiles" }) config.Remove(key);
+            RemoveDiscoveryKeys(config);
             layers.Add(new(kind, name, Element(config), trusted));
         }
 
@@ -203,7 +203,12 @@ public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions o
             else target[item.Key] = item.Value?.DeepClone();
         }
     }
-    private static void RejectLinks(string path)
+    internal static void RemoveDiscoveryKeys(JsonObject config)
+    {
+        foreach (var key in new[] { "projects", "project_root_markers", "profile", "profiles" }) config.Remove(key);
+    }
+
+    internal static void RejectLinks(string path)
     {
         for (FileSystemInfo? item = new FileInfo(path); item is not null; item = item is FileInfo file ? file.Directory : ((DirectoryInfo)item).Parent)
             if (item.LinkTarget is not null) throw Invalid("Configuration symlinks require host path resolution.");

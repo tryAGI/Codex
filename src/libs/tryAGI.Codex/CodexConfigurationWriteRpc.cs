@@ -219,6 +219,52 @@ public sealed class CodexConfigurationWriteRpc
         });
     }
 
+    // Storage adapters recheck that a candidate is reachable through the same native
+    // scalar/toggle mutations, even when invoked directly rather than through RPC.
+    internal static void ValidateCandidate(JsonElement before, JsonElement candidate, JsonElement effective,
+        JsonElement? requirements, IReadOnlySet<string> writableFeatures)
+    {
+        if (before.ValueKind != JsonValueKind.Object || candidate.ValueKind != JsonValueKind.Object)
+            throw Reject(CodexConfigurationWriteFailure.ConfigValidationError);
+        var source = JsonNode.Parse(before.GetRawText())!.AsObject();
+        var target = JsonNode.Parse(candidate.GetRawText())!.AsObject();
+        var draft = (JsonObject)source.DeepClone();
+
+        void ApplyChecked(string[] path, JsonNode? value)
+        {
+            using var document = JsonDocument.Parse(value?.ToJsonString() ?? "null");
+            var edit = new Edit(path, document.RootElement);
+            ValidateEdit(edit, writableFeatures);
+            if (requirements is { } managed && (managed.TryGetProperty(path[0], out _) ||
+                path[0] == "features" && managed.TryGetProperty("feature_requirements", out _)))
+                throw Reject(CodexConfigurationWriteFailure.ConfigRequirementReadonly);
+            var preserveBroker = path.Length >= 2 && path[0] == "features" && path[1] == "network_proxy" &&
+                edit.Value.ValueKind == JsonValueKind.Null && HasBrokerSettings(effective);
+            Apply(draft, edit, preserveBroker);
+        }
+
+        foreach (var key in source.Select(item => item.Key).Concat(target.Select(item => item.Key)).Distinct(StringComparer.Ordinal))
+        {
+            var oldValue = source[key];
+            var newValue = target[key];
+            if (JsonNode.DeepEquals(oldValue, newValue)) continue;
+            if (key != "features") { ApplyChecked([key], newValue); continue; }
+            if (oldValue is not null and not JsonObject || newValue is not JsonObject newFeatures)
+                throw Reject(CodexConfigurationWriteFailure.ConfigValidationError);
+            var oldFeatures = oldValue as JsonObject ?? new JsonObject();
+            foreach (var name in oldFeatures.Select(item => item.Key).Concat(newFeatures.Select(item => item.Key)).Distinct(StringComparer.Ordinal))
+            {
+                var oldFeature = oldFeatures[name];
+                var newFeature = newFeatures[name];
+                if (JsonNode.DeepEquals(oldFeature, newFeature)) continue;
+                if (newFeature is JsonObject structured)
+                    ApplyChecked(["features", name, "enabled"], structured["enabled"]);
+                else ApplyChecked(["features", name], newFeature);
+            }
+        }
+        if (!JsonNode.DeepEquals(draft, target)) throw Reject(CodexConfigurationWriteFailure.ConfigValidationError);
+    }
+
     private static Edit ParseEdit(JsonElement p)
     {
         var key = OptionalText(p, "keyPath") ?? throw Reject(CodexConfigurationWriteFailure.ConfigValidationError);

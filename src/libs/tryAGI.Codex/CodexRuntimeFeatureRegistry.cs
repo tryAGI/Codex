@@ -74,6 +74,77 @@ public sealed class CodexRuntimeFeatureRegistry
         }
     }
 
+    /// <summary>Hot-reloads configured feature defaults from an authenticated committed configuration stack.
+    /// Preserves process runtime overrides and the existing authoritative managed policy. Legacy exact
+    /// requirements must already be reflected in that policy; this method cannot grant new authority.
+    /// Existing consumer captures remain immutable. Session-static model and thread settings are untouched.</summary>
+    public bool TryReloadConfiguration(string expectedPolicyRevision, CodexThreadConfigurationSnapshot snapshot)
+    {
+        var resolved = CodexConfigurationResolver.Resolve(snapshot);
+        var configured = ReadConfiguredFeatures(resolved.Config);
+        var legacy = snapshot.Layers.Where(layer => layer.Kind is CodexConfigurationLayerKind.LegacyManagedFile or
+            CodexConfigurationLayerKind.LegacyManagedMdm).ToArray();
+        var required = legacy.Length == 0 ? new Dictionary<string, bool>(StringComparer.Ordinal) :
+            ReadConfiguredFeatures(CodexConfigurationResolver.Resolve(new(snapshot.Revision, legacy)).Config);
+        if (snapshot.Requirements is { } requirements && requirements.TryGetProperty("feature_requirements", out var managed))
+        {
+            if (managed.ValueKind != JsonValueKind.Object)
+                throw new CodexConfigurationWriteException(CodexConfigurationWriteFailure.ConfigValidationError);
+            foreach (var item in managed.EnumerateObject())
+            {
+                if (!byName.ContainsKey(item.Name)) continue;
+                if (item.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                    throw new CodexConfigurationWriteException(CodexConfigurationWriteFailure.ConfigValidationError);
+                var enabled = item.Value.GetBoolean();
+                if (required.TryGetValue(item.Name, out var prior) && prior != enabled)
+                    throw new CodexConfigurationWriteException(CodexConfigurationWriteFailure.ConfigRequirementReadonly);
+                required[item.Name] = enabled;
+            }
+        }
+
+        lock (gate)
+        {
+            if (policy.Revision != expectedPolicyRevision) return false;
+            foreach (var (key, value) in required)
+                if (!policy.Required.TryGetValue(key, out var actual) || actual != value)
+                    throw new CodexConfigurationWriteException(CodexConfigurationWriteFailure.ConfigRequirementReadonly);
+            if (configured.Count == policy.Configured.Count && configured.All(item =>
+                policy.Configured.TryGetValue(item.Key, out var value) && value == item.Value)) return true;
+            policy = new(Guid.NewGuid().ToString("N"), new ReadOnlyDictionary<string, bool>(configured), policy.Required);
+            generation = checked(generation + 1);
+            return true;
+        }
+    }
+
+    /// <summary>Post-commit consumer suitable for the file configuration storage reload callback.
+    /// The authenticated host must hold its configuration-policy admission while invoking it.</summary>
+    public Task ReloadConfigurationAsync(CodexThreadConfigurationSnapshot snapshot, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        string expected;
+        lock (gate) expected = policy.Revision;
+        if (!TryReloadConfiguration(expected, snapshot))
+            throw new CodexConfigurationWriteException(CodexConfigurationWriteFailure.ConfigVersionConflict);
+        return Task.CompletedTask;
+    }
+
+    private Dictionary<string, bool> ReadConfiguredFeatures(JsonElement config)
+    {
+        var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (!config.TryGetProperty("features", out var flags)) return result;
+        if (flags.ValueKind != JsonValueKind.Object)
+            throw new CodexConfigurationWriteException(CodexConfigurationWriteFailure.ConfigValidationError);
+        foreach (var feature in definitions)
+        {
+            if (!flags.TryGetProperty(feature.Name, out var value)) continue;
+            if (value.ValueKind == JsonValueKind.Object && !value.TryGetProperty("enabled", out value)) continue;
+            if (value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new CodexConfigurationWriteException(CodexConfigurationWriteFailure.ConfigValidationError);
+            result.Add(feature.Name, value.GetBoolean());
+        }
+        return result;
+    }
+
     /// <summary>Captures the current effective process state or an authenticated thread's configuration overrides.
     /// A thread cannot weaken process-managed requirements.</summary>
     public CodexRuntimeFeatureSnapshot Capture(IReadOnlyDictionary<string, bool>? threadConfiguration = null)

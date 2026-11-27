@@ -25,6 +25,18 @@ internal static partial class CodexToml
     /// <exception cref="FormatException">The document is not valid TOML or uses an unsupported value.</exception>
     public static JsonObject Parse(string text) => new Parser(text).Document();
 
+    internal sealed record Assignment(string[] Path, int Start, int ValueStart, int ValueEnd);
+    internal sealed record Section(string[] Path, int InsertAt);
+    internal sealed record ParsedDocument(JsonObject Root, IReadOnlyList<Assignment> Assignments, IReadOnlyList<Section> Sections);
+
+    internal static ParsedDocument ParseWithSpans(string text)
+    {
+        var assignments = new List<Assignment>();
+        var sections = new List<Section> { new([], 0) };
+        var root = new Parser(text, assignments, sections).Document();
+        return new(root, assignments, sections);
+    }
+
     [GeneratedRegex(@"^[+-]?(?:0|[1-9](?:_?[0-9])*)$", RegexOptions.CultureInvariant)]
     private static partial Regex DecimalInteger();
 
@@ -34,7 +46,7 @@ internal static partial class CodexToml
     [GeneratedRegex(@"^[+-]?(?:0|[1-9](?:_?[0-9])*)(?:\.[0-9](?:_?[0-9])*)?(?:[eE][+-]?[0-9](?:_?[0-9])*)?$", RegexOptions.CultureInvariant)]
     private static partial Regex Float();
 
-    private sealed class Parser(string text)
+    private sealed class Parser(string text, List<Assignment>? assignments = null, List<Section>? sections = null)
     {
         // Reference sets: TOML's redefinition rules depend on how a table came to exist.
         private readonly HashSet<JsonObject> headerTables = new(ReferenceEqualityComparer.Instance);
@@ -42,6 +54,8 @@ internal static partial class CodexToml
         private readonly HashSet<JsonNode> inlineValues = new(ReferenceEqualityComparer.Instance);
         private readonly HashSet<JsonArray> tableArrays = new(ReferenceEqualityComparer.Instance);
         private int position;
+        private string[] sectionPath = [];
+        private bool sectionInArray;
 
         private bool End => position >= text.Length;
 
@@ -62,13 +76,18 @@ internal static partial class CodexToml
                 if (Current == '[')
                 {
                     table = Header(root);
+                    ExpectLineEnd();
+                    // Array-of-tables instances are deliberately not editable by config RPC.
+                    if (!sectionInArray) sections?.Add(new(sectionPath, position));
                 }
                 else
                 {
-                    KeyValue(table, depth: 0);
+                    var start = position;
+                    var (keys, valueStart) = KeyValue(table, depth: 0);
+                    if (!sectionInArray && assignments is not null)
+                        assignments.Add(new([.. sectionPath, .. keys], start, valueStart, position));
+                    ExpectLineEnd();
                 }
-
-                ExpectLineEnd();
             }
         }
 
@@ -78,6 +97,8 @@ internal static partial class CodexToml
             position += isArray ? 2 : 1;
             SkipWhitespace();
             var keys = Key();
+            sectionPath = keys.ToArray();
+            sectionInArray = isArray;
             SkipWhitespace();
             Expect(']');
             if (isArray)
@@ -88,6 +109,7 @@ internal static partial class CodexToml
             var table = root;
             for (var i = 0; i < keys.Count - 1; i++)
             {
+                if (table[keys[i]] is JsonArray) sectionInArray = true;
                 table = HeaderSegment(table, keys[i]);
             }
 
@@ -150,7 +172,7 @@ internal static partial class CodexToml
             };
         }
 
-        private void KeyValue(JsonObject table, int depth)
+        private (List<string> Keys, int ValueStart) KeyValue(JsonObject table, int depth)
         {
             var keys = Key();
             SkipWhitespace();
@@ -180,7 +202,9 @@ internal static partial class CodexToml
                 throw Error($"Key '{string.Join('.', keys)}' is defined more than once.");
             }
 
+            var valueStart = position;
             table[keys[^1]] = Value(depth + 1);
+            return (keys, valueStart);
         }
 
         private List<string> Key()
