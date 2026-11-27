@@ -54,6 +54,9 @@ public sealed class CodexRealtimeTranscriptAccumulator
     private readonly Dictionary<string, string> receipts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CodexRealtimeHandoffSnapshot> handoffs = new(StringComparer.Ordinal);
     private readonly HashSet<string> flushedUserInputs = new(StringComparer.Ordinal);
+    // Only active utterance prefixes are retained to reconcile a delayed full final after
+    // a presentation boundary. They are not emitted again or counted as new speech.
+    private readonly Dictionary<string, string> presentationPrefixes = new(StringComparer.Ordinal);
     private int activeBytes;
     private int handoffBytes;
     private bool newInput;
@@ -118,8 +121,8 @@ public sealed class CodexRealtimeTranscriptAccumulator
             else if (delegation is not null) captured = CaptureHandoff(source, delegation, identities);
             else
             {
-                if (inputBoundary) newInput = true;
-                if (outputBoundary) newOutput = true;
+                if (inputBoundary) { ForgetPresentationPrefix("user"); newInput = true; }
+                if (outputBoundary) { ForgetPresentationPrefix("assistant"); newOutput = true; }
                 lastFinalRole = null;
             }
             RecordReceipts(identities);
@@ -170,6 +173,48 @@ public sealed class CodexRealtimeTranscriptAccumulator
         }
     }
 
+    // Seal visible segments without forgetting an utterance whose provider final may still
+    // include the already sealed prefix. A handoff later consumes all associated frame IDs.
+    internal CodexRealtimeTranscriptEntry[] TakePresentationBoundary()
+    {
+        lock (gate)
+        {
+            var result = entries.Select(e => e.Snapshot()).ToArray();
+            foreach (var group in entries.GroupBy(e => e.Role))
+            {
+                var last = group.Last();
+                foreach (var completed in group.Where(e => !ReferenceEquals(e, last)))
+                    if (completed.Role == "user") RememberPresentedUser(completed.Text);
+                var prefix = presentationPrefixes.GetValueOrDefault(last.Role, "") + last.Text;
+                if (Utf8(prefix) > maximumActiveBytes)
+                    throw new InvalidOperationException("Realtime transcript prefix exceeds its bound.");
+                if (last.Final || (last.Role == "user" ? newInput : newOutput))
+                {
+                    if (last.Role == "user") RememberPresentedUser(prefix);
+                    presentationPrefixes.Remove(last.Role);
+                }
+                else presentationPrefixes[last.Role] = prefix;
+            }
+            entries.Clear();
+            activeBytes = 0;
+            lastFinalRole = null;
+            return result;
+        }
+    }
+
+    private void RememberPresentedUser(string text)
+    {
+        if (flushedUserInputs.Count >= MaximumReceipts && !flushedUserInputs.Contains(Hash(text.Trim())))
+            throw new InvalidOperationException("Realtime transcript identity capacity exhausted.");
+        flushedUserInputs.Add(Hash(text.Trim()));
+    }
+
+    private void ForgetPresentationPrefix(string role)
+    {
+        if (!presentationPrefixes.Remove(role, out var prefix)) return;
+        if (role == "user") RememberPresentedUser(prefix);
+    }
+
     private void ObserveTranscript(CodexRealtimeEvent source, CodexRealtimeTranscript fragment,
         string? eventId, string? observationId, IReadOnlyList<(string Key, string Digest)> identities)
     {
@@ -181,6 +226,15 @@ public sealed class CodexRealtimeTranscriptAccumulator
                 entries.LastOrDefault() is { } last && last.Role == fragment.Role ? last : null;
 
         var text = fragment.Text;
+        var prefix = forceNew ? "" : presentationPrefixes.GetValueOrDefault(fragment.Role, "");
+        if (fragment.Final && prefix.Length != 0)
+        {
+            // A full final can extend, never rewrite, already committed speech.
+            text = text.StartsWith(prefix, StringComparison.Ordinal) ? text[prefix.Length..] : "";
+            if (fragment.Role == "user") RememberPresentedUser(prefix +
+                (text.StartsWith(entry?.Text ?? "", StringComparison.Ordinal) ? text : entry?.Text ?? ""));
+            presentationPrefixes.Remove(fragment.Role);
+        }
         if (text.Length == 0 && !fragment.Final) return;
         if (entry is null && text.Length == 0)
         {
@@ -225,8 +279,10 @@ public sealed class CodexRealtimeTranscriptAccumulator
     {
         ValidateId(delegation.Id);
         var input = delegation.Transcript.Trim();
+        var userPrefix = presentationPrefixes.GetValueOrDefault("user", "");
+        var currentUser = entries.LastOrDefault(e => e.Role == "user")?.Text ?? "";
         var append = input.Length > 0 && !entries.Any(e => e.Role == "user" && e.Text.Trim() == input)
-            && !flushedUserInputs.Contains(Hash(input));
+            && (userPrefix + currentUser).Trim() != input && !flushedUserInputs.Contains(Hash(input));
         var extra = append ? Utf8(input) + 64 : 0;
         var bytes = checked(activeBytes + extra + Utf8(source.Payload.GetRawText()));
         if (handoffs.Count >= MaximumHandoffs || (long)handoffBytes + bytes > MaximumHandoffBytes)
@@ -245,6 +301,7 @@ public sealed class CodexRealtimeTranscriptAccumulator
         entries.Clear();
         activeBytes = 0;
         flushedUserInputs.Clear();
+        presentationPrefixes.Clear();
         newInput = newOutput = true;
         lastFinalRole = null;
     }

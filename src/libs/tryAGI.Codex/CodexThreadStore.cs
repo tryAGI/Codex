@@ -74,7 +74,8 @@ public sealed partial class CodexThreadStore
             document = SealRealtimeBeforeTurn(document, turnId);
             var turn = new CodexStoredTurn(turnId, rootTurnId ?? turnId, ownerId, "inProgress", time.GetUtcNow(),
                 Items(input), [], [], ClientUserMessageIds: clientUserMessageIds?.ToArray(), TurnTrigger: turnTrigger);
-            return document with { Turns = [.. document.Turns, turn] };
+            return BindRealtimePresentation(document with { Turns = [.. document.Turns, turn] },
+                turnId, PresentationSession(document)?.SessionId);
         }, cancellationToken);
 
     /// <summary>Records client message IDs for the turn's user inputs. Existing IDs cannot be rewritten.</summary>
@@ -129,7 +130,8 @@ public sealed partial class CodexThreadStore
                     throw new InvalidOperationException("Realtime mode capture was not retained in the exact native input.");
                 turn = turn with { RealtimeModeTransitions = [.. turn.RealtimeModeTransitions ?? [], mode.Transition] };
             }
-            return Replace(document, turn with { Output = next }) with { Format = 2 };
+            var updated = turn with { Output = next };
+            return PromoteRealtimeArtifacts(Replace(document, updated) with { Format = 2 }, turn, updated);
         }, cancellationToken);
 
     /// <summary>Only a true durable admission permits dispatch. A repeated call ID never grants
@@ -165,20 +167,23 @@ public sealed partial class CodexThreadStore
                 ?? throw new KeyNotFoundException("Native dispatch receipt not found.");
             if (prior.State is "succeeded" or "failed")
                 throw new InvalidOperationException("An observed terminal dispatch result cannot be replaced.");
-            return Replace(document, turn with { Dispatches = turn.Dispatches.Select(d => d.CallId == callId
-                ? d with { State = outcome, Result = result?.Clone() } : d).ToArray() });
+            var updated = turn with { Dispatches = turn.Dispatches.Select(d => d.CallId == callId
+                ? d with { State = outcome, Result = result?.Clone() } : d).ToArray() };
+            return PromoteRealtimeArtifacts(Replace(document, updated), turn, updated);
         }, cancellationToken);
 
     /// <summary>Completes a turn with its final status and output items.</summary>
     public Task<CodexThreadDocument> CompleteAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string status, IReadOnlyList<JsonElement> output, CancellationToken cancellationToken = default)
-        => ChangeTurnAsync(threadId, expectedRevision, turnId, ownerId, turn =>
+        => ChangeAsync(threadId, expectedRevision, document =>
         {
+            var turn = Active(document, turnId, ownerId);
             if (status is not ("completed" or "failed" or "interrupted")) throw new ArgumentException("Invalid terminal turn status.", nameof(status));
             if (turn.Dispatches.Any(d => d.State == "dispatching") ||
                 status == "completed" && turn.Dispatches.Any(d => d.State == "unknown"))
                 throw new InvalidOperationException("Unsettled dispatches prevent this terminal transition.");
-            return turn with { Status = status, Output = Items(output), CompletedAt = time.GetUtcNow() };
+            var updated = turn with { Status = status, Output = Items(output), CompletedAt = time.GetUtcNow() };
+            return PromoteRealtimeArtifacts(Replace(document, updated), turn, updated);
         }, cancellationToken);
 
     /// <summary>Call only after the host proves the recorded execution owner is lost. A read alone
@@ -321,6 +326,7 @@ public sealed partial class CodexThreadStore
             }
         }
         ValidateRealtimeHandoffTurnInputs(value);
+        ValidateRealtimePromotions(value);
         if (value.CompactionCheckpoint is { } checkpoint) CodexThreadCompaction.Validate(value, checkpoint);
         return value;
     }

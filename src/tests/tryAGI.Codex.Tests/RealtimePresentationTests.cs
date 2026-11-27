@@ -1,0 +1,125 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace tryAGI.Codex.Tests;
+
+public sealed class RealtimePresentationTests
+{
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+    private static JsonElement Json(string value) => RealtimeHistoryTests.Json(value);
+    private static JsonElement Message(string id, string text) => Json(new JsonObject
+    {
+        ["type"] = "message", ["role"] = "assistant", ["id"] = id,
+        ["content"] = new JsonArray(new JsonObject { ["type"] = "output_text", ["text"] = text }),
+    }.ToJsonString());
+
+    private static JsonObject[] Items(CodexThreadDocument thread) => CodexThreadStore.ProjectRealtimeItems(thread).ToArray();
+    private static string Type(JsonObject item) => item["type"]!.GetValue<string>();
+
+    [Fact]
+    public async Task PromotesCompletedInlineMarkdownAndDistinctVisualizationsOnce()
+    {
+        var (_, store, thread, attachment) = await RealtimeHistoryTests.Setup();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [Json("""{"role":"user","content":"question"}""")], cancellationToken: Ct);
+        var markdown = Message("markdown", "[NOTE] ::codex-realtime-inline{}\nVisible explanation");
+        var visualizations = Message("visuals", "```\n::codex-inline-vis{hidden}\n```\n~~~\n::codex-inline-vis{also-hidden}\n~~~\n::codex-inline-vis{first}\n\uE200visualize\uE202{second}");
+        var notReady = Message("no-body", "::codex-realtime-inline{}");
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [notReady, markdown, visualizations], Ct);
+        var items = Items(thread);
+        Assert.Equal(4, items.Length);
+        Assert.Equal("inlineMarkdown", items[1]["presentation"]!["type"]!.GetValue<string>());
+        Assert.Equal("markdown", items[1]["item_id"]!.GetValue<string>());
+        Assert.All(items.Skip(2), item => Assert.Equal("inlineVisualization", item["presentation"]!["type"]!.GetValue<string>()));
+        Assert.Equal([0, 1], items.Skip(2).Select(item => item["presentation"]!["index"]!.GetValue<int>()).ToArray());
+        thread = await store.CompleteAsync(thread.Id, thread.Revision, turn, "runner", "completed", [notReady, markdown, visualizations], Ct);
+        var reloaded = await store.ReadAsync(thread.Id, Ct);
+        Assert.Equal(items.Select(x => x.ToJsonString()), Items(reloaded).Select(x => x.ToJsonString()));
+        Assert.Equal(3, RealtimeHistoryTests.Session(reloaded).History!.Events.Count(e => e.Kind == "promotion"));
+        await store.DetachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+    }
+
+    [Fact]
+    public async Task SuccessfulDynamicToolSplitsSpeechAndDelayedFinalDoesNotDuplicatePrefix()
+    {
+        var (_, store, thread, attachment) = await RealtimeHistoryTests.Setup();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        var failed = Json("""{"type":"function_call","id":"failed-item","name":"tool","call_id":"failed","arguments":"{}"}""");
+        var successful = Json("""{"type":"function_call","id":"successful-item","name":"tool","call_id":"successful","arguments":"{}"}""");
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [failed, successful], Ct);
+        async Task Observe(string id, string wire) => thread = (await store.RecordRealtimeObservationAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, id, RealtimeHistoryTests.Event(wire), Ct)).Thread;
+        await Observe("delta-before", """{"type":"output_transcript.added","item":{"text":"Before tool. "}}""");
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "failed", "tool", failed, Ct)).Thread;
+        thread = await store.SettleAsync(thread.Id, thread.Revision, turn, "runner", "failed", "failed", cancellationToken: Ct);
+        Assert.Single(Items(thread));
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "successful", "tool", successful, Ct)).Thread;
+        thread = await store.SettleAsync(thread.Id, thread.Revision, turn, "runner", "successful", "succeeded",
+            Json("""{"type":"function_call_output","call_id":"successful","output":"confirmed"}"""), Ct);
+        var projected = Items(thread);
+        Assert.Equal(["realtimeSessionStarted", "frame", "bemItemPromoted"], projected.Select(Type).ToArray());
+        Assert.Equal("Before tool. ", projected[1]["channels"]!["voice_transcript"]!["text"]!.GetValue<string>());
+        Assert.Equal("successful-item", projected[2]["item_id"]!.GetValue<string>());
+        await Observe("delta-after", """{"type":"output_transcript.added","item":{"text":"After tool."}}""");
+        await Observe("full-final", """{"type":"turn.done","turn":{"role":"assistant","transcript":"Before tool. After tool."}}""");
+        thread = (await store.SealRealtimeHistoryAsync(thread.Id, thread.Revision, "session", "owner", attachment, "seal-after", "chunk", Ct)).Thread;
+        var frames = RealtimeHistoryTests.Session(await store.ReadAsync(thread.Id, Ct)).History!.Frames;
+        Assert.Equal(["Before tool. ", "After tool."], frames.Select(f => f.Text).ToArray());
+        Assert.Equal(projected.Select(x => x.ToJsonString()), Items(thread).Take(projected.Length).Select(x => x.ToJsonString()));
+    }
+
+    [Fact]
+    public async Task SplitUserUtteranceRemainsOneHandoffWithAllSourceFrames()
+    {
+        var (_, store, thread, attachment) = await RealtimeHistoryTests.Setup();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        async Task Observe(string id, string wire) => thread = (await store.RecordRealtimeObservationAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, id, RealtimeHistoryTests.Event(wire), Ct)).Thread;
+        await Observe("first-part", """{"type":"input_transcript.added","item":{"text":"First "}}""");
+        var artifact = Message("inline", "::codex-realtime-inline{}\nartifact");
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [artifact], Ct);
+        await Observe("second-part", """{"type":"input_transcript.added","item":{"text":"part"}}""");
+        await Observe("final-user", """{"type":"turn.done","turn":{"role":"user","transcript":"First part"}}""");
+        await Observe("handoff", """{"type":"delegation.created","item":{"type":"delegation","target":"client","id":"handoff","content":[{"type":"input_text","text":"First part"}]}}""");
+        var session = RealtimeHistoryTests.Session(thread);
+        var history = session.History!;
+        var capture = Assert.Single(history.Handoffs);
+        Assert.Equal(2, capture.FrameIds.Length);
+        Assert.Equal(["First ", "part"], history.Frames.Select(f => f.Text).ToArray());
+        Assert.All(history.Frames, f => Assert.Equal("handoff", f.HandoffId));
+        var input = CodexThreadStore.PrepareRealtimeHandoffInput(session, "handoff")!;
+        Assert.Equal(capture.FrameIds, input.SourceIds);
+        var admission = await store.AdmitRealtimeHandoffAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, "handoff", Guid.NewGuid(), turn, "runner", input.Text, Ct);
+        Assert.True(admission.Admitted);
+        Assert.All(RealtimeHistoryTests.Session(admission.Thread).History!.Frames, f => Assert.Equal("accepted", f.Disposition));
+    }
+
+    [Fact]
+    public async Task InterruptedTurnRetainsOriginalVoiceSessionForLateSuccessfulTool()
+    {
+        var (_, store, thread, attachment) = await RealtimeHistoryTests.Setup();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        var call = Json("""{"type":"function_call","id":"late-item","name":"tool","call_id":"late","arguments":"{}"}""");
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [call], Ct);
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "late", "tool", call, Ct)).Thread;
+        thread = await store.RecoverInterruptedAsync(thread.Id, thread.Revision, turn, "runner", Ct);
+        var end = Guid.NewGuid();
+        thread = (await store.BeginRealtimeEndAsync(thread.Id, thread.Revision, "session", "owner", attachment, end, Ct)).Thread;
+        thread = await store.CompleteRealtimeEndAsync(thread.Id, thread.Revision, "session", "owner", end, Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "second", "rtc_second", "v3", "owner", Ct);
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "second", "owner", Guid.NewGuid(), Ct);
+        var previous = Items(thread);
+        thread = await store.SettleAsync(thread.Id, thread.Revision, turn, "runner", "late", "succeeded",
+            Json("""{"type":"function_call_output","call_id":"late","output":"late result"}"""), Ct);
+        var after = Items(await store.ReadAsync(thread.Id, Ct));
+        Assert.Equal(previous.Select(x => x.ToJsonString()), after.Take(previous.Length).Select(x => x.ToJsonString()));
+        Assert.Equal("bemItemPromoted", Type(after[^1]));
+        Assert.Equal("session", after[^1]["realtimeSessionId"]!.GetValue<string>());
+        Assert.Equal("late-item", after[^1]["item_id"]!.GetValue<string>());
+        Assert.Equal(turn.ToString(), after[^1]["turn_id"]!.GetValue<string>());
+    }
+}

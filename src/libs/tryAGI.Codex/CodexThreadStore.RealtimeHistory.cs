@@ -28,7 +28,9 @@ public sealed record CodexStoredRealtimeHistoryEvent(
     double? ReceivedAfterConnectMs = null,
     string? Reason = null,
     string? HandoffId = null,
-    Guid? TurnId = null);
+    Guid? TurnId = null,
+    long? CommitRevision = null,
+    CodexStoredRealtimePromotion? Promotion = null);
 
 /// <summary>A reconciled transcript frame, ordered by its first observation rather than final arrival.</summary>
 public sealed record CodexStoredRealtimeFrame(
@@ -137,7 +139,8 @@ public sealed partial class CodexThreadStore
         }
         var item = new CodexStoredRealtimeHistoryEvent(observationId, "observation",
             NextRealtimeObservationTime(history), before.Turns.Length, attachmentId,
-            source.Type, source.Payload.Clone(), source.ReceivedAfterConnectMs);
+            source.Type, source.Payload.Clone(), source.ReceivedAfterConnectMs,
+            CommitRevision: checked(before.Revision + 1));
         var next = ReplaceRealtimeSession(before, session with
         {
             History = AppendRealtimeHistory(session, history, item),
@@ -202,7 +205,7 @@ public sealed partial class CodexThreadStore
             throw new InvalidOperationException("Accepted handoff must bind to a durable reasoning turn.");
         var item = new CodexStoredRealtimeHistoryEvent("handoff:" + Guid.NewGuid().ToString("N"),
             state, NextRealtimeObservationTime(history), document.Turns.Length,
-            HandoffId: handoffId, TurnId: acceptedTurnId);
+            HandoffId: handoffId, TurnId: acceptedTurnId, CommitRevision: checked(document.Revision + 1));
         return ReplaceRealtimeSession(document, session with { History = AppendRealtimeHistory(session, history, item) });
     }
 
@@ -218,7 +221,7 @@ public sealed partial class CodexThreadStore
         var observedAt = NextRealtimeObservationTime(history);
         var rejected = pending.Select(h => new CodexStoredRealtimeHistoryEvent(
             "handoff:" + Guid.NewGuid().ToString("N"), "rejected", observedAt, document.Turns.Length,
-            Reason: "attachmentRetired", HandoffId: h.HandoffId));
+            Reason: "attachmentRetired", HandoffId: h.HandoffId, CommitRevision: checked(document.Revision + 1)));
         return ReplaceRealtimeSession(document, session with
         {
             History = ReplayRealtimeHistory(session, history.Mode, [.. history.Events, .. rejected]),
@@ -252,7 +255,7 @@ public sealed partial class CodexThreadStore
             throw new InvalidOperationException("Realtime handoff admission must settle before sealing carryover.");
         if (!history.Frames.Any(f => f.Disposition == "pending")) return document;
         var item = new CodexStoredRealtimeHistoryEvent(sealId, "seal", NextRealtimeObservationTime(history),
-            document.Turns.Length, Reason: reason);
+            document.Turns.Length, Reason: reason, CommitRevision: checked(document.Revision + 1));
         return ReplaceRealtimeSession(document, session with { History = AppendRealtimeHistory(session, history, item) });
     }
 
@@ -279,6 +282,7 @@ public sealed partial class CodexThreadStore
             if (session.History is null) continue;
             var history = RecoverRealtimeHistory(session);
             if (history.Events.Any(e => e.BeforeTurnCount > document.Turns.Length) ||
+                history.Events.Any(e => e.CommitRevision is { } revision && (revision < 1 || revision > document.Revision)) ||
                 history.Handoffs.Any(h => h.TurnId is { } turn && !document.Turns.Any(t => t.Id == turn)) ||
                 session.State is "ended" or "ending" && (history.Frames.Any(f => f.Disposition == "pending") ||
                     history.Handoffs.Any(h => h.State == "pending")))
@@ -306,7 +310,8 @@ public sealed partial class CodexThreadStore
         CodexRealtimeHistoryMode mode, CodexStoredRealtimeHistoryEvent[] events,
         Action<CodexStoredRealtimeFrame, CodexStoredRealtimeHistoryEvent>? frameCommitted = null,
         Action<CodexStoredRealtimeCarryover, CodexStoredRealtimeHistoryEvent>? inputSaved = null,
-        Action<CodexStoredRealtimeHandoffCapture, CodexStoredRealtimeHistoryEvent>? inputAccepted = null)
+        Action<CodexStoredRealtimeHandoffCapture, CodexStoredRealtimeHistoryEvent>? inputAccepted = null,
+        Action<CodexStoredRealtimePromotion, CodexStoredRealtimeHistoryEvent>? promoted = null)
     {
         if (!Enum.IsDefined(mode) || events is null || events.Length > MaximumItems)
             throw new InvalidDataException("Invalid realtime history enrollment or event count.");
@@ -317,6 +322,8 @@ public sealed partial class CodexThreadStore
         var observed = new Dictionary<string, (long Sequence, long Timestamp)>(StringComparer.Ordinal);
         var ids = new HashSet<string>(StringComparer.Ordinal);
         long previousTimestamp = 0;
+        long previousRevision = 0;
+        var splitFrames = new List<string>();
         int previousTurnCount = 0;
         long sequence = 0;
 
@@ -366,6 +373,14 @@ public sealed partial class CodexThreadStore
             if (item is null || !ValidToken(item.Id) || !ids.Add(item.Id) || item.ObservedAtMs < previousTimestamp ||
                 item.BeforeTurnCount < previousTurnCount)
                 throw new InvalidDataException("Invalid realtime history event order or identity.");
+            if (item.CommitRevision is { } revision)
+            {
+                if (revision < 1 || revision < previousRevision) throw new InvalidDataException("Realtime commit order changed.");
+                previousRevision = revision;
+            }
+            else if (previousRevision != 0) throw new InvalidDataException("Realtime event lacks commit order after enrollment.");
+            if ((item.Kind == "promotion") != (item.Promotion is not null))
+                throw new InvalidDataException("Invalid realtime promotion event.");
             previousTimestamp = item.ObservedAtMs;
             previousTurnCount = item.BeforeTurnCount;
             switch (item.Kind)
@@ -384,8 +399,11 @@ public sealed partial class CodexThreadStore
                     if (handoff is { IsNew: true })
                     {
                         AddFrames(handoff.Entries, item, handoff.Id);
-                        if (!handoffs.TryAdd(handoff.Id, new(handoff.Id, handoff.InputTranscript,
-                            handoff.Entries.Select(e => e.Id).ToArray(), "pending")))
+                        var capturedIds = splitFrames.Where(id => frames[id].Disposition == "pending")
+                            .Concat(handoff.Entries.Select(e => e.Id)).ToArray();
+                        splitFrames.Clear();
+                        foreach (var id in capturedIds) frames[id] = frames[id] with { HandoffId = handoff.Id };
+                        if (!handoffs.TryAdd(handoff.Id, new(handoff.Id, handoff.InputTranscript, capturedIds, "pending")))
                             throw new InvalidDataException("Realtime handoff capture identity collided.");
                     }
                     var completed = accumulator.TakeCompleted();
@@ -396,11 +414,26 @@ public sealed partial class CodexThreadStore
                     }
                     break;
                 }
+                case "promotion":
+                {
+                    var promotion = item.Promotion!;
+                    if (item.CommitRevision is null || promotion.TurnId == Guid.Empty ||
+                        !ValidToken(promotion.SessionId) || !ValidToken(promotion.ItemId) ||
+                        promotion.Presentation is not ("wholeItem" or "inlineMarkdown" or "inlineVisualization") ||
+                        (promotion.Presentation == "inlineVisualization") != (promotion.Index is not null) || promotion.Index is < 0)
+                        throw new InvalidDataException("Invalid realtime artifact presentation.");
+                    var split = accumulator.TakePresentationBoundary();
+                    AddFrames(split, item);
+                    splitFrames.AddRange(split.Select(e => e.Id));
+                    promoted?.Invoke(promotion, item);
+                    break;
+                }
                 case "seal":
                     if (item.Reason is not ("nextTurn" or "chunk" or "sessionEnd") || handoffs.Values.Any(h => h.State == "pending"))
                         throw new InvalidDataException("Realtime carryover seal preceded handoff settlement.");
                     AddFrames(accumulator.TakeTail(), item);
                     Carryover(item, item.Reason);
+                    splitFrames.Clear();
                     break;
                 case "accepted":
                 case "rejected":

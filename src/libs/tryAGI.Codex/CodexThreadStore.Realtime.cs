@@ -46,6 +46,15 @@ public sealed record CodexStoredRealtimeSession(
 
     /// <summary>Immutable backing model mode instructions for this logical call.</summary>
     public CodexRealtimeModeInstructions? ModeInstructions { get; init; }
+
+    /// <summary>Commit revision of the logical timeline's opening boundary.</summary>
+    public long? StartedRevision { get; init; }
+
+    /// <summary>Commit revision of the confirmed logical timeline's closing boundary.</summary>
+    public long? ClosedRevision { get; init; }
+
+    /// <summary>Backing reasoning turns associated with this voice session at a durable boundary.</summary>
+    public Guid[]? PresentationTurnIds { get; init; }
 }
 
 public sealed partial class CodexThreadStore
@@ -78,7 +87,8 @@ public sealed partial class CodexThreadStore
             if (sessions.Any(s => s.SessionId == sessionId || callId is not null && s.CallId == callId || s.State != "ended"))
                 throw new InvalidOperationException("Realtime session identity is already registered or another session is open.");
             return document with { RealtimeSessions = [.. sessions,
-                new CodexStoredRealtimeSession(1, sessionId, callId, protocol, ownerId, "detached") { TransportKind = kind }] };
+                new CodexStoredRealtimeSession(1, sessionId, callId, protocol, ownerId, "detached")
+                { TransportKind = kind, StartedRevision = checked(document.Revision + 1) }] };
         }, ct);
 
     /// <summary>Atomically claims a detached call for one transport. A new attachment ID must
@@ -96,10 +106,12 @@ public sealed partial class CodexThreadStore
             // Older detached snapshots may contain unadmitted captures from the previous transport.
             document = RetireLostRealtimeHandoffs(document, session);
             session = FindRealtimeSession(document, sessionId, ownerId);
-            return ReplaceRealtimeSession(document, session with
+            document = ReplaceRealtimeSession(document, session with
             {
                 State = "attached", AttachmentId = attachmentId, UsedAttachmentIds = [.. used, attachmentId],
             });
+            return document.Turns.LastOrDefault() is { Status: "inProgress" } turn
+                ? BindRealtimePresentation(document, turn.Id, sessionId) : document;
         }, cancellationToken);
 
     /// <summary>Detaches the exact transport after all accepted events have been drained and
@@ -147,7 +159,11 @@ public sealed partial class CodexThreadStore
             if (verifiedEnded)
                 document = SealRealtimeHistory(document, session, "recovery-end:" + expectedRevision, "sessionEnd");
             var recovered = FindRealtimeSession(document, sessionId, ownerId);
-            return ReplaceRealtimeSession(document, recovered with { State = verifiedEnded ? "ended" : "detached" });
+            return ReplaceRealtimeSession(document, recovered with
+            {
+                State = verifiedEnded ? "ended" : "detached",
+                ClosedRevision = verifiedEnded ? checked(document.Revision + 1) : null,
+            });
         }, cancellationToken);
 
     /// <summary>Records an end intent before any external effect, including after a clean detach.
@@ -226,7 +242,8 @@ public sealed partial class CodexThreadStore
         if (session.EndOperationId != endOperationId || session.State is not ("ending" or "ended"))
             throw new InvalidOperationException("Realtime end intent does not match.");
         if (session.State == "ended") return before;
-        return await PublishAsync(before.Revision, ReplaceRealtimeSession(before, session with { State = "ended" }) with
+        return await PublishAsync(before.Revision, ReplaceRealtimeSession(before, session with
+        { State = "ended", ClosedRevision = checked(before.Revision + 1) }) with
         {
             Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
         }, cancellationToken).ConfigureAwait(false);
@@ -266,6 +283,8 @@ public sealed partial class CodexThreadStore
             if (session is null || open || session.Version != 1 ||
                 !ValidToken(session.SessionId) || !ValidToken(session.OwnerId) || !ids.Add(session.SessionId) ||
                 !Enum.IsDefined(session.TransportKind) ||
+                session.StartedRevision is < 1 || session.ClosedRevision is < 1 ||
+                session.ClosedRevision is not null && (session.State != "ended" || session.ClosedRevision < session.StartedRevision) ||
                 (session.TransportKind == CodexRealtimeTransportKind.ExistingCall
                     ? session.CallId is not { } callId || !ValidToken(callId) || !calls.Add(callId)
                     : session.CallId is not null || session.UsedAttachmentIds is { Length: > 1 } ||

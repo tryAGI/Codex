@@ -9,38 +9,38 @@ public sealed partial class CodexThreadStore
     // previously returned position in an immutable snapshot.
     internal static IReadOnlyList<JsonObject> ProjectRealtimeItems(CodexThreadDocument thread)
     {
-        var result = new List<JsonObject>();
+        var result = new List<(long Revision, JsonObject Item)>();
         foreach (var session in thread.RealtimeSessions ?? [])
         {
-            void Add(JsonObject value, string id, long? observedAt)
+            void Add(JsonObject value, string id, long? observedAt, long? revision, string? attributedSession = null)
             {
                 value["id"] = id;
-                value["realtimeSessionId"] = session.SessionId;
+                value["realtimeSessionId"] = attributedSession ?? session.SessionId;
                 value["observedAtMs"] = observedAt;
-                result.Add(value);
+                result.Add((revision ?? 0, value));
             }
             static JsonArray Ids(IEnumerable<string> ids) => new(ids.Select(id => (JsonNode?)JsonValue.Create(id)).ToArray());
             // These stable local boundary identities represent the persisted lifecycle;
             // timestamps that were not retained by the journal are intentionally null.
-            Add(new JsonObject { ["type"] = "realtimeSessionStarted" }, "session:" + session.SessionId + ":start", null);
+            Add(new JsonObject { ["type"] = "realtimeSessionStarted" }, "session:" + session.SessionId + ":start", null, session.StartedRevision);
             if (session.History is { } history)
             {
                 var admissions = (session.HandoffAdmissions ?? []).ToDictionary(x => x.HandoffId, StringComparer.Ordinal);
                 _ = ReplayRealtimeHistory(session, history.Mode, history.Events,
-                    (frame, _) =>
+                    (frame, boundary) =>
                     {
                         var transcript = new JsonObject { ["role"] = frame.Role, ["text"] = frame.Text };
                         var item = history.Mode == CodexRealtimeHistoryMode.Canonical
                             ? new JsonObject { ["type"] = "frame", ["channels"] = new JsonObject { ["voice_transcript"] = transcript } }
                             : new JsonObject { ["type"] = "transcriptSegment", ["role"] = frame.Role, ["text"] = frame.Text };
-                        Add(item, frame.Id, frame.ObservedAtMs);
+                        Add(item, frame.Id, frame.ObservedAtMs, boundary.CommitRevision);
                     },
                     (saved, boundary) => Add(new JsonObject
                     {
                         ["type"] = "sessionInputSaved", ["input"] = CodexRealtimeProtocol.Text(saved.Input, "content"),
                         ["input_item_id"] = saved.Id, ["source_event_ids"] = Ids(saved.SourceFrameIds),
                         ["reason"] = saved.Reason == "sessionEnd" ? "sessionEnd" : "chunk",
-                    }, boundary.Id, boundary.ObservedAtMs),
+                    }, boundary.Id, boundary.ObservedAtMs, boundary.CommitRevision),
                     (capture, boundary) =>
                     {
                         if (!admissions.TryGetValue(capture.HandoffId, out var receipt) || receipt.TurnId is not { } turnId ||
@@ -53,13 +53,17 @@ public sealed partial class CodexThreadStore
                             ["input"] = CodexRealtimeProtocol.Text(turn.Input[index], "content"),
                             ["input_item_id"] = receipt.SubmissionId.ToString(), ["mode"] = receipt.State,
                             ["turn_id"] = turnId.ToString(), ["source_event_ids"] = Ids(prepared?.SourceIds ?? []),
-                        }, boundary.Id, boundary.ObservedAtMs);
-                    });
+                        }, boundary.Id, boundary.ObservedAtMs, boundary.CommitRevision);
+                    },
+                    (promotion, boundary) => Add(CodexRealtimePresentation.Json(promotion), boundary.Id,
+                        boundary.ObservedAtMs, boundary.CommitRevision, promotion.SessionId));
             }
             if (session.State == "ended")
                 Add(new JsonObject { ["type"] = "realtimeSessionClosed", ["outcome"] = "ended" },
-                    "session:" + session.SessionId + ":end", null);
+                    "session:" + session.SessionId + ":end", null, session.ClosedRevision);
         }
-        return result;
+        // Legacy unversioned items keep their existing relative positions. Subsequent
+        // writes carry the exact CAS revision, including late artifacts of earlier sessions.
+        return result.OrderBy(x => x.Revision).Select(x => x.Item).ToArray();
     }
 }

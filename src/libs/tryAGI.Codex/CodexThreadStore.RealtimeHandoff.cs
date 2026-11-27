@@ -132,6 +132,7 @@ public sealed partial class CodexThreadStore
 
         // The input, transcript acceptance and receipt become visible in one CAS. No provider or
         // tool callback occurs here; a lost CAS reply must be reconciled by reading this receipt.
+        if (receivingTurn is { } boundTurn) next = BindRealtimePresentation(next, boundTurn, sessionId);
         next = ResolveRealtimeHandoffHistory(next, sessionId, handoffId, receivingTurn);
         var updated = FindRealtimeSession(next, sessionId, ownerId);
         var receipt = new CodexStoredRealtimeHandoffAdmission(handoffId, submissionId, attachmentId, digest,
