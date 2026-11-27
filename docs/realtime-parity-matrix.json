@@ -28921,6 +28921,56 @@
       "rationale": "Offline mapping only; no live provider or playback evidence."
     },
     {
+      "id": "scenario:native-v3-audio-delegation-tool-feedback-followup",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "native-v3-audio-delegation-tool-feedback-followup",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/realtime_conversation.rs#L4666",
+      "ownerIssue": 50,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexThreadAgent.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/ThreadAgentTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeCoordinator.cs::CodexRealtimeCoordinator",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityLifecycleTests.cs::RustParityLifecycleTests.AudioDelegationToolFeedbackFollowupAndStandaloneSpeechStayOnOneThread",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "diagnostic-passed",
+        "receipt": "codex-parity-coordinator-r5-20261127",
+        "detail": "3 lifecycle tests passed, 0 failed/skipped. Native coordinator with synthetic PCM, sideband/Responses transport, actual local harmless tool callback, durable follow-up turn, and standalone speech request. No provider media or playback; shared tree is not revision-bound acceptance."
+      },
+      "rationale": "Independent V3 mock cycle includes ongoing input/output PCM while tool is blocked, exact feedback delegation identity, opaque reasoning/tool receipt continuity, and second turn on the same thread. Live and interruption remain separate."
+    },
+    {
+      "id": "scenario:native-v3-standalone-context-to-synthetic-audio",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "native-v3-standalone-context-to-synthetic-audio",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods_common_tests.rs#L84",
+      "ownerIssue": 38,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeCoordinator.cs::CodexRealtimeCoordinator",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityLifecycleTests.cs::RustParityLifecycleTests.AudioDelegationToolFeedbackFollowupAndStandaloneSpeechStayOnOneThread",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "diagnostic-passed",
+        "receipt": "codex-parity-coordinator-r5-20261127",
+        "detail": "3 lifecycle tests passed, 0 failed/skipped. Native coordinator with synthetic PCM, sideband/Responses transport, actual local harmless tool callback, durable follow-up turn, and standalone speech request. No provider media or playback; shared tree is not revision-bound acceptance."
+      },
+      "rationale": "Explicit standalone speech request creates a speakable session context without a new user message or reasoning request, then receives synthetic audio. Actual provider speech/playback is unverified."
+    },
+    {
       "id": "scenario:no-observer-history",
       "lane": "behavior",
       "kind": "scenario",
