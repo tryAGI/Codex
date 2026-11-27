@@ -13,8 +13,8 @@ public sealed class RealtimeStartupContextTests
         var context = CodexRealtimeStartupContext.Build(history, new string('р', 20000), "worker workspace");
         Assert.Contains("question-39", context);
         Assert.DoesNotContain("question-0:", context);
-        Assert.Contains("## Recent work", context);
-        Assert.Contains("## Machine and workspace", context);
+        Assert.Contains("## Recent Work", context);
+        Assert.Contains("## Machine / Workspace Map", context);
         Assert.True(CodexRealtimeStartupContext.ApproximateTokens((context ?? throw new InvalidDataException("Required data was null."))) <= 5400);
     }
     [Theory]
@@ -58,6 +58,18 @@ public sealed class RealtimeStartupContextTests
         var context = (CodexRealtimeStartupContext.Build(messages) ?? throw new InvalidDataException("Required data was null."));
         Assert.Contains("question", context); Assert.Contains("answer", context);
         Assert.DoesNotContain("secret", context); Assert.DoesNotContain("private", context); Assert.DoesNotContain("authority", context);
+    }
+    [Fact]
+    public void NativeUserMessagesAreIncludedButContextualDelegationsAreNotReplayed()
+    {
+        using var document = JsonDocument.Parse("""[{"role":"assistant","content":"unpaired"},{"role":"user","content":"ask"},{"role":"user","content":"<realtime_delegation>old handoff</realtime_delegation>"},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]}]""");
+        var messages = CodexRealtimeStartupContext.ConversationMessages(document.RootElement.EnumerateArray());
+        var context = Assert.IsType<string>(CodexRealtimeStartupContext.Build(messages));
+        Assert.StartsWith("<startup_context>\nStartup context from Codex.\nThis is background context", context, StringComparison.Ordinal);
+        Assert.Contains("## Current Thread\nMost recent user/assistant turns", context);
+        Assert.Contains("### Latest turn\nUser:\nask\n\nAssistant:\nanswer", context);
+        Assert.DoesNotContain("unpaired", context);
+        Assert.DoesNotContain("old handoff", context);
     }
     [Fact]
     public void EmptyContextDoesNotAddInstructionsAndDeveloperMessagesAreExcluded()

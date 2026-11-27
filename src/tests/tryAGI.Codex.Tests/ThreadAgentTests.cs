@@ -277,8 +277,10 @@ public sealed class ThreadAgentTests
         Assert.Equal("hello", server.Requests.Single().GetProperty("input")[0].GetProperty("content").GetString());
     }
 
-    [Fact]
-    public async Task NativeRealtimeRpcStartsAppendsListsAndStopsWithoutAppServer()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NativeRealtimeRpcStartsAppendsListsAndStopsWithoutAppServer(bool includeStartupContext)
     {
         var (_, store, thread, auth, budget, server) = await Setup();
         var agent = Agent(store, auth, budget, server);
@@ -289,9 +291,13 @@ public sealed class ThreadAgentTests
         var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
             Json("{}"), (_, _, _) => throw new InvalidOperationException("Use the native owned executor."),
             (method, body) => { notices.Writer.TryWrite((method, body)); return Task.CompletedTask; });
+        var contextCalls = 0;
         rpc.EnableRealtime(async (request, ct) =>
         {
             Assert.Equal(thread.Id, request.Thread.Id);
+            Assert.StartsWith("original prompt", request.SessionOptions.Instructions, StringComparison.Ordinal);
+            Assert.Equal(includeStartupContext, request.SessionOptions.Instructions.Contains("recent owner project", StringComparison.Ordinal));
+            Assert.Equal(includeStartupContext, request.SessionOptions.Instructions.Contains("explicit workspace", StringComparison.Ordinal));
             Assert.Equal("v3", request.SessionOptions.Protocol);
             Assert.True(request.CoordinatorOptions.DirectAudio);
             var session = await store.CreateRealtimeSessionAsync(thread.Id, request.Thread.Revision,
@@ -301,6 +307,11 @@ public sealed class ThreadAgentTests
                     new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), attach.Protocol, attach.StartBefore, cancel));
             return new(new CodexRealtimeCoordinator(store, agent, rpc, controller, session.Id,
                 "voice", "voice-owner", "account", _ => Options(session.Id, Guid.NewGuid()), NoTools, request.CoordinatorOptions));
+        }, (ownerThread, _) =>
+        {
+            Assert.Equal(thread.Id, ownerThread.Id);
+            Interlocked.Increment(ref contextCalls);
+            return Task.FromResult<CodexRealtimeStartupMetadata?>(new("recent owner project", "explicit workspace"));
         });
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(Ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(10));
@@ -318,7 +329,8 @@ public sealed class ThreadAgentTests
         Assert.Equal("unsupported", (await Invoke("list")).GetProperty("coverage").GetString());
         await Assert.ThrowsAsync<CodexThreadRpcException>(() => Invoke("start", new() { ["outputModality"] = "bad" }));
         await Invoke("start", new() { ["outputModality"] = "audio", ["version"] = "v3", ["realtimeSessionId"] = "voice",
-            ["transport"] = new JsonObject { ["type"] = "websocket" }, ["includeStartupContext"] = false });
+            ["transport"] = new JsonObject { ["type"] = "websocket" }, ["includeStartupContext"] = includeStartupContext, ["prompt"] = "original prompt" });
+        Assert.Equal(includeStartupContext ? 1 : 0, Volatile.Read(ref contextCalls));
         var started = await notices.Reader.ReadAsync(token);
         Assert.Equal("thread/realtime/started", started.Method);
         Assert.Equal("voice", started.Body.GetProperty("realtimeSessionId").GetString());

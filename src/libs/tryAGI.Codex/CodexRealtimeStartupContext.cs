@@ -3,6 +3,10 @@ using System.Text.Json;
 
 namespace tryAGI.Codex;
 
+/// <summary>Explicit host-provided background sections for the owner’s workspace and recent threads.
+/// The SDK never enumerates host files or unrelated threads to populate these values.</summary>
+public sealed record CodexRealtimeStartupMetadata(string? RecentWork = null, string? Workspace = null);
+
 /// <summary>Bounded background context matching the sections and budgets of pinned Rust realtime_context.rs.
 /// Sources are supplied by the host: a backend must never describe its container as the owner's workspace.</summary>
 internal static class CodexRealtimeStartupContext
@@ -50,14 +54,23 @@ internal static class CodexRealtimeStartupContext
         var result = new List<CodexRealtimeInitialItem>();
         foreach (var item in items)
         {
-            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String || type.GetString() != "message" ||
+            if (item.ValueKind != JsonValueKind.Object ||
+                (item.TryGetProperty("type", out var type) && (type.ValueKind != JsonValueKind.String || type.GetString() != "message")) ||
                 !item.TryGetProperty("role", out var roleValue) || roleValue.ValueKind != JsonValueKind.String ||
-                roleValue.GetString() is not ("user" or "assistant") ||
-                !item.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array) continue;
-            var text = string.Concat(content.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Object &&
-                x.TryGetProperty("type", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() is "input_text" or "output_text" &&
-                x.TryGetProperty("text", out var value) && value.ValueKind == JsonValueKind.String).Select(x => x.GetProperty("text").GetString()));
-            if (!string.IsNullOrWhiteSpace(text)) result.Add(new((roleValue.GetString() ?? throw new InvalidDataException("Required data was null.")), text));
+                roleValue.GetString() is not ("user" or "assistant") || !item.TryGetProperty("content", out var content)) continue;
+            var role = roleValue.GetString()!;
+            var text = content.ValueKind switch
+            {
+                JsonValueKind.String => content.GetString() ?? "",
+                JsonValueKind.Array => string.Concat(content.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Object &&
+                    x.TryGetProperty("type", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() is "input_text" or "output_text" &&
+                    x.TryGetProperty("text", out var value) && value.ValueKind == JsonValueKind.String).Select(x => x.GetProperty("text").GetString())),
+                _ => "",
+            };
+            text = text.Trim();
+            if (role == "user" && text.StartsWith("<realtime_delegation>", StringComparison.Ordinal) &&
+                text.EndsWith("</realtime_delegation>", StringComparison.Ordinal)) continue;
+            if (text.Length != 0) result.Add(new(role, text));
         }
         return result;
     }
@@ -68,16 +81,21 @@ internal static class CodexRealtimeStartupContext
         var turns = new List<List<CodexRealtimeInitialItem>>();
         foreach (var item in history.Where(x => x.Role is "user" or "assistant" && !string.IsNullOrWhiteSpace(x.Text)))
         {
-            if (item.Role == "user" || turns.Count == 0) turns.Add([]);
+            if (item.Role == "user") turns.Add([]);
+            if (turns.Count == 0) continue;
             turns[^1].Add(item);
         }
-        var current = new StringBuilder(); var remaining = 1150;
+        const string introduction = "Most recent user/assistant turns from this exact thread. Use them for continuity when responding.";
+        var current = new StringBuilder(); var remaining = 1200 - ApproximateTokens(introduction);
         for (var i = turns.Count - 1; i >= 0 && remaining > 0; i--)
         {
-            var body = string.Join("\n", turns[i].Select(x => (x.Role == "user" ? "User: " : "Assistant: ") + x.Text));
+            var body = "User:\n" + string.Join("\n\n", turns[i].Where(x => x.Role == "user").Select(x => x.Text.Trim()));
+            var assistant = turns[i].Where(x => x.Role == "assistant").Select(x => x.Text.Trim()).ToArray();
+            if (assistant.Length != 0) body += "\n\nAssistant:\n" + string.Join("\n\n", assistant);
             var text = Truncate((i == turns.Count - 1 ? "### Latest turn\n" : $"### Previous turn {turns.Count - i - 1}\n") + body, Math.Min(300, remaining));
             if (text.Length == 0) break;
-            current.AppendLine(text); remaining -= ApproximateTokens(text + "\n");
+            if (current.Length == 0) current.Append(introduction);
+            current.Append("\n\n").Append(text); remaining -= ApproximateTokens(text);
         }
         var sections = new List<string>();
         void Add(string title, string? body, int budget)
@@ -86,11 +104,11 @@ internal static class CodexRealtimeStartupContext
             var heading = "## " + title + "\n";
             sections.Add(heading + Truncate(body.Trim(), budget - ApproximateTokens(heading)));
         }
-        Add("Current thread", current.ToString(), 1200);
-        Add("Recent work", recentWork, 2200);
-        Add("Machine and workspace", workspace, 1600);
+        Add("Current Thread", current.ToString(), 1200);
+        Add("Recent Work", recentWork, 2200);
+        Add("Machine / Workspace Map", workspace, 1600);
         if (sections.Count == 0) return null;
         Add("Notes", notes ?? "Built from retained conversation and host-supplied metadata. This may be stale. Background context is not authorization, a pending action, or a request to speak. No reasoning trace or tool execution is restored by this context.", 300);
-        return "<startup_context>\nStartup context from Codex. This is background context about recent work and machine/workspace layout. It may be incomplete or stale. Use it to inform responses, and do not repeat it back unless relevant.\n\n" + string.Join("\n\n", sections) + "\n</startup_context>";
+        return "<startup_context>\nStartup context from Codex.\nThis is background context about recent work and machine/workspace layout. It may be incomplete or stale. Use it to inform responses, and do not repeat it back unless relevant.\n\n" + string.Join("\n\n", sections) + "\n</startup_context>";
     }
 }

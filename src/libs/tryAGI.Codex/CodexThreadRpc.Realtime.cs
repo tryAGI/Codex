@@ -36,6 +36,27 @@ public sealed partial class CodexThreadRpc
             throw new InvalidOperationException("Native realtime transport factory is already installed.");
     }
 
+    /// <summary>Install the native transport and an explicit owner-scoped startup context provider.
+    /// The provider is never called when includeStartupContext is false.</summary>
+    public void EnableRealtime(Func<CodexNativeRealtimeStart, CancellationToken, Task<CodexNativeRealtimeBinding>> factory,
+        Func<CodexThreadDocument, CancellationToken, Task<CodexRealtimeStartupMetadata?>> startupContextProvider)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(startupContextProvider);
+        EnableRealtime(async (request, ct) =>
+        {
+            if (StartupContextEnabled(request.Parameters))
+            {
+                var metadata = await startupContextProvider(request.Thread, ct).ConfigureAwait(false);
+                if (metadata is not null) request = RealtimeStart(request.Thread, request.Parameters, metadata);
+            }
+            return await factory(request, ct).ConfigureAwait(false);
+        });
+    }
+
+    private static bool StartupContextEnabled(JsonElement p) => !p.TryGetProperty("includeStartupContext", out var include) ||
+        include.ValueKind == JsonValueKind.Null || Flag(p, "includeStartupContext");
+
     private static JsonElement ListRealtimeVoices(JsonElement p)
     {
         ValidateFields(p, []);
@@ -48,7 +69,7 @@ public sealed partial class CodexThreadRpc
         } });
     }
 
-    private static CodexNativeRealtimeStart RealtimeStart(CodexThreadDocument thread, JsonElement p)
+    internal static CodexNativeRealtimeStart RealtimeStart(CodexThreadDocument thread, JsonElement p, CodexRealtimeStartupMetadata? metadata = null)
     {
         ValidateFields(p, ["threadId", "outputModality", "version", "model", "voice", "transport", "prompt",
             "initialItems", "includeStartupContext", "realtimeSessionId", "voiceSessionId", "delegationAckFiller",
@@ -96,13 +117,12 @@ public sealed partial class CodexThreadRpc
         foreach (var field in new[] { "realtimeStartInstructions", "realtimeEndInstructions" })
             CodexRealtimeSessionOptions.ValidateModeInstructions(Text(p, field));
         _ = Flag(p, "flushTranscriptTailOnSessionEnd");
-        var include = !p.TryGetProperty("includeStartupContext", out var includeValue) ||
-            includeValue.ValueKind == JsonValueKind.Null || Flag(p, "includeStartupContext");
+        var include = StartupContextEnabled(p);
         var prompt = Text(p, "prompt") ?? "";
         if (include)
         {
             var context = CodexRealtimeStartupContext.Build(CodexRealtimeStartupContext.ConversationMessages(
-                thread.Turns.SelectMany(turn => turn.Input.Concat(turn.Output))));
+                thread.Turns.SelectMany(turn => turn.Input.Concat(turn.Output))), metadata?.RecentWork, metadata?.Workspace);
             if (context is not null) prompt = prompt.Length == 0 ? context : prompt + "\n\n" + context;
         }
         bool? filler = p.TryGetProperty("delegationAckFiller", out var f) && f.ValueKind != JsonValueKind.Null
