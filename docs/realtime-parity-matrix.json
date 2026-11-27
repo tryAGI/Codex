@@ -18271,11 +18271,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
+      "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
       "evidence": null,
-      "rationale": "Image-only charge candidate."
+      "rationale": "Exact pinned line 1400 image-only inline plus newest with legacy image-budget disabled at two tokens: one minimum token charged to image-only item, older dropped. All theory cases required."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_drops_image_only_messages_after_budget_is_spent",
@@ -18291,11 +18291,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
+      "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
       "evidence": null,
-      "rationale": "Image-only exhaustion and no backfill candidate."
+      "rationale": "Pinned line 1428 image-only boundary with one-token budget leaves newest only; C# includes an additional older item which is also excluded. All theory cases required."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_keeps_newest_messages_first",
@@ -18311,11 +18311,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
+      "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation",
       "evidence": null,
-      "rationale": "Newest-first selection and UTF8 middle truncation candidate."
+      "rationale": "Exact Rust line 1244 fixture: old-old/middle1234/new at 3 tokens, exact UTF-8 truncation marker, newest and unknown content kind preserved."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_preserves_images_and_truncates_later_text_parts",
@@ -18391,11 +18391,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRetainedMediaTests.cs::RustParityRetainedMediaTests.FileAudioCutoffDropsAllEarlierUnchargedMediaInBothModes",
       "evidence": null,
-      "rationale": "Remote compaction media budget: file_audio_cutoff_does_not_backfill_older_uncharged_media. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+      "rationale": "Pinned lines 182–226: both image-budget modes preserve only trailing after text; no earlier inline audio/image can backfill across unaffordable file audio. Synthetic image label used; exact retained semantic content asserted."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:file_audio_is_charged_and_atomic_in_both_image_budget_modes",
@@ -18411,11 +18411,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRetainedMediaTests.cs::RustParityRetainedMediaTests.FileAudioBoundaryPreservesExactAnnotatedSuffixInBothBudgetModes",
       "evidence": null,
-      "rationale": "Remote compaction media budget: file_audio_is_charged_and_atomic_in_both_image_budget_modes. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+      "rationale": "Pinned lines 98–179: unknown file audio reserves upstream maximum; three adjacent boundaries, both modes, exact retained suffix, exact kinds sidecar, immutable input."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:image_only_boundary_is_atomic_and_does_not_backfill_older_messages",
@@ -18431,11 +18431,11 @@
         "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
+      "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
-      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRetainedMediaTests.cs::RustParityRetainedMediaTests.InlineAndOriginalFileImagesAreAtomicWithoutOlderBackfill",
       "evidence": null,
-      "rationale": "Atomic image-only boundary candidate."
+      "rationale": "Pinned lines 71–95: inline resized and original file image, charge mode enabled; exact retained image/newest at cost+1 and newest only at cost or 1. Both media kinds tested."
     },
     {
       "id": "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:image_treatment_preserves_client_developer_boundary_behavior",
