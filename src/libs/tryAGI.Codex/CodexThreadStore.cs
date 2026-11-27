@@ -203,7 +203,7 @@ public sealed partial class CodexThreadStore
         var now = time.GetUtcNow();
         return await PublishAsync(null, source with { Id = destinationId, Revision = 1, CreatedAt = now, UpdatedAt = now,
             ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected, RealtimeSessions = null,
-            InheritedRealtimeCarryover = ForkRealtimeCarryover(source, count, cutoff is null),
+            InheritedRealtimeCarryover = ForkRealtimeCarryover(source, count, cutoff is null), CompactionCheckpoint = null,
             Settings = effectiveSettings?.Clone() ?? source.Settings }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -217,7 +217,7 @@ public sealed partial class CodexThreadStore
         Func<CodexThreadDocument, CodexThreadDocument> update, CancellationToken ct)
     {
         var before = await CurrentAsync(threadId, revision, ct).ConfigureAwait(false);
-        return await PublishAsync(before.Revision, update(before) with { Revision = checked(before.Revision + 1),
+        return await PublishAsync(before.Revision, InvalidateChangedCompactionPrefix(update(before)) with { Revision = checked(before.Revision + 1),
             UpdatedAt = time.GetUtcNow() }, ct).ConfigureAwait(false);
     }
     private Task<CodexThreadDocument> ChangeTurnAsync(Guid threadId, long revision, Guid turnId, string ownerId,
@@ -307,6 +307,7 @@ public sealed partial class CodexThreadStore
                     throw new InvalidDataException("Native dispatch history is invalid.");
             }
         }
+        if (value.CompactionCheckpoint is { } checkpoint) CodexThreadCompaction.Validate(value, checkpoint);
         return value;
     }
     private static JsonElement[] Items(IReadOnlyList<JsonElement> items)

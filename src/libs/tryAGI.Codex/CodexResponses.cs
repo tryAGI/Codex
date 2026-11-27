@@ -40,6 +40,8 @@ public sealed record CodexResponseOptions(string Model, string Instructions)
     public CodexResponsesWebSocketSession? WebSocketSession { get; init; }
     /// <summary>Prime a new WebSocket using a non-generating response.create before inference.</summary>
     public bool PrewarmWebSocket { get; init; }
+    /// <summary>Opt-in automatic compaction at a native thread's closed-turn boundary.</summary>
+    public CodexThreadCompactionOptions? AutomaticCompaction { get; init; }
 }
 /// <summary>One server-sent event of a Responses stream.</summary>
 /// <param name="Type">Event type, for example <c>response.output_text.delta</c>.</param>

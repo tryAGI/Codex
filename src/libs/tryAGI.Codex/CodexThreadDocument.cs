@@ -45,6 +45,9 @@ public sealed record CodexThreadDocument(
 
     /// <summary>Saved model history inherited by a fork without inheriting live call ownership.</summary>
     public CodexStoredRealtimeCarryover[]? InheritedRealtimeCarryover { get; init; }
+
+    /// <summary>Optional CAS-installed model-context projection; original turns remain authoritative.</summary>
+    public CodexStoredCompactionCheckpoint? CompactionCheckpoint { get; init; }
 }
 
 /// <summary>One stored turn.</summary>
