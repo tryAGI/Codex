@@ -11,6 +11,7 @@ public sealed class RealtimeResponseLifecycleTests
     {
         private readonly Queue<string> messages = new(incoming);
         public List<JsonElement> Sent { get; } = [];
+        public Func<CancellationToken, Task>? AfterFirstSend { get; init; }
         public int Creates => Sent.Count(x => x.GetProperty("type").GetString() == "response.create");
         public override WebSocketCloseStatus? CloseStatus => WebSocketCloseStatus.NormalClosure;
         public override string? CloseStatusDescription => null;
@@ -33,11 +34,80 @@ public sealed class RealtimeResponseLifecycleTests
             ct.ThrowIfCancellationRequested();
             using var document = JsonDocument.Parse(buffer.AsMemory());
             Sent.Add(document.RootElement.Clone());
-            return Task.CompletedTask;
+            return Sent.Count == 1 && AfterFirstSend is { } after ? after(ct) : Task.CompletedTask;
         }
     }
 
     private static JsonObject Create() => new() { ["type"] = "response.create" };
+
+    [Theory]
+    [InlineData("speakable", false)]
+    [InlineData("commentary", false)]
+    [InlineData("speakable", true)]
+    [InlineData("commentary", true)]
+    public async Task RevokingFencedMultipartFeedbackStopsEveryRemainingFrame(string channel, bool reasoning)
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var socket = new Socket
+        {
+            AfterFirstSend = async ct =>
+            {
+                started.SetResult();
+                await release.Task.WaitAsync(ct);
+            },
+        };
+        await using var connection = new CodexRealtimeConnection(socket, 8192, "v3");
+        var ct = TestContext.Current.CancellationToken;
+        var admission = connection.CaptureFeedbackAdmission();
+        var text = new string('x', 1400);
+        var send = reasoning
+            ? connection.SendReasoningFeedbackAsync(admission, CodexRealtimeFeedbackKind.Progress, text, "handoff", channel, null, ct)
+            : connection.AppendFencedContextAsync(admission, text, "handoff", channel, ct);
+        try
+        {
+            await started.Task.WaitAsync(ct);
+            connection.InvalidatePendingFeedback();
+        }
+        finally { release.TrySetResult(); }
+        Assert.False(await send);
+        var first = Assert.Single(socket.Sent);
+        Assert.Equal(channel, first.GetProperty("channel").GetString());
+        Assert.False(connection.IsFeedbackAdmissionCurrent(admission));
+        Assert.True(await connection.AppendFencedContextAsync(connection.CaptureFeedbackAdmission(), "new turn", channel: channel, cancellationToken: ct));
+        Assert.Equal(2, socket.Sent.Count);
+    }
+
+    [Fact]
+    public async Task FencedReceiptRejectedBeforeDispatchCanBeRetriedByCurrentGeneration()
+    {
+        var socket = new Socket();
+        await using var connection = new CodexRealtimeConnection(socket, 1024, "v2");
+        var ct = TestContext.Current.CancellationToken;
+        var admission = connection.CaptureFeedbackAdmission();
+        await Assert.ThrowsAsync<CodexProtocolException>(() =>
+            connection.AppendFencedContextAsync(admission, new string('x', 2048), "call", "commentary", ct));
+        Assert.Empty(socket.Sent);
+        connection.InvalidatePendingFeedback();
+        Assert.True(await connection.AppendFencedContextAsync(connection.CaptureFeedbackAdmission(), "valid", "call", "commentary", ct));
+        var message = Assert.Single(socket.Sent);
+        Assert.Equal("function_call_output", message.GetProperty("item").GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public async Task AmbiguousFencedReceiptIsNeverResent()
+    {
+        var socket = new Socket { AfterFirstSend = _ => Task.FromException(new WebSocketException("ambiguous")) };
+        await using var connection = new CodexRealtimeConnection(socket, 8192, "v2");
+        var ct = TestContext.Current.CancellationToken;
+        var admission = connection.CaptureFeedbackAdmission();
+        await Assert.ThrowsAsync<WebSocketException>(() =>
+            connection.SendReasoningFeedbackAsync(admission, CodexRealtimeFeedbackKind.Complete, "done", "call", "speakable", null, ct));
+        connection.InvalidatePendingFeedback();
+        Assert.False(await connection.SendReasoningFeedbackAsync(connection.CaptureFeedbackAdmission(),
+            CodexRealtimeFeedbackKind.Complete, "done", "call", "speakable", null, ct));
+        Assert.Single(socket.Sent);
+    }
 
     [Theory]
     [InlineData("Conversation already has an active response in progress: response_older", true)]

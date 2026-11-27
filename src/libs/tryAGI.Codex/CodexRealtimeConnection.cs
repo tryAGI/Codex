@@ -296,9 +296,10 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                 if (delegationId is not null && retiredFunctions.Contains(delegationId)) return false;
                 if (toolOutputs.Count >= 4096 && delegationId is not null && !toolOutputs.Contains(delegationId))
                     throw new CodexProtocolException("GA tool receipt bound exceeded; rotate the connection.");
-                var output = delegationId is not null && toolOutputs.Add(delegationId);
-                await SendUnderGateAsync(output ? CodexRealtimeGaProtocol.FunctionOutput((delegationId ?? throw new InvalidDataException("Required data was null.")), text)
-                    : CodexRealtimeGaProtocol.Message("developer", channel == "commentary" ? "Background context, not a request to speak: " + text : text), linked.Token).ConfigureAwait(false);
+                var output = delegationId is not null && !toolOutputs.Contains(delegationId);
+                if (!await SendUnderGateAsync(output ? CodexRealtimeGaProtocol.FunctionOutput((delegationId ?? throw new InvalidDataException("Required data was null.")), text)
+                    : CodexRealtimeGaProtocol.Message("developer", channel == "commentary" ? "Background context, not a request to speak: " + text : text),
+                    linked.Token, requestedAdmission, rejectStale, output ? delegationId : null).ConfigureAwait(false)) return false;
                 if (channel == "speakable") await RequestResponseUnderGateAsync(linked.Token, requestedAdmission, responseRequestId).ConfigureAwait(false);
             }
             else if (protocol == "v1")
@@ -306,10 +307,10 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                 if (!requestedAdmission.Allowed || !ReferenceEquals(requestedAdmission, Volatile.Read(ref responseAdmission))) return false;
                 var legacy = delegationId is null ? CodexRealtimeGaProtocol.Message("developer", text, preserveDeveloperRole: true)
                     : new JsonObject { ["type"] = "conversation.handoff.append", ["handoff_id"] = delegationId, ["output_text"] = text };
-                if (!await SendUnderGateAsync(legacy, linked.Token, requestedAdmission).ConfigureAwait(false)) return false;
+                if (!await SendUnderGateAsync(legacy, linked.Token, requestedAdmission, rejectStale).ConfigureAwait(false)) return false;
             }
             else foreach (var item in CodexRealtimeProtocol.Context(text, delegationId, channel))
-                await SendUnderGateAsync(item, linked.Token, requestedAdmission).ConfigureAwait(false);
+                if (!await SendUnderGateAsync(item, linked.Token, requestedAdmission, rejectStale).ConfigureAwait(false)) return false;
             return !rejectStale || ReferenceEquals(requestedAdmission, Volatile.Read(ref responseAdmission));
         }
         finally { writeGate.Release(); }
@@ -330,16 +331,14 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
             {
                 if (toolOutputs.Contains(id)) return false;
                 if (toolOutputs.Count >= 4096) throw new CodexProtocolException("GA tool receipt bound exceeded; rotate the connection.");
-                // Claim before transport I/O: an uncertain write must never be automatically repeated.
-                toolOutputs.Add(id);
             }
             foreach (var message in messages)
             {
-                if (!IsFeedbackAdmissionCurrent(admission)) return false;
-                if (!await SendUnderGateAsync(message, linked.Token, requested).ConfigureAwait(false)) return false;
+                if (!await SendUnderGateAsync(message, linked.Token, requested, rejectStale: true,
+                    claimToolOutputId: receipt ? id : null).ConfigureAwait(false)) return false;
             }
             if (create) await RequestResponseUnderGateAsync(linked.Token, requested).ConfigureAwait(false);
-            return true;
+            return IsFeedbackAdmissionCurrent(admission);
         }
         finally { writeGate.Release(); }
     }
@@ -647,7 +646,8 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         }
         finally { writeGate.Release(); }
     }
-    private async Task<bool> SendUnderGateAsync(JsonObject message, CancellationToken ct, ResponseAdmission? requestedAdmission = null)
+    private async Task<bool> SendUnderGateAsync(JsonObject message, CancellationToken ct, ResponseAdmission? requestedAdmission = null,
+        bool rejectStale = false, string? claimToolOutputId = null)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
         if (protocol == "v2" && message["item"] is JsonObject output && output["type"]?.GetValue<string>() == "function_call_output" &&
@@ -657,7 +657,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         // Prepare both legal wire forms before the admission lock. Sleep must never wait
         // for serialization or a network write, including when a multipart append is active.
         byte[]? quietBytes = null;
-        if (protocol != "v2" && message["type"]?.GetValue<string>() is "session.context.append" or "delegation.context.append" &&
+        if (!rejectStale && protocol != "v2" && message["type"]?.GetValue<string>() is "session.context.append" or "delegation.context.append" &&
             message["channel"]?.GetValue<string>() != "commentary")
         {
             var quiet = (JsonObject)message.DeepClone();
@@ -666,7 +666,18 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         }
         // No replay on failure: delivery can be uncertain after a network interruption.
         ValueTask write;
-        if (quietBytes is not null)
+        if (rejectStale)
+        {
+            // Linearize every fenced frame against generation invalidation, not just speech requests.
+            // Once a write starts, delivery is ambiguous until the provider acknowledges it.
+            lock (responseAdmissionGate)
+            {
+                if (requestedAdmission is null || !responseAdmission.Allowed ||
+                    !ReferenceEquals(responseAdmission, requestedAdmission)) return false;
+                write = StartWrite(bytes);
+            }
+        }
+        else if (quietBytes is not null)
         {
             lock (responseAdmissionGate)
             {
@@ -687,7 +698,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                 write = socket.SendAsync(bytes.AsMemory(), WebSocketMessageType.Text, true, ct);
             }
         }
-        else write = socket.SendAsync(bytes.AsMemory(), WebSocketMessageType.Text, true, ct);
+        else write = StartWrite(bytes);
         await write.ConfigureAwait(false);
         if (protocol == "v2" && message["item"] is JsonObject item && item["type"]?.GetValue<string>() == "function_call_output" &&
             item["call_id"]?.GetValue<string>() is { } callId)
@@ -696,6 +707,15 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
             await FlushPendingResponseUnderGateAsync(ct).ConfigureAwait(false);
         }
         return true;
+
+        ValueTask StartWrite(byte[] frame)
+        {
+            ct.ThrowIfCancellationRequested();
+            // Claim only at dispatch, retaining the receipt even if the transport throws.
+            // A rejected generation or an oversized frame has not consumed the receipt.
+            if (claimToolOutputId is not null) toolOutputs.Add(claimToolOutputId);
+            return socket.SendAsync(frame.AsMemory(), WebSocketMessageType.Text, true, ct);
+        }
     }
 
     /// <inheritdoc />
