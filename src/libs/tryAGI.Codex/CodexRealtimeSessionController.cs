@@ -205,7 +205,8 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
 
     /// <summary>Recover a fenced session and optionally reconnect it. An attached session
     /// left by a dead owner can be fenced only by supplying its exact lost attachment ID,
-    /// after the host proves the old transport is gone. Never steals a live attachment.</summary>
+    /// after the host proves the old transport is gone. An admitted end remains owned by its
+    /// original operation until authoritative closure is verified. Never steals a live attachment.</summary>
     public async Task<CodexRealtimeLifecycleStatus> RecoverAsync(
         Func<CodexRealtimeRecoveryContext, CancellationToken, Task<CodexRealtimeRecoveryDecision>> reconcile,
         bool reconnect = true, Guid? provenLostAttachmentId = null, CancellationToken cancellationToken = default)
@@ -233,19 +234,20 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                 }
                 if (session.State == "detached")
                     return reconnect ? await AttachCoreAsync(ct).ConfigureAwait(false) : CodexRealtimeLifecycleStatus.Detached;
-                if (session.State == "ending")
-                {
-                    if (!await FenceAsync(null, ct).ConfigureAwait(false)) return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
-                    thread = await store.ReadAsync(threadId, ct).ConfigureAwait(false);
-                    session = Session(thread);
-                }
-                if (session.State != "recoveryRequired") return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+                if (session.State is not ("recoveryRequired" or "ending"))
+                    return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+                var generation = session.UsedAttachmentIds?.LastOrDefault();
+                var endOperation = session.EndOperationId;
                 if (Volatile.Read(ref pending) is { } retained)
                 {
+                    if (session.State != "recoveryRequired") return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
                     await PersistAsync(retained, true, ct).ConfigureAwait(false);
                     Interlocked.CompareExchange(ref pending, null, retained);
                     thread = await store.ReadAsync(threadId, ct).ConfigureAwait(false);
                     session = Session(thread);
+                    if (session.State != "recoveryRequired" || session.UsedAttachmentIds?.LastOrDefault() != generation ||
+                        session.EndOperationId != endOperation)
+                        return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
                 }
                 _ = CodexThreadStore.RecoverRealtimeHistory(session);
                 for (var number = 0; number < policy.MaximumAttempts; number++)
@@ -259,12 +261,19 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                     }
                     if (decision is not (CodexRealtimeRecoveryDecision.Open or CodexRealtimeRecoveryDecision.Ended))
                         return RecoveryStatus(decision);
-                    if (directConnect is not null && decision == CodexRealtimeRecoveryDecision.Open)
+                    if (decision == CodexRealtimeRecoveryDecision.Open &&
+                        (directConnect is not null || endOperation is not null || session.State == "ending"))
                         return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
                     try
                     {
-                        thread = await store.ConfirmRealtimeHistoryRecoveryAsync(threadId, thread.Revision,
-                            sessionId, ownerId, decision == CodexRealtimeRecoveryDecision.Ended, ct).ConfigureAwait(false);
+                        // A different controller may still be performing the admitted end.
+                        // Do not fence it merely to probe status. Proof of closure lets us
+                        // complete the same durable intent without redispatching any effect.
+                        thread = session.State == "ending" && endOperation is { } operation
+                            ? await store.CompleteRealtimeEndAsync(threadId, thread.Revision,
+                                sessionId, ownerId, operation, ct).ConfigureAwait(false)
+                            : await store.ConfirmRealtimeHistoryRecoveryAsync(threadId, thread.Revision,
+                                sessionId, ownerId, decision == CodexRealtimeRecoveryDecision.Ended, ct).ConfigureAwait(false);
                     }
                     catch (CodexThreadConflictException)
                     {
@@ -272,7 +281,11 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                         // history again rather than accepting a different journal blindly.
                         thread = await store.ReadAsync(threadId, ct).ConfigureAwait(false);
                         session = Session(thread);
-                        if (session.State != "recoveryRequired") return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+                        if (session.UsedAttachmentIds?.LastOrDefault() != generation || session.EndOperationId != endOperation)
+                            return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+                        if (session.State == "ended") return CodexRealtimeLifecycleStatus.Ended;
+                        if (session.State is not ("recoveryRequired" or "ending"))
+                            return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
                         continue;
                     }
                     if (decision == CodexRealtimeRecoveryDecision.Ended) return CodexRealtimeLifecycleStatus.Ended;

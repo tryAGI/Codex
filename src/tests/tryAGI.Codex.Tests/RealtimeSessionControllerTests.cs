@@ -329,6 +329,78 @@ public sealed class RealtimeSessionControllerTests
     }
 
     [Fact]
+    public async Task RecoveryCannotFenceAnEndInProgressOnAnotherController()
+    {
+        var (_, store, thread) = await Detached();
+        using var factory = new Factory();
+        await using var closing = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        await using var recovering = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await closing.AttachAsync(Ct));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var effects = 0;
+        var operation = Guid.NewGuid();
+        var end = closing.EndAsync(operation, async (_, ct) =>
+        {
+            effects++;
+            entered.TrySetResult();
+            await release.Task.WaitAsync(ct);
+        }, Ct);
+        try
+        {
+            await entered.Task.WaitAsync(Ct);
+            var before = await store.ReadAsync(thread.Id, Ct);
+            foreach (var decision in new[] { CodexRealtimeRecoveryDecision.Unknown, CodexRealtimeRecoveryDecision.Open })
+            {
+                Assert.Equal(CodexRealtimeLifecycleStatus.HistoryRecoveryRequired,
+                    await recovering.RecoverAsync((context, _) =>
+                    {
+                        Assert.Equal("ending", context.Session.State);
+                        Assert.Equal(operation, context.Session.EndOperationId);
+                        return Task.FromResult(decision);
+                    }, cancellationToken: Ct));
+                var after = await store.ReadAsync(thread.Id, Ct);
+                Assert.Equal(before.Revision, after.Revision);
+                Assert.Equal("ending", RealtimeHistoryTests.Session(after).State);
+            }
+            Assert.Single(factory.Requests);
+        }
+        finally { release.TrySetResult(); }
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await end);
+        Assert.Equal(1, effects);
+    }
+
+    [Fact]
+    public async Task RecoveryCompletesExactPersistedEndWithoutReplayingAnEffect()
+    {
+        var (storage, store, thread) = await Detached();
+        var operation = Guid.NewGuid();
+        var admission = await store.BeginRealtimeEndAsync(thread.Id, thread.Revision, "session", "owner", null, operation, Ct);
+        Assert.True(admission.Admitted);
+        using var factory = new Factory();
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        storage.CompetingWriteOnce = (old, proposed) =>
+        {
+            var previous = store.ValidateSnapshot(old);
+            var next = store.ValidateSnapshot(proposed);
+            return CodexThreadStore.Encode(previous with { Revision = next.Revision, UpdatedAt = next.UpdatedAt });
+        };
+        var probes = 0;
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await controller.RecoverAsync((context, _) =>
+        {
+            probes++;
+            Assert.Equal("ending", context.Session.State);
+            Assert.Equal(operation, context.Session.EndOperationId);
+            return Task.FromResult(CodexRealtimeRecoveryDecision.Ended);
+        }, cancellationToken: Ct));
+        Assert.Equal(2, probes);
+        var session = RealtimeHistoryTests.Session(await store.ReadAsync(thread.Id, Ct));
+        Assert.Equal("ended", session.State);
+        Assert.Equal(operation, session.EndOperationId);
+        Assert.Empty(factory.Requests);
+    }
+
+    [Fact]
     public async Task EndOfDrainedAttachmentPreservesPendingHandoffAndReconcilesLostCompletionReceipt()
     {
         var (storage, store, thread) = await Detached();
