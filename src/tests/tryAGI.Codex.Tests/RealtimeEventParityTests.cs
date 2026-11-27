@@ -253,13 +253,54 @@ public sealed class RealtimeEventParityTests
     [InlineData("v1", """{"type":"response.output_text.done","text":"unexpected"}""")]
     [InlineData("v2", """{"type":"conversation.input_transcript.delta","delta":"unexpected"}""")]
     [InlineData("v3", """{"type":"response.output_text.delta","delta":"unexpected"}""")]
-    public void OtherAdapterAudioAndTranscriptEventsRemainRaw(string protocol, string json)
+    [InlineData("v1", """{"type":"session.started","session":{"id":"unexpected"}}""")]
+    [InlineData("v2", """{"type":"session.started","session":{"id":"unexpected"}}""")]
+    [InlineData("v1", """{"type":"session.created","session":{"id":"unexpected"}}""")]
+    [InlineData("v3", """{"type":"session.created","session":{"id":"unexpected"}}""")]
+    [InlineData("v1", """{"type":"conversation.item.created","item":{"id":"unexpected"}}""")]
+    [InlineData("v3", """{"type":"conversation.item.created","item":{"id":"unexpected"}}""")]
+    [InlineData("v3", """{"type":"conversation.item.added","item":{"id":"unexpected"}}""")]
+    [InlineData("v3", """{"type":"conversation.item.done","item":{"id":"unexpected"}}""")]
+    [InlineData("v1", """{"type":"input_audio_buffer.speech_started","item_id":"unexpected"}""")]
+    [InlineData("v3", """{"type":"input_audio_buffer.speech_started","item_id":"unexpected"}""")]
+    [InlineData("v1", """{"type":"response.created","response":{"id":"unexpected"}}""")]
+    [InlineData("v1", """{"type":"response.cancelled","response":{"id":"unexpected"}}""")]
+    [InlineData("v1", """{"type":"response.done","response":{"id":"unexpected"}}""")]
+    [InlineData("v3", """{"type":"response.created","response":{"id":"unexpected"}}""")]
+    [InlineData("v3", """{"type":"response.cancelled","response":{"id":"unexpected"}}""")]
+    [InlineData("v3", """{"type":"response.done","response":{"id":"unexpected"}}""")]
+    [InlineData("v1", """{"type":"turn.done","turn":{"role":"user","transcript":"unexpected"}}""")]
+    [InlineData("v2", """{"type":"turn.done","turn":{"role":"user","transcript":"unexpected"}}""")]
+    public void OtherAdapterTypedEventsRemainRaw(string protocol, string json)
     {
         var value = Event(protocol, json);
         Assert.False(value.RecognizedByRust);
         Assert.Null(value.Audio);
         Assert.Null(value.Transcript);
+        Assert.Null(value.Session);
+        Assert.Null(value.ConversationItem);
+        Assert.Null(value.SpeechStarted);
+        Assert.Null(value.Response);
+        Assert.Null(value.Turn);
         Assert.Equal(json, value.Payload.GetRawText());
+    }
+
+    [Fact]
+    public void GaSessionCreatedRemainsAnExplicitCompatibilityExtension()
+    {
+        var value = Event("v2", """{"type":"session.created","session":{"id":"s","model":"m"}}""");
+        Assert.False(value.RecognizedByRust);
+        Assert.Equal(new CodexRealtimeSessionReceipt("s", null, "m"), value.Session);
+    }
+
+    [Fact]
+    public void UnboundEventsCanStillBeInspectedAcrossAdapters()
+    {
+        var value = Event("v3", """{"type":"response.created","response":{"id":"r"}}""") with { Protocol = null };
+        Assert.True(value.RecognizedByRust);
+        Assert.Equal("r", value.Response?.ResponseId);
+        var session = Event("v1", """{"type":"session.created","session":{"id":"s"}}""") with { Protocol = null };
+        Assert.Equal("s", session.Session?.Id);
     }
 
     [Theory]

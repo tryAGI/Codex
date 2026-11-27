@@ -125,20 +125,23 @@ public sealed record CodexRealtimeEvent(string Type, JsonElement Payload, double
         ? CodexRealtimeEventProjections.Recognized(protocol, Type)
         : new[] { "v1", "v2", "v3" }.Any(p => CodexRealtimeEventProjections.Recognized(p, Type));
 
-    /// <summary>Session identity and optional configuration receipt.</summary>
-    public CodexRealtimeSessionReceipt? Session => CodexRealtimeEventProjections.Session(Payload);
+    private bool AllowsProjection => Protocol is null || RecognizedByRust;
+
+    /// <summary>Session identity and optional configuration receipt. V2 session.created is a GA compatibility extension.</summary>
+    public CodexRealtimeSessionReceipt? Session => AllowsProjection || Protocol == "v2" && Type == "session.created"
+        ? CodexRealtimeEventProjections.Session(Payload) : null;
     /// <summary>Explicit background-agent handoff, including its conversation item ID.</summary>
     public CodexRealtimeHandoff? Handoff => CodexRealtimeEventProjections.Handoff(Payload, Protocol);
     /// <summary>Explicit remain-silent function, separate from delegation.</summary>
     public CodexRealtimeNoop? Noop => CodexRealtimeEventProjections.Noop(Payload, Protocol);
     /// <summary>Conversation item added or done, with original item JSON.</summary>
-    public CodexRealtimeConversationItem? ConversationItem => CodexRealtimeEventProjections.ConversationItem(Payload);
+    public CodexRealtimeConversationItem? ConversationItem => AllowsProjection ? CodexRealtimeEventProjections.ConversationItem(Payload) : null;
     /// <summary>Speech-started event, if reported.</summary>
-    public CodexRealtimeSpeechStarted? SpeechStarted => CodexRealtimeEventProjections.SpeechStarted(Payload);
+    public CodexRealtimeSpeechStarted? SpeechStarted => AllowsProjection ? CodexRealtimeEventProjections.SpeechStarted(Payload) : null;
     /// <summary>Response creation or terminal receipt, if reported.</summary>
-    public CodexRealtimeResponseReceipt? Response => CodexRealtimeEventProjections.Response(Payload);
+    public CodexRealtimeResponseReceipt? Response => AllowsProjection ? CodexRealtimeEventProjections.Response(Payload) : null;
     /// <summary>Completed frameless turn, if reported.</summary>
-    public CodexRealtimeTurn? Turn => CodexRealtimeEventProjections.Turn(Payload);
+    public CodexRealtimeTurn? Turn => AllowsProjection ? CodexRealtimeEventProjections.Turn(Payload) : null;
 
     /// <summary>The delegation carried by this event, if any. Arbitrary function calls are not delegations.</summary>
     public CodexDelegation? Delegation => Handoff is { } handoff
