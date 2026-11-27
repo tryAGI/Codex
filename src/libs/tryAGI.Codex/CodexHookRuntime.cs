@@ -40,9 +40,9 @@ public sealed record CodexHookOutcome(bool Blocked, bool StopRequested, bool Req
 
 /// <summary>Host-executed synchronous hook lifecycle. No process, MCP request or agent
 /// is executed by this class. Every invocation is authorized separately; any tool input
-/// rewrite must be re-admitted by the ordinary host policy. Async scheduling is explicit
-/// and not implemented by this synchronous runtime.</summary>
-public sealed class CodexHookRuntime
+/// rewrite must be re-admitted by the ordinary host policy. Async scheduling requires an
+/// explicitly owned CodexAsyncHookQueue and never contributes control decisions.</summary>
+public sealed partial class CodexHookRuntime
 {
     private static readonly HashSet<string> Events = new(StringComparer.Ordinal)
     {
@@ -99,9 +99,11 @@ public sealed class CodexHookRuntime
         var contexts = new List<string>();
         var runs = new List<JsonElement>();
         var protectedAction = context.EventName is "PreToolUse" or "PermissionRequest";
+        ScheduleAsyncHooks(context, selected, original, runs, cancellationToken);
 
         foreach (var definition in selected)
         {
+            if (asyncQueue is not null && definition.ExecutionMode == "async") continue;
             cancellationToken.ThrowIfCancellationRequested();
             var runId = $"{context.EventId}:{definition.Id}";
             var invocation = new CodexHookInvocation(context, definition, runId, current);
