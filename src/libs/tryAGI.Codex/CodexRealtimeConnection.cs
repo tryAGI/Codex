@@ -200,7 +200,8 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         {
             var result = await socket.ReceiveAsync(buffer, ct).ConfigureAwait(false);
             if (result.MessageType == WebSocketMessageType.Close)
-                Volatile.Write(ref closure, new("remote_close", socket.CloseStatus is { } code ? (int)code : null, null));
+                Volatile.Write(ref closure, new(socket is CodexAttachmentChannelSocket { LocalInputDrained: true }
+                    ? "local_drain" : "remote_close", socket.CloseStatus is { } code ? (int)code : null, null));
             return result;
         }
         catch (OperationCanceledException)
@@ -371,6 +372,15 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         }
         finally { writeGate.Release(); }
     }
+
+    internal bool TryBeginCallerInputDrain()
+    {
+        if (socket is not CodexAttachmentChannelSocket channel) return false;
+        channel.RequestInputDrain();
+        return true;
+    }
+
+    internal bool CallerInputDrained => socket is CodexAttachmentChannelSocket { InputDrained: true };
 
     /// <summary>Detaches this connection with a normal WebSocket close and no <c>session.close</c>,
     /// so a frontend-owned (WebRTC) call keeps running. Dispose the connection afterwards.</summary>

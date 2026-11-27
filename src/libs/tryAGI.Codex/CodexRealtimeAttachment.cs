@@ -264,6 +264,9 @@ internal sealed class CodexAttachmentChannelSocket(CodexRealtimeAttachmentStream
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly CancellationTokenSource lifetime = new();
     private readonly CancellationTokenSource failedOutput = new();
+    private readonly CancellationTokenSource inputDrain = new();
+    private int inputDrained;
+    private int localInputDrained;
     private byte[]? current;
     private int offset;
     private int state = (int)WebSocketState.Open;
@@ -273,6 +276,12 @@ internal sealed class CodexAttachmentChannelSocket(CodexRealtimeAttachmentStream
     public override string? CloseStatusDescription => null;
     public override WebSocketState State => (WebSocketState)Volatile.Read(ref state);
     public override string? SubProtocol => null;
+
+    // Drain queued messages without closing host channels or waiting for new input.
+    // The host must stop publishing for a definitive cutoff; later writes remain in its channel.
+    internal void RequestInputDrain() => inputDrain.Cancel();
+    internal bool InputDrained => Volatile.Read(ref inputDrained) != 0;
+    internal bool LocalInputDrained => Volatile.Read(ref localInputDrained) != 0;
 
     public override void Abort()
     {
@@ -306,12 +315,15 @@ internal sealed class CodexAttachmentChannelSocket(CodexRealtimeAttachmentStream
             if (!stream.Incoming.TryRead(out var value))
             {
                 using var wait = CancellationTokenSource.CreateLinkedTokenSource(
-                    linked.Token, failedOutput.Token, stream.PeerOutputClosed);
+                    linked.Token, failedOutput.Token, stream.PeerOutputClosed, inputDrain.Token);
                 try { value = await stream.Incoming.ReadAsync(wait.Token).ConfigureAwait(false); }
                 catch (OperationCanceledException) when (!linked.IsCancellationRequested &&
-                    (failedOutput.IsCancellationRequested || stream.PeerOutputClosed.IsCancellationRequested))
+                    (failedOutput.IsCancellationRequested || stream.PeerOutputClosed.IsCancellationRequested ||
+                        inputDrain.IsCancellationRequested))
                 {
-                    if (!stream.Incoming.TryRead(out value)) return EndInput();
+                    if (!stream.Incoming.TryRead(out value))
+                        return EndInput(localDrain: inputDrain.IsCancellationRequested &&
+                            !failedOutput.IsCancellationRequested && !stream.PeerOutputClosed.IsCancellationRequested);
                 }
                 catch (ChannelClosedException e) when (e.InnerException is null) { return EndInput(); }
                 catch (ChannelClosedException) { Abort(); throw; }
@@ -348,10 +360,14 @@ internal sealed class CodexAttachmentChannelSocket(CodexRealtimeAttachmentStream
         catch (ChannelClosedException) { failedOutput.Cancel(); throw; }
     }
 
-    private WebSocketReceiveResult EndInput()
+    private WebSocketReceiveResult EndInput(bool localDrain = false)
     {
         Interlocked.CompareExchange(ref state, (int)WebSocketState.CloseReceived, (int)WebSocketState.Open);
-        lifetime.Cancel();
+        if (localDrain) Volatile.Write(ref localInputDrained, 1);
+        Volatile.Write(ref inputDrained, 1);
+        // An explicit drain leaves the output usable for the admitted end callback.
+        // A real peer closure terminates both halves.
+        if (!localDrain) lifetime.Cancel();
         return new(0, WebSocketMessageType.Close, true, WebSocketCloseStatus.NormalClosure, null);
     }
 }

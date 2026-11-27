@@ -104,6 +104,7 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         public CodexRealtimeAttachedCall? Sideband { get; } = sideband;
         public ValueTask DisposeAsync() => Sideband is null ? Connection.DisposeAsync() : Sideband.DisposeAsync();
         public CancellationTokenSource Stop { get; } = new();
+        public CancellationTokenSource ObserverStop { get; } = new();
         public Task<CodexRealtimeLifecycleStatus>? Pump { get; set; }
         public bool StopRequested { get; set; }
     }
@@ -563,6 +564,7 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         Func<CodexRealtimeEvent, CancellationToken, Task>? observer, CancellationToken cancellationToken)
     {
         using var read = CancellationTokenSource.CreateLinkedTokenSource(live.Stop.Token, cancellationToken);
+        using var notify = CancellationTokenSource.CreateLinkedTokenSource(read.Token, live.ObserverStop.Token);
         var result = CodexRealtimeLifecycleStatus.Retryable;
         try
         {
@@ -582,8 +584,14 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                     deliver = await PersistAsync(observation, false, commit.Token).ConfigureAwait(false);
                     Interlocked.CompareExchange(ref pending, null, observation);
                 }
-                if (deliver && observer is not null && !read.IsCancellationRequested)
-                    await observer(item, read.Token).ConfigureAwait(false);
+                if (deliver && observer is not null && !notify.IsCancellationRequested)
+                {
+                    try { await observer(item, notify.Token).ConfigureAwait(false); }
+                    catch (OperationCanceledException) when (live.ObserverStop.IsCancellationRequested && !read.IsCancellationRequested)
+                    {
+                        // Stop dispatching callbacks while still persisting queued input.
+                    }
+                }
             }
         }
         catch (Exception error) when (error is not OutOfMemoryException)
@@ -675,13 +683,29 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
     {
         Task<CodexRealtimeLifecycleStatus>? pump;
         lock (sync) { live.StopRequested = true; pump = live.Pump; }
-        live.Stop.Cancel();
+        var drainCaller = live.Connection.TryBeginCallerInputDrain();
+        if (drainCaller)
+        {
+            // Drain accepted channel events through the existing journal instead of
+            // cancelling the parser. The drain deadline also bounds an unbounded producer.
+            live.ObserverStop.Cancel();
+            lock (sync) pump = live.Pump ??= DrainUnobservedCallerAsync(live);
+        }
+        else live.Stop.Cancel();
         if (pump is not null)
         {
             try { await pump.WaitAsync(policy.DrainTimeout, ct).ConfigureAwait(false); }
             catch (Exception error) when (error is TimeoutException or OperationCanceledException) { return false; }
         }
-        return Volatile.Read(ref pending) is null;
+        return Volatile.Read(ref pending) is null && (!drainCaller || live.Connection.CallerInputDrained);
+    }
+
+    private async Task<CodexRealtimeLifecycleStatus> DrainUnobservedCallerAsync(Live live)
+    {
+        // Even a synchronously completing channel/storage must not run the whole
+        // drain under the controller lock or before the caller can enforce its deadline.
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+        return await PumpCoreAsync(live, null, CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task<bool> LoseAsync(Live live)

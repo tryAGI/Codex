@@ -24,12 +24,13 @@ public sealed class RealtimeSessionControllerTests
         public Channel<string> Incoming { get; private set; } = Channel.CreateUnbounded<string>();
         public Channel<string> Outgoing { get; private set; } = Channel.CreateUnbounded<string>();
         public Func<CodexRealtimeAttachRequest, CancellationToken, Task>? BeforeConnect { get; set; }
+        public int? IncomingCapacity { get; set; }
 
         public async Task<CodexRealtimeAttachedCall> Join(CodexRealtimeAttachRequest request, CancellationToken ct)
         {
             Requests.Add(request);
             if (BeforeConnect is not null) await BeforeConnect(request, ct);
-            Incoming = Channel.CreateUnbounded<string>();
+            Incoming = IncomingCapacity is { } capacity ? Channel.CreateBounded<string>(capacity) : Channel.CreateUnbounded<string>();
             Outgoing = Channel.CreateUnbounded<string>();
             return await client.AttachExistingRealtimeCallAsync(request.CallId,
                 new CodexRealtimeAttachmentStream(Incoming.Reader, Outgoing.Writer), request.Protocol, request.StartBefore, ct);
@@ -86,6 +87,89 @@ public sealed class RealtimeSessionControllerTests
         Assert.Equal("first second", Assert.Single(RealtimeHistoryTests.Session(finished).History!.Frames).Text);
         Assert.Single(CodexThreadStore.RealtimeCarryoverBeforeTurn(finished, 0));
         Assert.Empty(finished.Turns);
+    }
+
+    [Fact]
+    public async Task DetachDrainsAcceptedChannelInputWithoutWaitingForTheProducerOrAnExistingPump()
+    {
+        var (_, store, thread) = await Detached();
+        using var factory = new Factory { IncomingCapacity = 64 };
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join,
+            Policy with { DrainTimeout = TimeSpan.FromSeconds(10) });
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await controller.AttachAsync(Ct));
+        for (var i = 0; i < 63; i++)
+            Assert.True(factory.Incoming.Writer.TryWrite("""{"type":"input_transcript.added","item":{"text":"x"}}"""));
+
+        // The host keeps the channel open; there may never be another write.
+        Assert.Equal(CodexRealtimeLifecycleStatus.Detached, await controller.DetachAsync(Ct));
+        var detached = await store.ReadAsync(thread.Id, Ct);
+        var history = RealtimeHistoryTests.Session(detached).History!;
+        Assert.Equal(63, history.Events.Count(e => e.Kind == "observation" && e.EventType == "input_transcript.added"));
+        Assert.Equal(new string('x', 63), string.Concat(history.Frames.Select(f => f.Text)));
+        Assert.True(factory.Incoming.Writer.TryWrite("host retains its channel"));
+        Assert.True(factory.Incoming.Reader.TryRead(out var retained));
+        Assert.Equal("host retains its channel", retained);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await controller.EndAsync(Guid.NewGuid(), cancellationToken: Ct));
+        var closed = await store.ReadAsync(thread.Id, Ct);
+        Assert.Single(RealtimeHistoryTests.Session(closed).History!.Carryover);
+        Assert.Empty(closed.Turns);
+    }
+
+    [Fact]
+    public async Task EndDrainsWhileObserverIsBlockedAndPreservesAuthorizedEndOutput()
+    {
+        var (_, store, thread) = await Detached();
+        using var factory = new Factory();
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await controller.AttachAsync(Ct));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callbacks = 0;
+        var pump = controller.PumpAsync(async (_, ct) =>
+        {
+            callbacks++;
+            entered.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+        }, Ct);
+        Assert.True(factory.Incoming.Writer.TryWrite("""{"type":"input_transcript.added","item":{"text":"first"}}"""));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), Ct);
+        Assert.True(factory.Incoming.Writer.TryWrite("""{"type":"input_transcript.added","item":{"text":" second"}}"""));
+        Assert.True(factory.Incoming.Writer.TryWrite("""{"type":"turn.done","turn":{"role":"user","transcript":"first second third"}}"""));
+        var effects = 0;
+        var status = await controller.EndAsync(Guid.NewGuid(), async (connection, ct) =>
+        {
+            effects++;
+            Assert.NotNull(connection);
+            Assert.Equal("local_drain", connection.Closure?.End);
+            await connection.SendEventAsync(new System.Text.Json.Nodes.JsonObject { ["type"] = "session.close" }, ct);
+        }, Ct);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, status);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Cancelled, await pump);
+        Assert.Equal(1, callbacks);
+        Assert.Equal(1, effects);
+        Assert.True(factory.Outgoing.Reader.TryRead(out var command));
+        Assert.Contains("session.close", command);
+        Assert.False(factory.Outgoing.Reader.TryRead(out _));
+        var closed = await store.ReadAsync(thread.Id, Ct);
+        var history = RealtimeHistoryTests.Session(closed).History!;
+        Assert.Equal("first second third", string.Concat(history.Frames.Select(f => f.Text)));
+        Assert.Single(history.Carryover);
+        Assert.Empty(closed.Turns);
+    }
+
+    [Fact]
+    public async Task MalformedQueuedFrameFencesDrainRatherThanSilentlyReportingDetach()
+    {
+        var (_, store, thread) = await Detached();
+        using var factory = new Factory();
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await controller.AttachAsync(Ct));
+        Assert.True(factory.Incoming.Writer.TryWrite("""{"type":"input_transcript.added","item":{"text":"preserved"}}"""));
+        Assert.True(factory.Incoming.Writer.TryWrite("{"));
+        Assert.Equal(CodexRealtimeLifecycleStatus.HistoryRecoveryRequired, await controller.DetachAsync(Ct));
+        var session = RealtimeHistoryTests.Session(await store.ReadAsync(thread.Id, Ct));
+        Assert.Equal("recoveryRequired", session.State);
+        Assert.Equal("preserved", Assert.Single(session.History!.Frames).Text);
+        Assert.Null(controller.Connection);
     }
 
     [Theory]
