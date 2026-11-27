@@ -22,7 +22,7 @@ All paths in the Rust column are relative to `codex-rs` at the pinned revision.
 | `file-system`, `file-watcher/src/file_watcher_tests.rs`, exec-server no_follow and fs_sandbox_windows_tests | Opt-in `CodexMacOsRootedFileSystem` uses a pinned root descriptor and kernel O_NOFOLLOW_ANY for readFile/getMetadata/readDirectory, and rejects all mutations. Existing path-based host is unchanged and is not an enforcement fallback. General rooted mutation, recursive/watch and platform coverage remain open. | #103, #144 |
 | `file-search/src/lib.rs`, `snapshot.rs`, `matcher_tests.rs`; `app-server/tests/suite/fuzzy_file_search.rs` | `CodexFileSearch` implements one-shot search and connection-scoped sessions, cancellation and top-50 notifications; `CodexStableDirectoryFileSearchSource` uses a host-protected rooted traversal. Exact Nucleo scores and ignore/snapshot behavior remain separate. | #102, #136, #137 |
 | `apply-patch/src/lib.rs`, `apply-patch/src/file_update_tests.rs`, `apply-patch/tests/suite`; command_exec apply_patch line endings test | Existing `CodexPatch`, `CodexPatchUpdate`, `CodexWorkspacePatch`, `CodexWorkspacePatchTransport` and related tests; preconditions and plan digest already represented. | Preserve; differential coverage and authorization integration pending #79, #80 |
-| `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. Compiled enforcement, scoped grants, legacy routing and actual dispatch remain separate. | #80, #111–#113; coordinate #64 |
+| `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. `CodexMacOsSqliteApprovalStorage` supplies real durable CAS and `CodexApprovalDispatcher` gates an actual contained command. Production command/patch/tool routing, cross-platform storage, compiled enforcement, scoped grants and legacy routing remain separate (#158). | #80, #111–#113; coordinate #64 |
 | `execpolicy`, `sandboxing`, `network-proxy`; sandboxing platform tests, network-proxy authorization_path_tests and host_policy_tests | `CodexMacOsLeafCommandAdapter` provides actual deny-default Seatbelt for a restricted macOS single-process lane (no fork, no PTY, no direct network, approved stable workspace). General OS and network policy compilation and tree containment remain open. | #81, #104, #132; coordinate #86 and #98 |
 | `app-server-protocol/src/protocol/v2/review.rs`; `app-server/tests/suite/v2/review.rs`; `core/src/guardian`; app-server guardian_v2 / guardian_v3_sync_tests | `CodexReviewRpc` validates inline review targets, verifies a committed correlated turn, routes advisory Guardian assessment and exact denial escalation through a trusted adapter and approval store. `CodexGuardianReviewJournal` commits ordered auto-review lifecycle records and binds exact recorded denials to one pending approval. Actual runner, host storage/reviewer integration and strict-review dispatch fence remain separate. | #82, #129, #130, #142 |
 
@@ -263,3 +263,39 @@ symlink rejection, existing external hard links, nonblocking FIFO rejection, aut
 bounds, foreign connections and disposal. The separate actual descriptor ABI probe
 codex-65-rooted-dirent-probe-20261127-01 confirmed Darwin directory/regular/symlink kinds.
 No general mutable-root or mutation enforcement claim is made.
+
+## Durable local approval CAS and dispatch (#113)
+
+`CodexMacOsSqliteApprovalStorage` implements the existing ICodexApprovalStorage
+contract using the macOS system SQLite library, source-generated JSON and one
+atomic insert-if-absent or revision-matched update. Account and request keys
+are bound binary parameters; record identity and stored revision are checked on
+read. It requires explicit exclusive creation or reopening a valid versioned
+database, a private existing canonical directory, and a private regular file.
+SQLite rollback journal mode, synchronous EXTRA and fullfsync ON are checked
+on each connection. The host must own and stabilize the storage directory,
+prevent database replacement/rollback or untrusted writers and supply required
+encryption at rest; this adapter is not encrypted by itself. It is opt-in and
+macOS-only; other platforms and the consumer's storage remain separate.
+
+`CodexApprovalDispatcher` checks the trusted current host policy and consumes
+one exact action through the existing approval store before invoking a trusted
+callback bound to the immutable resolved action and effective policy. A failed
+or uncertain CAS never dispatches; an error after consume does not recreate the
+grant. Expiry and cancellation are checked again before the callback; the actual
+adapter must independently enforce the current policy and expiry at admission.
+The dispatcher does not recover unknown effects or cancel already-admitted work.
+
+Actual macOS arm64 / .NET 10 validation: 9 focused SQLite approval tests passed,
+0 failed/skipped; 47 combined approval/store/bridge/Guardian tests passed, 0
+failed/skipped. Admitted receipt native-20261127-3c714616e3fb4b1f85b54b1e2f0ad414.
+Verified reopen/account isolation, competing independent SQLite connections,
+consume/revoke, a deliberately lost real commit receipt, a failed effect,
+RPC binding round-trip, missing/foreign database rejection, and rollback of an
+uncommitted update when a separate SQLite fixture process is killed. The real
+Seatbelt leaf command ran only after durable approval consumption and did not
+run again after reopen. The first build was blocked by a missing history-index
+type in concurrent work; the next admitted run passed. No gates were weakened.
+Actual production command/exec, process/*, workspace patch and MCP/tool wiring
+and non-macOS durable storage are tracked in #158; no Advantage deployment or
+power-loss certification is claimed.

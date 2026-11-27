@@ -106,6 +106,11 @@ public sealed class CodexApprovalStore
     private readonly TimeProvider clock;
     private readonly TimeSpan maximumLifetime;
     internal string AccountId => accountId;
+    internal bool IsUnexpired(CodexApprovalRecord record)
+    {
+        var now = clock.GetUtcNow();
+        return record.AccountId == accountId && now < record.ExpiresAt && now >= record.UpdatedAt;
+    }
 
     /// <summary>Creates an approval journal with an explicit storage and reviewer authorization boundary.</summary>
     public CodexApprovalStore(ICodexApprovalStorage storage, string accountId,
