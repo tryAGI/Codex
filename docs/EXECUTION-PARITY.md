@@ -23,7 +23,7 @@ All paths in the Rust column are relative to `codex-rs` at the pinned revision.
 | Rust file-search and App Server search contracts | No native file-search session handler identified. | #102 |
 | `apply-patch/src/lib.rs`, `apply-patch/src/file_update_tests.rs`, `apply-patch/tests/suite`; command_exec apply_patch line endings test | Existing `CodexPatch`, `CodexPatchUpdate`, `CodexWorkspacePatch`, `CodexWorkspacePatchTransport` and related tests; preconditions and plan digest already represented. | Preserve; differential coverage and authorization integration pending #79, #80 |
 | `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. Compiled enforcement, scoped grants, legacy routing and actual dispatch remain separate. | #80, #111–#113; coordinate #64 |
-| `execpolicy`, `sandboxing`, `network-proxy`; sandboxing platform tests, network-proxy authorization_path_tests and host_policy_tests | Need actual enforceable OS and network policies, explicit unsupported/denied status; do not infer enforcement from policy DTOs. | #81, #104, coordinate #86 and #98 |
+| `execpolicy`, `sandboxing`, `network-proxy`; sandboxing platform tests, network-proxy authorization_path_tests and host_policy_tests | `CodexMacOsLeafCommandAdapter` provides actual deny-default Seatbelt for a restricted macOS single-process lane (no fork, no PTY, no direct network, approved stable workspace). General OS and network policy compilation and tree containment remain open. | #81, #104, #132; coordinate #86 and #98 |
 | `app-server-protocol/src/protocol/v2/review.rs`; `app-server/tests/suite/v2/review.rs`; `core/src/guardian`; app-server guardian_v2 / guardian_v3_sync_tests | `CodexReviewRpc` validates inline review targets, verifies a committed correlated turn, routes advisory Guardian assessment and exact denial escalation through a trusted adapter and approval store. Actual runner, history and auto-review notifications remain separate. | #82, #129, #130 |
 
 ## Adapter rules
@@ -127,10 +127,35 @@ Admitted build receipt: native-20261127-e404d0fab6394321b3620247067b182c. Storag
 A deny-default Seatbelt probe for /usr/bin/true with minimal library reads returned exit 134
 without output, as did a second probe allowing sysctl reads and self process information.
 Runs: run-01a21be07ca771c2b72c721aba3b4672 and run-01a21be0b3d07dca9af883053a304324.
-These failed probes do not prove that Seatbelt is unavailable or that the policy can enforce
-the desired restrictions. Keep the real-adapter row unaccepted; no fallback or looser
-production policy was installed. Review the pinned Rust base/defaults policies and lifecycle
-before admitting any real platform adapter.
+The pinned Rust seatbelt_base_policy.sbpl and seatbelt_read_only_platform_defaults.sbpl showed
+that runtime executable mapping and specific system operations are needed for startup.
+A source-backed deny-default fixture probe then verified allowed workspace reads/writes and
+denied outside reads/writes on actual macOS (codex-65-seatbelt-upstream-fixture-20261127-01).
+The restricted leaf probe verified fork denial, loopback denial and launcher exec retaining the
+same PID (codex-65-seatbelt-leaf-probe-20261127-01). A narrowed policy also denied symlink
+reads and fork and direct network, without the upstream general-purpose runtime allowances
+(codex-65-seatbelt-minimal-fixture-20261127-02).
+
+`CodexMacOsLeafCommandAdapter` is a real, opt-in ICodexCommandAdapter for the explicit
+macos-leaf-read-only and macos-leaf-workspace profiles, or a host-approved leaf default.
+It launches only the fixed /usr/bin/sandbox-exec and exact absolute system executable, passing
+workspace/executable through separate SBPL parameters. It clears inherited environment,
+allows a limited system runtime (including named sysctl reads and necessary device/IPC
+operations), denies fork and direct network, and permits workspace writes only with an explicit
+host decision. The kernel rejects access through a symlink to an outside fixture. The host must
+provide stable canonical root ownership, exclude external hardlink/inode aliases and prevent
+untrusted concurrent root changes. This does not certify arbitrary path replacement races,
+general process trees, PTY, process/spawn admission or unsupported legacy/Rust profiles.
+Unsupported requests and non-macOS hosts fail closed. No direct target-launch fallback exists.
+
+Actual macOS arm64 / .NET 10 validation: 7 leaf tests passed, 0 failed, 1 platform-specific
+non-macOS denial test skipped; combined command/process/leaf suite 41 passed, 0 failed,
+1 skipped. Admitted receipt native-20261127-55667b4449484bdc902d3f174f4b1b85.
+Verified actual read/write and read-only boundaries, symlink read/write denial, fork denial,
+direct loopback denial, binary pipe streaming, termination and disconnect reaping of an owned PID.
+The first shared build failed due to an unrelated provider test analyzer error; no analyzer gate
+was changed and the repeat passed. General descendant containment and PTY remain #132;
+root replacement and external alias handling remain #103. #104 and #81 are not fully accepted.
 
 ## Review and Guardian RPC (#82)
 

@@ -180,6 +180,7 @@ public sealed class CodexCommandExecution : IAsyncDisposable
                 linked.Token.ThrowIfCancellationRequested();
                 entry.Ready.TrySetResult(session);
                 var exit = await session.Completion.WaitAsync(linked.Token).ConfigureAwait(false);
+                linked.Token.ThrowIfCancellationRequested();
                 return output.Result(exit);
             }
             finally
