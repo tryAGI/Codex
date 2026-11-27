@@ -970,10 +970,10 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:model/list": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "reviewedCommit": "d64514537a2de85dd413729a2f2fc85cadb08037",
         "ownerIssue": 84,
         "scope": "native-behavior",
-        "rationale": "Native catalog projection, ordering, hidden filtering, cursor behavior and explicit provider selection have credential-free evidence. Actual account-scoped provider discovery and all upstream fields remain separately unverified.",
+        "rationale": "Native catalog projection, static priority order, provider display order independently of priority default, hidden filtering, cursor behavior and explicit provider selection have credential-free evidence. Real account-scoped authorization, provider transport and all upstream fields remain separately unverified.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexModelCatalogRpc.cs::InvokeAsync"
         ],
@@ -982,7 +982,8 @@
           "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.ExplicitProviderSelectionFiltersApiModelsAndDoesNotChangeDefault",
           "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.DynamicPaidProviderIsNeverSelectedImplicitlyAndFailureDoesNotFallback",
           "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.RejectsInvalidParameters",
-          "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.ProviderMismatchIsRejected"
+          "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.ProviderMismatchIsRejected",
+          "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.ProviderCatalogPreservesDisplayOrderWhilePrioritySelectsDefaultBeforePagination"
         ],
         "upstreamTests": [
           "codex-rs/app-server/tests/suite/v2/model_list.rs::list_models_includes_hidden_models",
@@ -993,12 +994,13 @@
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
-          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
-          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "csharpCommit": "d64514537a2de85dd413729a2f2fc85cadb08037",
+          "receipt": "docs/global-parity-evidence/ci-d645145-45964053799.json",
+          "receiptSha256": "24869e1df286d35cb1d6e67ffe60170805dbc52dbeea2f1188fb5b1c7066d1c8",
           "cases": [
             "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.DynamicPaidProviderIsNeverSelectedImplicitlyAndFailureDoesNotFallback",
             "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ExplicitProviderSelectionFiltersApiModelsAndDoesNotChangeDefault",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ProviderCatalogPreservesDisplayOrderWhilePrioritySelectsDefaultBeforePagination",
             "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ProviderMismatchIsRejected",
             "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"cursor\\\":\\\"-1\\\"}\")",
             "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"cursor\\\":\\\"999\\\"}\")",
@@ -1014,7 +1016,7 @@
         "ownerIssue": 84,
         "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
         "scope": "rust-runtime",
-        "rationale": "Same explicit synthetic static catalog on both hosts, order, default, hidden and pagination compared. Provider-backed display order, account-scoped discovery and live behavior remain unverified.",
+        "rationale": "Same explicit synthetic static catalog on both hosts, order, default, hidden and pagination compared. Provider-backed order has its own separate runtime scenario and revision; real account/live behavior remains unverified.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
           "src/libs/tryAGI.Codex/CodexModelCatalogRpc.cs::InvokeAsync"
@@ -1031,6 +1033,31 @@
           "cases": [
             "tryAGI.Codex.Tests.RustModelCatalogDifferentialTests.ExplicitCatalogDisplayOrderDefaultsAndPaginationMatchRust"
           ]
+        },
+        "runtimeScenarios": {
+          "provider-model-catalog": {
+            "reviewedCommit": "d64514537a2de85dd413729a2f2fc85cadb08037",
+            "scope": "rust-runtime",
+            "rationale": "Real Rust provider-backed catalog and managed model discovery receive identical synthetic catalog bytes. Initial run reproduced incorrect native display ordering; corrected native ordering, default and pagination pass. Rust uses isolated loopback and native injected HTTP handler, not live provider or transport acceptance.",
+            "implementation": [
+              "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+              "src/libs/tryAGI.Codex/CodexModelCatalog.cs::GetModelCatalogAsync",
+              "src/libs/tryAGI.Codex/CodexModelCatalogRpc.cs::InvokeAsync"
+            ],
+            "test": [
+              "src/tests/tryAGI.Codex.Tests/RustProviderModelDifferentialTests.cs::RustProviderModelDifferentialTests.ProviderDisplayOrderIsIndependentOfPriorityDefaultAndPagination"
+            ],
+            "runtimeEvidence": {
+              "lane": "rust-runtime-differential",
+              "outcome": "passed",
+              "csharpCommit": "d64514537a2de85dd413729a2f2fc85cadb08037",
+              "receipt": "docs/global-parity-evidence/rust-provider-model-catalog-d645145-45964069669.json",
+              "receiptSha256": "6bc5acaa71af9eb47998b10c082c2ad7045c39662643663fd25c333246612b01",
+              "cases": [
+                "tryAGI.Codex.Tests.RustProviderModelDifferentialTests.ProviderDisplayOrderIsIndependentOfPriorityDefaultAndPagination"
+              ]
+            }
+          }
         }
       }
     },

@@ -70,7 +70,7 @@ def validate_reviews(data, review):
             owner = entry.get("ownerIssue")
             if status not in STATUSES or not HEX40.fullmatch(revision) or not isinstance(rationale, str) or not rationale.strip() or type(owner) is not int or owner < 25:
                 raise ValueError(f"Incomplete review: {rid}/{lane}")
-            if set(entry) - {"status", "reviewedCommit", "rationale", "ownerIssue", "scope", "implementation", "test", "basis", "evidence", "testEvidence", "upstreamTests", "runtimeEvidence", "runtimeObservation"}:
+            if set(entry) - {"status", "reviewedCommit", "rationale", "ownerIssue", "scope", "implementation", "test", "basis", "evidence", "testEvidence", "upstreamTests", "runtimeEvidence", "runtimeObservation", "runtimeScenarios"}:
                 raise ValueError(f"Unknown review field: {rid}/{lane}")
             _, reviewed_tree = source_revision(revision)
             paths = set()
@@ -160,6 +160,24 @@ def validate_reviews(data, review):
                 references(additional["implementation"], additional_rev)
                 references(additional["test"], additional_rev)
                 validate_runtime_observation(candidates[rid], additional, additional["runtimeEvidence"])
+            scenarios = entry.get("runtimeScenarios", {})
+            if "runtimeScenarios" in entry:
+                if (lane != "rust-app-server-interop" or status != "source-reviewed"
+                        or (runtime is None and additional is None)
+                        or not isinstance(scenarios, dict) or not scenarios):
+                    raise ValueError("Additional runtime scenarios require an independent base runtime review")
+                for scenario_scope, observation in scenarios.items():
+                    if (not isinstance(observation, dict)
+                            or set(observation) != {"reviewedCommit", "scope", "rationale", "implementation", "test", "runtimeEvidence"}
+                            or observation.get("scope") != "rust-runtime"
+                            or not HEX40.fullmatch(observation.get("reviewedCommit", ""))
+                            or not isinstance(observation.get("rationale"), str) or not observation["rationale"].strip()):
+                        raise ValueError("Invalid additional runtime scenario")
+                    observation_rev = observation["reviewedCommit"]
+                    references(observation["implementation"], observation_rev)
+                    references(observation["test"], observation_rev)
+                    validate_runtime_observation(candidates[rid], observation, observation["runtimeEvidence"],
+                                                 scenario_scope=scenario_scope)
             key = (rid, lane)
             reviewed[key] = entry
             # Negative conclusions can be invalidated by a new handler in another file;
@@ -186,6 +204,7 @@ def summarize(data, review):
     for lane in LANES:
         counts = collections.Counter()
         test_observed = test_current = runtime_observed = runtime_current = 0
+        runtime_scenarios_observed = runtime_scenarios_current = 0
         for row in data["rows"]:
             key = (row["id"], lane)
             entry = entries.get(key)
@@ -197,7 +216,15 @@ def summarize(data, review):
             runtime_entry = entry.get("runtimeObservation", entry) if entry else None
             if runtime_entry and runtime_entry.get("runtimeEvidence"):
                 runtime_observed += 1
-                if source_revision(runtime_entry["reviewedCommit"])[1] == current_tree and clean:
+                observations = [runtime_entry, *entry.get("runtimeScenarios", {}).values()]
+                runtime_scenarios_observed += len(observations)
+                current_observations = sum(
+                    source_revision(observation["reviewedCommit"])[1] == current_tree and clean
+                    for observation in observations)
+                runtime_scenarios_current += current_observations
+                # Count the RPC once, and only as fully current if all its
+                # independently mapped scenarios still match the source.
+                if current_observations == len(observations):
                     runtime_current += 1
         unresolved = counts["pending"] + counts["stale"]
         applicable = sum(counts[s] for s in ("source-reviewed", "missing", "divergent", "passed"))
@@ -208,6 +235,8 @@ def summarize(data, review):
             "passed": counts["passed"], "applicableReviewed": applicable,
             "testOnlyEvidenceObserved": test_observed, "testOnlyEvidenceCurrent": test_current,
             "runtimeEvidenceObserved": runtime_observed, "runtimeEvidenceCurrent": runtime_current,
+            "runtimeScenarioObservations": runtime_scenarios_observed,
+            "runtimeScenarioObservationsCurrent": runtime_scenarios_current,
             "reviewedDenominator": applicable if review["inventoryReviewed"] and not unresolved else None,
         }
     # Narrow runtime observations do not certify complete RPCs. Full platform,
@@ -257,5 +286,16 @@ def self_test(data, review):
         reject(lambda r: typed_entry(r)["runtimeObservation"].update(reviewedCommit="HEAD"))
         reject(lambda r: typed_entry(r)["runtimeObservation"]["runtimeEvidence"].update(cases=[]))
         reject(lambda r: typed_entry(r).update(scope="rust-runtime"))
+    scenario_row = next((key for key, value in review["rows"].items()
+                         if value.get("rust-app-server-interop", {}).get("runtimeScenarios")), None)
+    if scenario_row is not None:
+        def scenario_entry(r):
+            return r["rows"][scenario_row]["rust-app-server-interop"]
+        scenario_key = next(iter(scenario_entry(review)["runtimeScenarios"]))
+        reject(lambda r: scenario_entry(r)["runtimeScenarios"][scenario_key].update(reviewedCommit="HEAD"))
+        reject(lambda r: scenario_entry(r)["runtimeScenarios"][scenario_key]["runtimeEvidence"].update(cases=[]))
+        reject(lambda r: scenario_entry(r)["runtimeScenarios"].update(
+            {"unknown-scope": scenario_entry(r)["runtimeScenarios"][scenario_key]}))
+        reject(lambda r: scenario_entry(r).update(status="passed"))
     assert not summarize(data, review)[1]
     print("Global review self-test: orphan, mutable revision, unjustified or evidence-free pass and wrong lane rejected.")

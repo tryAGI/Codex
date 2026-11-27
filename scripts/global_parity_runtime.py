@@ -36,11 +36,15 @@ MODEL = "ExplicitCatalogDisplayOrderDefaultsAndPaginationMatchRust"
 TURN_CLASS = "RustTurnLifecycleDifferentialTests"
 TURN_PATH = f"src/tests/tryAGI.Codex.Tests/{TURN_CLASS}.cs"
 TURN = "TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+PROVIDER_MODEL_CLASS = "RustProviderModelDifferentialTests"
+PROVIDER_MODEL_PATH = f"src/tests/tryAGI.Codex.Tests/{PROVIDER_MODEL_CLASS}.cs"
+PROVIDER_MODEL = "ProviderDisplayOrderIsIndependentOfPriorityDefaultAndPagination"
 SUITES = {
     "filesystem": (CLASS, TEST_PATH, (BINARY, DIRECTORY, INVALID, RELATIVE, COPY)),
     "thread-lifecycle": (THREAD_CLASS, THREAD_MODEL_PATH, (NAME, ARCHIVE)),
     "model-catalog": (MODEL_CLASS, THREAD_MODEL_PATH, (MODEL,)),
     "turn-lifecycle": (TURN_CLASS, TURN_PATH, (TURN,)),
+    "provider-model-catalog": (PROVIDER_MODEL_CLASS, PROVIDER_MODEL_PATH, (PROVIDER_MODEL,)),
 }
 SCENARIOS = {("clientRequests", method): ("filesystem", cases)
              for method, cases in METHOD_CASES.items()}
@@ -62,7 +66,12 @@ SCENARIOS.update({
 })
 
 
-def validate_runtime_observation(row, entry, evidence, root=ROOT):
+ADDITIONAL_SCENARIOS = {
+    ("clientRequests", "model/list", "provider-model-catalog"): ("provider-model-catalog", (PROVIDER_MODEL,)),
+}
+
+
+def validate_runtime_observation(row, entry, evidence, root=ROOT, scenario_scope=None):
     if not isinstance(evidence, dict) or set(evidence) != {
         "lane", "outcome", "csharpCommit", "receipt", "receiptSha256", "cases"
     }:
@@ -71,7 +80,8 @@ def validate_runtime_observation(row, entry, evidence, root=ROOT):
     if (evidence["lane"] != "rust-runtime-differential" or evidence["outcome"] != "passed"
             or evidence["csharpCommit"] != revision or not HEX40.fullmatch(revision)):
         raise ValueError("Runtime observation revision or lane differs from reviewed mapping")
-    scenario = SCENARIOS.get((row.get("direction"), row.get("method")))
+    key = (row.get("direction"), row.get("method"))
+    scenario = SCENARIOS.get(key) if scenario_scope is None else ADDITIONAL_SCENARIOS.get((*key, scenario_scope))
     if scenario is None:
         raise ValueError("No independently reviewed Rust differential scenario for this RPC")
     scope, methods = scenario
