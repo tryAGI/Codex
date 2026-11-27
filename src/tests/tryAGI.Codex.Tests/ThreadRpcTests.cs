@@ -33,6 +33,7 @@ public sealed class ThreadRpcTests
         private readonly object gate = new();
         internal readonly Dictionary<Guid, JsonElement> Rows = [];
         internal Action? AfterToolAdmission;
+        internal Action? AfterQueueAdmission;
         public Task<JsonElement?> ReadAsync(Guid id, CancellationToken ct)
         { ct.ThrowIfCancellationRequested(); lock (gate) return Task.FromResult(Rows.TryGetValue(id, out var row) ? (JsonElement?)row.Clone() : null); }
         public Task<bool> CompareExchangeAsync(Guid id, long? revision, JsonElement next, CancellationToken ct)
@@ -43,6 +44,9 @@ public sealed class ThreadRpcTests
                 long? actual = Rows.TryGetValue(id, out var row) ? row.GetProperty("revision").GetInt64() : null;
                 if (actual != revision) return Task.FromResult(false);
                 Rows[id] = next.Clone();
+                if (AfterQueueAdmission is { } queueHook && next.GetProperty("turns").EnumerateArray().Any(turn =>
+                    turn.TryGetProperty("turnTrigger", out var trigger) && trigger.GetString() == "native:queued"))
+                { AfterQueueAdmission = null; queueHook(); }
                 if (AfterToolAdmission is { } hook && next.GetProperty("turns").EnumerateArray()
                     .SelectMany(t => t.GetProperty("dispatches").EnumerateArray())
                     .Any(d => d.GetProperty("kind").GetString() == "tool" && d.GetProperty("state").GetString() == "dispatching"))
@@ -109,6 +113,7 @@ public sealed class ThreadRpcTests
                 Events.Enqueue((method, value));
                 RequiredRoot(value, method switch
                 {
+                    "thread/queue/changed" => "ThreadQueueChangedNotification",
                     "thread/archived" => "ThreadArchivedNotification", "thread/unarchived" => "ThreadUnarchivedNotification",
                     "turn/started" => "TurnStartedNotification", "turn/completed" => "TurnCompletedNotification",
                     "item/started" => "ItemStartedNotification", "item/completed" => "ItemCompletedNotification",
@@ -863,6 +868,162 @@ public sealed class ThreadRpcTests
             Add(id, new string('x', 257), "invalid"), ct));
         Assert.Equal(-32602, invalid.Code);
         Assert.Empty(f.Provider.Requests);
+    }
+
+    private static JsonElement QueueArgs(Guid id, string clientId, string text, JsonObject? metadata = null)
+        => Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["clientUserMessageId"] = clientId,
+            ["input"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }),
+            ["responsesapiClientMetadata"] = metadata
+        });
+
+    private static JsonElement QueueStartArgs(Guid id, string? submission = null) => Args(new JsonObject
+    {
+        ["threadId"] = id.ToString(), ["queuedSubmissionId"] = submission
+    });
+
+    private static async Task<JsonElement> AddQueue(CodexThreadRpc host, Guid id, string client, string text, JsonObject? metadata = null)
+        => (await host.InvokeAsync("thread/queue/add", QueueArgs(id, client, text, metadata), TestContext.Current.CancellationToken))
+            .GetProperty("queuedSubmission");
+
+    [Fact]
+    public async Task QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        var args = Args(new JsonObject { ["threadId"] = id.ToString() });
+        Assert.Equal(-32601, (await Assert.ThrowsAsync<CodexThreadRpcException>(() => host.InvokeAsync("thread/queue/list", args, ct))).Code);
+        host.EnableThreadQueue();
+        var first = await AddQueue(host, id, "client1", "first", new JsonObject { ["client_type"] = "macos" });
+        var second = await AddQueue(host, id, "client2", "second");
+        var initial = await f.Store.ReadAsync(id, ct);
+        var duplicate = await AddQueue(host, id, "client1", "first", new JsonObject { ["client_type"] = "macos" });
+        Assert.True(JsonElement.DeepEquals(first, duplicate));
+        Assert.Equal(initial.Revision, (await f.Store.ReadAsync(id, ct)).Revision);
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => AddQueue(host, id, "client1", "changed"));
+
+        var cold = f.Host(); cold.EnableThreadQueue();
+        var firstId = first.GetProperty("id").GetString()!;
+        var secondId = second.GetProperty("id").GetString()!;
+        var updated = (await cold.InvokeAsync("thread/queue/update", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["queuedSubmissionId"] = firstId,
+            ["input"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "edited" }),
+            ["responsesapiClientMetadata"] = new JsonObject()
+        }), ct)).GetProperty("queuedSubmission");
+        Assert.Equal(firstId, updated.GetProperty("id").GetString());
+        Assert.Equal("client1", updated.GetProperty("clientUserMessageId").GetString());
+        Assert.Equal("macos", updated.GetProperty("responsesapiClientMetadata").GetProperty("client_type").GetString());
+        var before = await f.Store.ReadAsync(id, ct);
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/queue/reorder", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["queuedSubmissionIds"] = new JsonArray(firstId, firstId)
+        }), ct));
+        Assert.Equal(before.Revision, (await f.Store.ReadAsync(id, ct)).Revision);
+        await cold.InvokeAsync("thread/queue/reorder", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["queuedSubmissionIds"] = new JsonArray(secondId, firstId)
+        }), ct);
+        var page = await cold.InvokeAsync("thread/queue/list", Args(new JsonObject { ["threadId"] = id.ToString(), ["limit"] = 1 }), ct);
+        Assert.Equal(secondId, Assert.Single(page.GetProperty("data").EnumerateArray()).GetProperty("id").GetString());
+        Assert.Equal("1", page.GetProperty("nextCursor").GetString());
+        var tail = await cold.InvokeAsync("thread/queue/list", Args(new JsonObject { ["threadId"] = id.ToString(), ["cursor"] = "1" }), ct);
+        Assert.Equal(firstId, Assert.Single(tail.GetProperty("data").EnumerateArray()).GetProperty("id").GetString());
+        Assert.Equal(JsonValueKind.Null, tail.GetProperty("nextCursor").ValueKind);
+
+        var remove = QueueStartArgs(id, secondId);
+        Assert.True((await cold.InvokeAsync("thread/queue/delete", remove, ct)).GetProperty("deleted").GetBoolean());
+        Assert.False((await cold.InvokeAsync("thread/queue/delete", remove, ct)).GetProperty("deleted").GetBoolean());
+        var saved = await f.Store.ReadAsync(id, ct);
+        var fork = await f.Store.ForkAsync(id, saved.Revision, Guid.NewGuid(), cancellationToken: ct);
+        Assert.Null(fork.QueuedSubmissions);
+        Assert.Equal(5, f.Events.Count(e => e.Method == "thread/queue/changed"));
+        Assert.Empty(f.Provider.Requests);
+    }
+
+    [Fact]
+    public async Task QueueStartConsumesSelectedSubmissionWithTurnAdmissionAndBusyPreservesRemaining()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); host.EnableThreadQueue(); var id = await Create(host);
+        var first = await AddQueue(host, id, "first", "pending first");
+        var second = await AddQueue(host, id, "second", "selected second");
+        var firstId = first.GetProperty("id").GetString()!;
+        var secondId = second.GetProperty("id").GetString()!;
+        var providerEntered = Signal(); var ordinary = f.Provider.Reply;
+        f.Provider.Reply = async (n, token) =>
+        {
+            if (n == 1) { providerEntered.TrySetResult(); await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, token); }
+            return await ordinary(n, token);
+        };
+        var started = await host.InvokeAsync("thread/queue/start", QueueStartArgs(id, secondId), ct);
+        Assert.Equal(secondId, started.GetProperty("turn").GetProperty("id").GetString());
+        await providerEntered.Task.WaitAsync(Timeout, ct);
+        var saved = await f.Store.ReadAsync(id, ct);
+        Assert.Equal(Guid.Parse(firstId), Assert.Single(saved.QueuedSubmissions!).Id);
+        Assert.Equal("second", Assert.Single(saved.Turns[^1].ClientUserMessageIds!));
+        Assert.Contains("selected second", saved.Turns[^1].Input[0].GetRawText());
+        var busy = await Assert.ThrowsAsync<CodexThreadRpcException>(() => host.InvokeAsync("thread/queue/start", QueueStartArgs(id), ct));
+        Assert.Equal(-32602, busy.Code);
+        Assert.Equal(Guid.Parse(firstId), Assert.Single((await f.Store.ReadAsync(id, ct)).QueuedSubmissions!).Id);
+        await host.InvokeAsync("turn/interrupt", Args(new JsonObject { ["threadId"] = id.ToString(), ["turnId"] = secondId }), ct);
+        Assert.Equal("interrupted", (await f.Store.ReadAsync(id, ct)).Turns[^1].Status);
+
+        var cold = f.Host(); cold.EnableThreadQueue();
+        await cold.InvokeAsync("thread/resume", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/queue/start", QueueStartArgs(id, secondId), ct));
+        var next = await cold.InvokeAsync("thread/queue/start", QueueStartArgs(id), ct);
+        Assert.Equal(firstId, next.GetProperty("turn").GetProperty("id").GetString());
+        await cold.StopAsync(ct);
+        var final = await f.Store.ReadAsync(id, ct);
+        Assert.Null(final.QueuedSubmissions);
+        Assert.Equal(2, final.Turns.Length);
+        Assert.Equal("first", Assert.Single(final.Turns[^1].ClientUserMessageIds!));
+    }
+
+    [Fact]
+    public async Task QueueAdmissionLostAcknowledgmentDoesNotReplayProviderOrConsumeAnotherSubmission()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); host.EnableThreadQueue(); var id = await Create(host);
+        var first = await AddQueue(host, id, "first", "first");
+        var second = await AddQueue(host, id, "second", "second");
+        var firstId = first.GetProperty("id").GetString()!;
+        f.Storage.AfterQueueAdmission = () => throw new IOException("Lost durable queue admission acknowledgement.");
+        await Assert.ThrowsAsync<IOException>(() => host.InvokeAsync("thread/queue/start", QueueStartArgs(id, firstId), ct));
+        var saved = await f.Store.ReadAsync(id, ct);
+        var admitted = Assert.Single(saved.Turns);
+        Assert.Equal(Guid.Parse(firstId), admitted.Id);
+        Assert.Equal("inProgress", admitted.Status);
+        Assert.Equal(second.GetProperty("id").GetString(), Assert.Single(saved.QueuedSubmissions!).Id.ToString());
+        Assert.Empty(f.Provider.Requests);
+        var cold = f.Host(); cold.EnableThreadQueue();
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/queue/start", QueueStartArgs(id, firstId), ct));
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/resume", Args(new JsonObject { ["threadId"] = id.ToString() }), ct));
+        await f.Store.RecoverInterruptedAsync(id, saved.Revision, admitted.Id, admitted.OwnerId, ct);
+        Assert.Empty(f.Provider.Requests);
+        Assert.Single((await f.Store.ReadAsync(id, ct)).QueuedSubmissions!);
+    }
+
+    [Fact]
+    public async Task QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); host.EnableThreadQueue(); var id = await Create(host);
+        var metadata = await AddQueue(host, id, "metadata", "test", new JsonObject { ["client_type"] = "ios" });
+        Assert.Equal(-32601, (await Assert.ThrowsAsync<CodexThreadRpcException>(() => host.InvokeAsync("thread/queue/start",
+            QueueStartArgs(id, metadata.GetProperty("id").GetString()), ct))).Code);
+        Assert.Empty(f.Provider.Requests);
+        for (var i = 1; i < 100; i++) await AddQueue(host, id, "client-" + i, "message");
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => AddQueue(host, id, "excess", "message"));
+        var saved = await f.Store.ReadAsync(id, ct);
+        Assert.Equal(100, saved.QueuedSubmissions!.Length);
+        await host.InvokeAsync("thread/archive", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => host.InvokeAsync("thread/queue/list", Args(new JsonObject { ["threadId"] = id.ToString() }), ct));
+        var ephemeral = await host.InvokeAsync("thread/start", Json("""{"ephemeral":true}"""), ct);
+        var ephemeralId = Guid.Parse(ephemeral.GetProperty("thread").GetProperty("id").GetString()!);
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => AddQueue(host, ephemeralId, "temp", "test"));
     }
 
     [Fact]

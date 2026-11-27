@@ -42,13 +42,14 @@ public sealed partial class CodexThreadRpc
     /// <summary>Notifications that could not be delivered.</summary>
     public long NotificationFailures => Interlocked.Read(ref notificationFailures);
 
-    private async Task<JsonElement> StartAsync(JsonElement p, CancellationToken ct)
+    private async Task<JsonElement> StartAsync(JsonElement p, CancellationToken ct, Guid? queuedId = null, long? queueRevision = null)
     {
         ValidateFields(p, ["threadId", "input", "rootTurnId", "parentTurnId", "model", "effort", "summary", "outputSchema", "serviceTier", "serviceTierForTurn", "personality",
             "cwd", "approvalPolicy", "approvalsReviewer", "sandboxPolicy", "clientUserMessageId", "disabledPluginIds", "toolOutput", "turnTrigger"]);
         var input = Input(p);
         var clientId = InputIdentity(p, "clientUserMessageId");
-        var trigger = InputIdentity(p, "turnTrigger");
+        var trigger = queuedId is null ? InputIdentity(p, "turnTrigger") : CodexThreadStore.QueuedTurnTrigger;
+        if (queuedId is null && trigger == CodexThreadStore.QueuedTurnTrigger) throw Invalid("Reserved native queue trigger.");
         if (Text(p, "personality") is { } personality && personality is not ("none" or "friendly" or "pragmatic"))
             throw Invalid("Invalid deprecated personality value.");
         validateInput?.Invoke(input);
@@ -62,6 +63,7 @@ public sealed partial class CodexThreadRpc
             if (!loaded.ContainsKey(id)) throw Invalid("Resume the native thread before starting a turn.");
             if (active.TryGetValue(id, out var running))
             {
+                if (queuedId is not null) throw Invalid("Thread already has an active or pending turn.");
                 // No incompatible overrides may be silently ignored by start-or-steer.
                 if (p.EnumerateObject().Any(x => x.Name is not ("threadId" or "input" or "clientUserMessageId" or "turnTrigger" or "toolOutput")))
                     throw Invalid("Active start-or-steer does not accept settings overrides; use turn/settings/update.");
@@ -69,12 +71,19 @@ public sealed partial class CodexThreadRpc
                 return Element(new JsonObject { ["turn"] = Turn((await store.ReadAsync(id, ct).ConfigureAwait(false)).Turns.Single(t => t.Id == running.Id), "notLoaded") });
             }
             var thread = CodexThreadStore.RequireUnarchived(await store.ReadAsync(id, ct).ConfigureAwait(false));
+            if (queuedId is not null)
+            {
+                CodexThreadStore.RequireQueueInputThread(thread);
+                if (thread.Revision != queueRevision || thread.QueuedSubmissions?.Any(item => item.Id == queuedId) != true)
+                    throw new CodexThreadConflictException();
+                if (thread.Turns.LastOrDefault()?.Status == "inProgress") throw Invalid("Thread already has an active or pending turn.");
+            }
             var effectiveSettings = TurnSettings(thread.Settings, p);
             if (maximumConcurrentTurns is < 1 or > 64 || active.Count >= maximumConcurrentTurns)
                 throw new CodexThreadRpcException(-32010, "Native thread host concurrent-turn capacity is exhausted.");
             if (p.TryGetProperty("outputSchema", out var requestedSchema) && requestedSchema.ValueKind is not (JsonValueKind.Null or JsonValueKind.Object))
                 throw Invalid("Output schema must be an object.");
-            var turnId = Guid.CreateVersion7();
+            var turnId = queuedId ?? Guid.CreateVersion7();
             var instructions = ThreadInstructions(thread.Settings);
             var options = Apply(new CodexResponseOptions(Text(thread.Settings, "model") ?? throw Invalid("Missing model."), instructions)
             {
@@ -129,6 +138,8 @@ public sealed partial class CodexThreadRpc
             var result = await (running.ExecuteOwned ?? execute)(run, async started =>
             {
                 await EmitAsync("turn/started", new JsonObject { ["threadId"] = thread.Id.ToString(), ["turn"] = Turn(started.Turns.Single(t => t.Id == running.Id), "notLoaded") }).ConfigureAwait(false);
+                if (running.Control.TurnTrigger == CodexThreadStore.QueuedTurnTrigger)
+                    await NotifyQueueChangedAsync(thread.Id).ConfigureAwait(false);
                 running.Started.TrySetResult(started);
                 await PublishItemsAsync(thread.Id, running, CancellationToken.None).ConfigureAwait(false);
             }, running.Control.Token).ConfigureAwait(false);
