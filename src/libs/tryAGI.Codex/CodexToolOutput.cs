@@ -11,6 +11,9 @@ public sealed record CodexToolImage(ReadOnlyMemory<byte> Data, string MimeType);
 /// <param name="Text">Text output.</param>
 public sealed record CodexToolOutput(string Text)
 {
+    /// <summary>Optional trusted handler outcome for goal lifecycle accounting. Never inferred from output text.</summary>
+    public CodexToolOutcome? Outcome { get; init; }
+
     /// <summary>Images returned with the text.</summary>
     public IReadOnlyList<CodexToolImage> Images { get; init; } = [];
     /// <summary>Limits the images must fit.</summary>

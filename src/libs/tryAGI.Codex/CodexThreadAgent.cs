@@ -269,7 +269,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
-            try { await execution.FailAsync(error is OperationCanceledException).ConfigureAwait(false); }
+            try { await execution.FailAsync(error).ConfigureAwait(false); }
             catch (Exception cleanup) when (cleanup is not OutOfMemoryException)
             { throw new AggregateException("Native turn failed and its terminal journal state is unconfirmed; inspect the same turn, never replay.", error, cleanup); }
             throw;
@@ -367,6 +367,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         internal CodexContextWindowStatus? ContextWindow { get; private set; }
         private readonly SemaphoreSlim gate = new(1, 1);
         private readonly ConcurrentDictionary<string, JsonElement> observed = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, CodexToolOutcome> observedToolOutcomes = new(StringComparer.Ordinal);
         internal CodexThreadDocument Current { get; private set; }
         internal IReadOnlyList<JsonElement> Seed { get; }
         internal CodexResponseOptions? LastEffectiveSettings { get; private set; }
@@ -950,9 +951,10 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                     await JournalAsync(doc => store.SettleInlineCompactionAccountingAsync(doc.Id, doc.Revision,
                         turnId, owner, id, result, compaction, ct), ct).ConfigureAwait(false);
                 else
-                    await JournalAsync(doc => store.SettleAsync(doc.Id, doc.Revision, turnId, owner, id,
+                    await JournalAsync(doc => store.SettleWithToolOutcomeAsync(doc.Id, doc.Revision, turnId, owner, id,
                         known ? "succeeded" : notDispatched ? "failed" : "unknown",
-                        known ? result : notDispatched ? Json(new JsonObject { ["notDispatched"] = true }) : null, ct), ct).ConfigureAwait(false);
+                        known ? result : notDispatched ? Json(new JsonObject { ["notDispatched"] = true }) : null, ct,
+                        known && observedToolOutcomes.TryGetValue(id, out var toolOutcome) ? toolOutcome : null), ct).ConfigureAwait(false);
                 if (prior.GoalInference?.GoalThreadId is not null) descendantReceipt = Current;
             }
             finally { gate.Release(); }
@@ -1024,6 +1026,11 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 }
                 var receipt = Json(new JsonObject { ["type"] = call.Kind == CodexToolCallKind.Custom ? "custom_tool_call_output" : "function_call_output",
                     ["call_id"] = call.Id, ["output"] = output.Content() });
+                if (output.Outcome is { } outcome)
+                {
+                    if (!Enum.IsDefined(outcome)) throw new ArgumentException("Unknown host tool outcome.");
+                    if (!observedToolOutcomes.TryAdd(call.Id, outcome)) throw new CodexProtocolException("Conflicting native tool outcome.");
+                }
                 Remember(call.Id, receipt);
                 await SettleAsync(call.Id, false, token).ConfigureAwait(false);
                 return output;
@@ -1155,7 +1162,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             }
             finally { gate.Release(); }
         }
-        internal async Task FailAsync(bool interrupted)
+        internal async Task FailAsync(Exception error)
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             Current = await store.ReadAsync(Current.Id, timeout.Token).ConfigureAwait(false);
@@ -1163,8 +1170,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             if (Turn.Status != "inProgress") return;
             foreach (var id in Turn.Dispatches.Where(d => d.State is "dispatching" or "unknown").Select(d => d.CallId).ToArray())
                 await SettleAsync(id, false, timeout.Token).ConfigureAwait(false);
-            await JournalAsync(doc => store.CompleteAsync(doc.Id, doc.Revision, turnId, owner,
-                interrupted ? "interrupted" : "failed", CodexThreadStore.RecoverGoalToolOutputs(Turn, CodexInferenceRecovery.RecoverOutput(Turn)), timeout.Token), timeout.Token).ConfigureAwait(false);
+            await JournalAsync(doc => store.CompleteWithContextAsync(doc.Id, doc.Revision, turnId, owner,
+                error is OperationCanceledException ? "interrupted" : "failed", CodexThreadStore.RecoverGoalToolOutputs(Turn, CodexInferenceRecovery.RecoverOutput(Turn)),
+                null, timeout.Token, usageLimited: error is CodexUsageLimitException), timeout.Token).ConfigureAwait(false);
         }
         public void Dispose() => gate.Dispose();
     }

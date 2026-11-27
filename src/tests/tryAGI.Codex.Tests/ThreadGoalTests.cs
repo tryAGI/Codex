@@ -147,6 +147,63 @@ public sealed class ThreadGoalTests
     }
 
     [Fact]
+    public async Task GoalLifecycleDoesNotAttributeLostOwnerOrReplacedGoalTerminal()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"original"}""");
+        var current = await f.Store.ReadAsync(thread.Id, Ct);
+        var original = current.Goal!.Id;
+        var context = Json("""{"role":"user","content":"goal context"}""");
+        for (var i = 0; i < 2; i++)
+        {
+            var auto = Guid.NewGuid();
+            current = await f.Store.StartTurnAsync(thread.Id, current.Revision, auto, "owner", [context],
+                cancellationToken: Ct, clientUserMessageIds: [null], turnTrigger: "native:goal", goalContinuationId: original);
+            current = await f.Store.CompleteAsync(thread.Id, current.Revision, auto, "owner", "completed", [], Ct);
+        }
+        var lost = Guid.NewGuid();
+        current = await f.Store.StartTurnAsync(thread.Id, current.Revision, lost, "owner", [context],
+            cancellationToken: Ct, clientUserMessageIds: [null], turnTrigger: "native:goal", goalContinuationId: original);
+        current = await f.Reopen().RecoverInterruptedAsync(thread.Id, current.Revision, lost, "owner", Ct);
+        Assert.Equal(2, current.Goal!.EmptyContinuationCount);
+        Assert.Equal("active", current.Goal.Status);
+        Assert.Null(current.Turns[^1].GoalStopReason);
+
+        var explicitTurn = Guid.NewGuid();
+        current = await f.Store.StartTurnAsync(thread.Id, current.Revision, explicitTurn, "owner", [context], cancellationToken: Ct);
+        Assert.Equal(original, current.Turns[^1].GoalLifecycle!.GoalId);
+        var cleared = await f.Store.ClearGoalAsync(thread.Id, current.Revision, Ct);
+        current = await f.Store.SetGoalAsync(thread.Id, cleared.Thread.Revision, "replacement", null, false, null, null, Ct);
+        current = await f.Store.CompleteWithContextAsync(thread.Id, current.Revision, explicitTurn, "owner", "failed", [],
+            null, Ct, usageLimited: true);
+        Assert.Equal("active", current.Goal!.Status);
+        Assert.NotEqual(original, current.Goal.Id);
+        Assert.Null(current.Turns[^1].GoalStopReason);
+    }
+
+    [Fact]
+    public async Task ConfirmedEmptyInterruptionCountsButHostContextDoesNotConstituteProgress()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work"}""");
+        var current = await f.Store.ReadAsync(thread.Id, Ct);
+        var goalId = current.Goal!.Id;
+        var context = Json("""{"role":"user","content":"goal context"}""");
+        for (var i = 1; i <= 3; i++)
+        {
+            var id = Guid.NewGuid();
+            current = await f.Store.StartTurnAsync(thread.Id, current.Revision, id, "owner", [context],
+                cancellationToken: Ct, clientUserMessageIds: [null], turnTrigger: "native:goal", goalContinuationId: goalId);
+            current = await f.Store.CompleteAsync(thread.Id, current.Revision, id, "owner",
+                i == 3 ? "interrupted" : "completed",
+                [Json("""{"role":"developer","content":"host state only"}"""), Json("""{"type":"reasoning","summary":[]}""")], Ct);
+            Assert.Equal(i, current.Goal!.EmptyContinuationCount);
+            Assert.Equal(i == 3 ? "blocked" : "active", current.Goal.Status);
+        }
+        Assert.Equal(CodexGoalStopReason.EmptyResponse, current.Turns[^1].GoalStopReason);
+    }
+
+    [Fact]
     public async Task GoalEmptyContinuationCircuitBreakerPersistsAndExplicitRestartResetsIt()
     {
         var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
@@ -544,6 +601,8 @@ public sealed class ThreadGoalTests
         var active = await f.Finish(thread.Id, "completed", "Intermediate progress");
         Assert.Null(active.ReadReceipt);
         var failed = await f.Finish(thread.Id, "failed", "Failure needs attention");
+        Assert.Equal("blocked", failed.Goal!.Status);
+        Assert.Equal(CodexGoalStopReason.TurnError, failed.Turns[^1].GoalStopReason);
         Assert.Equal(failed.Turns[^1].Id.ToString(), failed.ReadReceipt!.FirstUnreadTurn);
         var fork = await f.Store.ForkAsync(thread.Id, failed.Revision, Guid.NewGuid(), cancellationToken: Ct);
         Assert.Equal(failed.Goal!.Id, fork.Goal!.Id);
@@ -557,7 +616,7 @@ public sealed class ThreadGoalTests
         await Goal(host, fork.Id, """{"status":"complete"}""");
         var terminal = await f.Finish(fork.Id, "completed", "Done");
         Assert.Equal(terminal.Turns[^1].Id.ToString(), terminal.ReadReceipt!.FirstUnreadTurn);
-        Assert.Equal("active", (await f.Store.ReadAsync(thread.Id, Ct)).Goal!.Status);
+        Assert.Equal("blocked", (await f.Store.ReadAsync(thread.Id, Ct)).Goal!.Status);
         var archived = await f.Store.ArchiveAsync(fork.Id, terminal.Revision, Ct);
         await Assert.ThrowsAsync<CodexThreadRpcException>(() => Get(host, archived.Id));
     }

@@ -1290,6 +1290,90 @@ public sealed class ThreadRpcTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GoalProviderAllowanceExhaustionStopsOriginalGoalEvenAtBudgetBoundary(bool duringWrapUp)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        host.EnableLiveGoalProgress();
+        host.EnableThreadGoalBudgetWrapUp((_, _) => Task.FromResult(true));
+        f.Tools = [Json("""{"type":"function","name":"exec","parameters":{"type":"object","properties":{}}}""")];
+        var executed = 0;
+        f.Tool = (_, _) => { Interlocked.Increment(ref executed); return Task.FromResult(new CodexToolOutput("unexpected")); };
+        var ordinary = f.Provider.Reply;
+        f.Provider.Reply = (n, token) => duringWrapUp && n == 1
+            ? Task.FromResult(GoalFunction("exec", "exhausted", "{}")) : ordinary(n, token);
+        f.Provider.Before = n => n == (duringWrapUp ? 2 : 1)
+            ? "data: {\"type\":\"error\",\"error\":{\"type\":\"usage_limit_reached\"}}\n\n" : "";
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = duringWrapUp ? 3 : 100
+        }), ct);
+        var original = (await f.Store.ReadAsync(id, ct)).Goal!.Id;
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        var turn = Assert.Single(final.Turns);
+        Assert.Equal("failed", turn.Status);
+        Assert.Equal(original, final.Goal!.Id);
+        Assert.Equal("usageLimited", final.Goal.Status);
+        Assert.Equal(CodexGoalStopReason.UsageLimit, turn.GoalStopReason);
+        Assert.Equal(0, executed);
+        Assert.Equal(duringWrapUp ? 2 : 1, f.Provider.Requests.Count);
+        Assert.Equal(duringWrapUp ? 3 : 0, final.Goal.TokensUsed);
+        Assert.Equal(duringWrapUp, turn.Dispatches.Any(receipt => receipt.GoalWrapUp is not null));
+        await host.StopAsync(ct);
+        Assert.Equal("usageLimited", f.Events.Last(item => item.Method == "thread/goal/updated").Params.GetProperty("goal").GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task TypedExecFailuresRequireThreeTurnsAndObservedToolSuccessResetsCounter()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        f.Tools = [Json("""{"type":"function","name":"exec","parameters":{"type":"object","properties":{}}}""")];
+        var ordinary = f.Provider.Reply;
+        f.Provider.Reply = (n, token) => n % 2 == 1
+            ? Task.FromResult(GoalFunction("exec", "exec-" + n, "{}")) : ordinary(n, token);
+        var outcomes = new[] { CodexToolOutcome.HandlerFailed, CodexToolOutcome.HandlerFailed,
+            CodexToolOutcome.CompletedSuccess, CodexToolOutcome.HandlerFailed, CodexToolOutcome.Blocked,
+            CodexToolOutcome.HandlerFailed, CodexToolOutcome.HandlerFailed };
+        int executed = 0;
+        f.Tool = (_, _) => Task.FromResult(new CodexToolOutput("opaque output")
+        {
+            Outcome = outcomes[Interlocked.Increment(ref executed) - 1]
+        });
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = 1000
+        }), ct);
+        var expected = new int?[] { 1, 2, null, 1, 1, 2, 3 };
+        for (var i = 0; i < outcomes.Length; i++)
+        {
+            var started = await host.InvokeAsync("turn/start", Input(id), ct);
+            var turnId = started.GetProperty("turn").GetProperty("id").GetString()!;
+            var final = await WaitForQueueDrain(f, id, i + 1);
+            Assert.Equal(expected[i], final.Goal!.ExecutionFailureCount);
+            Assert.Equal(i == outcomes.Length - 1 ? "blocked" : "active", final.Goal.Status);
+            var receipt = Assert.Single(final.Turns[^1].Dispatches, item => item.Kind == "tool");
+            Assert.True(receipt.GoalToolAttempt!.IsExecution);
+            Assert.Equal(outcomes[i], receipt.GoalToolAttempt.Outcome);
+            Assert.Equal("succeeded", receipt.State);
+            Assert.Equal(i == outcomes.Length - 1 ? CodexGoalStopReason.ExecutionUnavailable : (CodexGoalStopReason?)null,
+                final.Turns[^1].GoalStopReason);
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(Timeout);
+            while (!f.Events.Any(item => item.Method == "turn/completed" &&
+                item.Params.GetProperty("turn").GetProperty("id").GetString() == turnId))
+                await Task.Delay(10, deadline.Token);
+        }
+        await host.StopAsync(ct);
+        Assert.Equal(outcomes.Length * 2, f.Provider.Requests.Count);
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task GoalBudgetWrapUpRequiresAuthorityAndSuppressesSubstantiveTools(bool authorized)

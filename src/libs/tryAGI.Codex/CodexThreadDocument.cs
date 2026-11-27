@@ -86,6 +86,12 @@ public sealed record CodexStoredTurn(
     /// <summary>Host-authorized automatic goal continuation, not a user-originated message.</summary>
     public CodexGoalContinuationBinding? GoalContinuation { get; init; }
 
+    /// <summary>Original local goal generation for terminal lifecycle accounting.</summary>
+    public CodexGoalTurnBinding? GoalLifecycle { get; init; }
+
+    /// <summary>Observed terminal reason that stopped the original goal, when applicable.</summary>
+    public CodexGoalStopReason? GoalStopReason { get; init; }
+
     /// <summary>Host-authored goal context captured at native sampling boundaries.</summary>
     public CodexStoredGoalSteeringTransition[]? GoalSteeringTransitions { get; init; }
 
@@ -154,6 +160,9 @@ public sealed record CodexStoredDispatch(
 
     /// <summary>Local goal fence rejection; this tool was never physically dispatched.</summary>
     public string? GoalToolSuppression { get; init; }
+
+    /// <summary>Exact goal generation and known host-observed tool outcome, if available.</summary>
+    public CodexStoredGoalToolAttempt? GoalToolAttempt { get; init; }
 
     /// <summary>Exact settled native goal tool result, atomically committed with goal state.</summary>
     public CodexStoredGoalToolResult? GoalToolResult { get; init; }

@@ -122,7 +122,8 @@ public sealed partial class CodexThreadStore
                 if (before.Turns.LastOrDefault()?.Status == "inProgress")
                     throw new InvalidOperationException("A realtime start must not replace an active reasoning turn.");
                 var turn = new CodexStoredTurn(submissionId, submissionId, turnOwnerId, "inProgress",
-                    time.GetUtcNow(), [item], [], [], ClientUserMessageIds: [submissionId.ToString()], TurnTrigger: "realtime");
+                    time.GetUtcNow(), [item], [], [], ClientUserMessageIds: [submissionId.ToString()], TurnTrigger: "realtime")
+                { GoalLifecycle = CaptureTurnGoal(before) };
                 next = BeginGoalExecutionClock(PrepareGoalTurn(before with { Turns = [.. before.Turns, turn] }, null, null), submissionId);
                 receivingTurn = submissionId;
                 inputIndex = 0;

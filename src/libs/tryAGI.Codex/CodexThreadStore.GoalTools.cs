@@ -53,7 +53,8 @@ public sealed partial class CodexThreadStore
             State = "succeeded", Result = result,
             GoalToolResult = new(id, goal?.Id, command.Name, goal?.Status, CodexRetainedJournalMetadata.ItemHash(result))
         };
-        var updated = turn with { Dispatches = turn.Dispatches.Select(item => item.CallId == call.Id ? committed : item).ToArray() };
+        var updated = turn with { Dispatches = turn.Dispatches.Select(item => item.CallId == call.Id ? committed : item).ToArray(),
+            GoalLifecycle = turn.GoalLifecycle ?? (turn.GoalContinuation is null && goal is { Status: "active" } ? new(id, goal.Id) : null) };
         var next = Replace(before, updated) with
         {
             Revision = checked(before.Revision + 1), UpdatedAt = now, Goal = goal,
@@ -61,6 +62,7 @@ public sealed partial class CodexThreadStore
         };
         // The goal state and tool receipt have one CAS. Never emit a result or retry a
         // mutation when the CAS acknowledgement is ambiguous.
+        if (goal is not null) next = ResetGoalExecutionFailures(next, id, goal.Id);
         next = PromoteRealtimeArtifacts(RebindGoalClock(next), turn, updated);
         return new(await PublishAsync(before.Revision, next, ct, notice).ConfigureAwait(false), output,
             command.Name != CodexNativeGoalTools.Get);

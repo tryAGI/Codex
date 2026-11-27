@@ -120,7 +120,9 @@ public sealed partial class CodexThreadRpc
         if (Volatile.Read(ref goalAuthority) is null || thread.Goal is not { } goal) return;
         var accounted = (goal.UsageReceipts ?? []).Select(receipt => receipt.Id).ToHashSet();
         var continuation = turn.GoalContinuation is { } auto && auto.OriginThreadId == thread.Id && auto.GoalId == goal.Id;
-        if (!continuation && !turn.Dispatches.Any(dispatch => dispatch.GoalInference is { } binding
+        var stopped = turn.GoalStopReason is not null && turn.GoalLifecycle is { } lifecycle &&
+            lifecycle.OriginThreadId == thread.Id && lifecycle.GoalId == goal.Id;
+        if (!continuation && !stopped && !turn.Dispatches.Any(dispatch => dispatch.GoalInference is { } binding
             && binding.OriginThreadId == thread.Id && binding.GoalId == goal.Id && accounted.Contains(binding.UsageId))) return;
         // The result was committed together with the dispatch and is available without another read.
         await EmitAsync("thread/goal/updated", new JsonObject

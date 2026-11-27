@@ -41,7 +41,7 @@ public sealed partial class CodexThreadStore
             || !ValidGoalStatus(goal.Status) || goal.TokenBudget is <= 0 || goal.TokensUsed < 0 || goal.TimeUsedSeconds < 0
             || goal.CreatedAt == default || goal.UpdatedAt == default
             || goal.Status == "active" && goal.TokenBudget is { } budget && goal.TokensUsed >= budget
-            || goal.EmptyContinuationCount is < 0 or > 3
+            || goal.EmptyContinuationCount is < 0 or > 3 || goal.ExecutionFailureCount is < 0 or > 3
             || goal.ElapsedRemainderTicks is < 0 or >= TimeSpan.TicksPerSecond
             || goal.UsageReceipts is { Length: > MaximumGoalUsageReceipts })
             throw new InvalidDataException("Invalid native goal snapshot.");
@@ -152,5 +152,5 @@ public sealed partial class CodexThreadStore
 
     private static CodexStoredThreadGoal? ForkGoal(CodexThreadDocument source, System.Text.Json.JsonElement settings)
         => settings.TryGetProperty("ephemeral", out var ephemeral) && ephemeral.ValueKind == System.Text.Json.JsonValueKind.True
-            ? null : source.Goal is { } goal ? goal with { EmptyContinuationCount = null, ElapsedRemainderTicks = null } : null;
+            ? null : source.Goal is { } goal ? goal with { EmptyContinuationCount = null, ExecutionFailureCount = null, ElapsedRemainderTicks = null } : null;
 }

@@ -55,40 +55,4 @@ public sealed partial class CodexThreadStore
             throw new InvalidOperationException("The automatic goal turn no longer has an active goal generation.");
     }
 
-    private CodexThreadDocument ApplyGoalTerminal(CodexThreadDocument thread, CodexStoredTurn turn)
-    {
-        if (turn.GoalContinuation is not { } binding || binding.OriginThreadId != thread.Id
-            || thread.Goal is not { Status: "active" } goal || goal.Id != binding.GoalId) return thread;
-        // A failed or interrupted automatic turn does not authorize another dispatch.
-        // Match the three-empty-response circuit breaker for completed empty turns.
-        if (turn.Status == "interrupted") return thread;
-        var hasActivity = turn.Input.Length > 1 || turn.Dispatches.Any(d => d.Kind == "tool")
-            || turn.Output.Where((item, index) => !CodexGoalSteeringContext.IsRecorded(turn, index, item)).Any(item =>
-            {
-                var role = CodexRealtimeProtocol.Text(item, "role");
-                var type = CodexRealtimeProtocol.Text(item, "type");
-                if (role == "assistant" && type is null or "message")
-                {
-                    if (!item.TryGetProperty("content", out var content)) return false;
-                    return content.ValueKind switch
-                    {
-                        System.Text.Json.JsonValueKind.String => !string.IsNullOrWhiteSpace(content.GetString()),
-                        System.Text.Json.JsonValueKind.Array => content.EnumerateArray().Any(part =>
-                            !string.IsNullOrWhiteSpace(CodexRealtimeProtocol.Text(part, "text"))),
-                        _ => false
-                    };
-                }
-                if (type == "reasoning") return item.TryGetProperty("summary", out var summary)
-                    && summary.ValueKind == System.Text.Json.JsonValueKind.Array
-                    && summary.EnumerateArray().Any(part => !string.IsNullOrWhiteSpace(CodexRealtimeProtocol.Text(part, "text")));
-                return true;
-            });
-        var empty = turn.Status == "completed" && !hasActivity ? (goal.EmptyContinuationCount ?? 0) + 1 : 0;
-        var status = turn.Status == "failed" || empty >= 3 ? "blocked" : goal.Status;
-        if (status == goal.Status && empty == (goal.EmptyContinuationCount ?? 0)) return thread;
-        return thread with { Goal = goal with
-        {
-            Status = status, EmptyContinuationCount = empty == 0 ? null : empty, UpdatedAt = time.GetUtcNow()
-        } };
-    }
 }

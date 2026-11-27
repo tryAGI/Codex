@@ -9,7 +9,7 @@ internal sealed record CodexGoalNotice(Guid ThreadId, long Revision, Guid? TurnI
     internal static CodexStoredThreadGoal? Project(CodexStoredThreadGoal? goal)
         => goal is null ? null : goal with
         {
-            UsageReceipts = null, EmptyContinuationCount = null, ElapsedRemainderTicks = null,
+            UsageReceipts = null, EmptyContinuationCount = null, ExecutionFailureCount = null, ElapsedRemainderTicks = null,
             CreatedAt = DateTimeOffset.FromUnixTimeSeconds(goal.CreatedAt.ToUnixTimeSeconds()),
             UpdatedAt = DateTimeOffset.FromUnixTimeSeconds(goal.UpdatedAt.ToUnixTimeSeconds())
         };

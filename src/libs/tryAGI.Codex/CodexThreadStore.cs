@@ -86,7 +86,8 @@ public sealed partial class CodexThreadStore
             document = SealRealtimeBeforeTurn(document, turnId);
             var turn = new CodexStoredTurn(turnId, rootTurnId ?? turnId, ownerId, "inProgress", time.GetUtcNow(),
                 Items(input), [], [], ClientUserMessageIds: clientUserMessageIds?.ToArray(), TurnTrigger: turnTrigger)
-            { GoalContinuation = goalContinuationId is { } goal ? new(document.Id, goal) : null, DescendantGoal = descendantGoal };
+            { GoalContinuation = goalContinuationId is { } goal ? new(document.Id, goal) : null, DescendantGoal = descendantGoal,
+                GoalLifecycle = CaptureTurnGoal(document) };
             return BeginGoalExecutionClock(BindRealtimePresentation(document with { Turns = [.. document.Turns, turn] },
                 turnId, PresentationSession(document)?.SessionId), turnId);
         }, cancellationToken);
@@ -209,8 +210,10 @@ public sealed partial class CodexThreadStore
             ? new CodexStoredDispatch(callId, kind, hash, "failed", SuppressedGoalToolResult(steeredTool!, suppression))
                 { GoalToolSuppression = suppression }
             : new CodexStoredDispatch(callId, kind, hash, "dispatching")
-                { GoalInference = CaptureGoalInference(before, active, kind, wrapUp is not null), GoalWrapUp = wrapUp };
-        var turn = active with { Dispatches = [.. active.Dispatches, dispatch] };
+                { GoalInference = CaptureGoalInference(before, active, kind, wrapUp is not null), GoalWrapUp = wrapUp,
+                    GoalToolAttempt = CaptureGoalToolAttempt(before, kind, request) };
+        var turn = active with { Dispatches = [.. active.Dispatches, dispatch],
+            GoalLifecycle = active.GoalLifecycle ?? (active.GoalContinuation is null ? CaptureTurnGoal(before) : null) };
         var next = Replace(before, turn) with { Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow() };
         return new(true, await PublishAsync(before.Revision, next, cancellationToken, goalNotice).ConfigureAwait(false));
     }
@@ -218,6 +221,11 @@ public sealed partial class CodexThreadStore
     /// <summary>Records the outcome of a dispatch: <c>succeeded</c>, <c>failed</c> or <c>unknown</c>.</summary>
     public Task<CodexThreadDocument> SettleAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string callId, string outcome, JsonElement? result = null, CancellationToken cancellationToken = default)
+        => SettleWithToolOutcomeAsync(threadId, expectedRevision, turnId, ownerId, callId, outcome, result, cancellationToken);
+
+    internal Task<CodexThreadDocument> SettleWithToolOutcomeAsync(Guid threadId, long expectedRevision, Guid turnId,
+        string ownerId, string callId, string outcome, JsonElement? result, CancellationToken cancellationToken,
+        CodexToolOutcome? toolOutcome = null)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             var turn = document.Turns.FirstOrDefault(t => t.Id == turnId && t.OwnerId == ownerId)
@@ -227,12 +235,17 @@ public sealed partial class CodexThreadStore
                 ?? throw new KeyNotFoundException("Native dispatch receipt not found.");
             if (prior.State is "succeeded" or "failed" || prior.AbnormalAccounting is not null)
                 throw new InvalidOperationException("An observed terminal dispatch result cannot be replaced.");
+            if (toolOutcome is { } observed && (!Enum.IsDefined(observed) || prior.Kind != "tool" || outcome != "succeeded" || result is null))
+                throw new ArgumentException("A tool outcome requires an observed returned tool result.");
+            var attempt = prior.GoalToolAttempt is { } captured ? captured with { Outcome = toolOutcome } : null;
             var updated = turn with { Dispatches = turn.Dispatches.Select(d => d.CallId == callId
-                ? d with { State = outcome, Result = result?.Clone() } : d).ToArray() };
+                ? d with { State = outcome, Result = result?.Clone(), GoalToolAttempt = attempt } : d).ToArray() };
             var next = Replace(document, updated);
             if (outcome == "succeeded" && result is { } evidence)
                 next = AccountGoalInference(next, prior, turnId, evidence);
             else next = ObserveGoalExecutionTime(next, turnId, true);
+            if (attempt is { Outcome: CodexToolOutcome.CompletedSuccess })
+                next = ResetGoalExecutionFailures(next, attempt.OriginThreadId, attempt.GoalId);
             return PromoteRealtimeArtifacts(next, turn, updated);
         }, cancellationToken);
 
@@ -244,10 +257,11 @@ public sealed partial class CodexThreadStore
     // The optional provider observation and the ordinary terminal transition share one CAS.
     internal Task<CodexThreadDocument> CompleteWithContextAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string status, IReadOnlyList<JsonElement> output, CodexStoredContextWindowObservation? context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool usageLimited = false)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             var turn = Active(document, turnId, ownerId);
+            if (usageLimited && status != "failed") throw new ArgumentException("Usage-limit evidence requires a failed turn.");
             if (status is not ("completed" or "failed" or "interrupted")) throw new ArgumentException("Invalid terminal turn status.", nameof(status));
             if (turn.Dispatches.Any(d => d.State == "dispatching") ||
                 status == "completed" && turn.Dispatches.Any(d => d.State == "unknown"))
@@ -259,7 +273,7 @@ public sealed partial class CodexThreadStore
             };
             if (context is not null) CodexContextWindow.Validate(updated, context);
             document = ObserveGoalExecutionTime(document, turnId, true) with { GoalExecutionClock = null };
-            var next = ApplyGoalTerminal(Replace(document, updated), updated);
+            var next = ApplyGoalTerminal(Replace(document, updated), updated, usageLimited);
             return PublishTerminalReadAttention(PromoteRealtimeArtifacts(next, turn, updated), updated);
         }, cancellationToken);
 
@@ -420,6 +434,7 @@ public sealed partial class CodexThreadStore
             _ = Items(turn.Input); _ = Items(turn.Output);
             ValidateRealtimeModeTransitions(turn);
             ValidateGoalContinuation(turn);
+            ValidateGoalLifecycle(turn);
             ValidateGoalSteeringTransitions(turn);
             ValidateGoalWrapUpAndSuppression(turn);
             ValidateDescendantGoalAttribution(turn);
@@ -436,6 +451,7 @@ public sealed partial class CodexThreadStore
                     throw new InvalidDataException("Native dispatch history is invalid.");
                 ValidateGoalInference(turn, receipt, goalInferenceIds);
                 ValidateGoalToolResult(receipt);
+                ValidateGoalToolAttempt(receipt);
             }
             ValidateNativeBackingArtifacts(turn);
         }

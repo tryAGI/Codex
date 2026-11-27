@@ -29,6 +29,9 @@ public sealed record CodexStoredThreadGoal(Guid Id, string Objective, string Sta
     /// <summary>Consecutive empty automatic continuations; reset by explicit goal changes or turns.</summary>
     public int? EmptyContinuationCount { get; init; }
 
+    /// <summary>Goal turns with a known failed exec handler and no successful tool; reset by success or explicit goal mutation.</summary>
+    public int? ExecutionFailureCount { get; init; }
+
     /// <summary>Unreported fractional seconds retained across live accounting boundaries.</summary>
     public long? ElapsedRemainderTicks { get; init; }
 }
