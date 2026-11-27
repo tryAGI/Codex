@@ -647,6 +647,115 @@ public sealed class ThreadAgentTests
     }
 
     [Fact]
+    public async Task QueuedStandaloneSpeechCannotRebindAfterUserTurn()
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        var agent = Agent(store, auth, budget, server);
+        thread = await store.CreateDirectRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "v3", "voice-owner", Ct);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        var token = deadline.Token;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var socket = new DirectRealtimeTestSocket
+        {
+            BeforeSend = async (text, ct) =>
+            {
+                if (!text.Contains("blocking control", StringComparison.Ordinal)) return;
+                entered.TrySetResult();
+                await release.Task.WaitAsync(ct);
+            },
+        };
+        socket.Incoming.Writer.TryWrite("""{"type":"session.started","session":{"id":"voice"}}""");
+        var controller = CodexRealtimeSessionController.CreateDirect(store, thread.Id, "voice", "voice-owner",
+            (request, ct) => CodexClient.InitializeDirectRealtimeWebSocketAsync(socket,
+                new("test") { Protocol = request.Protocol }, cancellationToken: ct));
+        var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+            Json("{}"), (_, _, _) => throw new InvalidOperationException("No reasoning expected."), (_, _) => Task.CompletedTask);
+        await using var coordinator = new CodexRealtimeCoordinator(store, agent, rpc, controller, thread.Id,
+            "voice", "voice-owner", "account", _ => Options(thread.Id, Guid.NewGuid()), NoTools, new() { DirectAudio = true });
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await coordinator.AttachAsync(token));
+        var userFinal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pump = coordinator.RunAsync((item, _) =>
+        {
+            if (item.Turn is { Role: "user" }) userFinal.TrySetResult();
+            return Task.CompletedTask;
+        }, ct: token);
+        await coordinator.PumpReady.WaitAsync(token);
+        try
+        {
+            Assert.True(coordinator.TryAppendText("blocking control"));
+            await entered.Task.WaitAsync(token);
+            Assert.True(coordinator.TryAppendSpeech("stale queued speech"));
+            await socket.Incoming.Writer.WriteAsync("""{"type":"turn.done","turn":{"role":"user","transcript":"new input"}}""", token);
+            await userFinal.Task.WaitAsync(token);
+            Assert.True(coordinator.TryAppendSpeech("fresh queued speech"));
+        }
+        finally { release.TrySetResult(); }
+        while (true)
+        {
+            var wire = await socket.Outgoing.Reader.ReadAsync(token);
+            Assert.DoesNotContain("stale queued speech", wire, StringComparison.Ordinal);
+            if (wire.Contains("fresh queued speech", StringComparison.Ordinal)) break;
+        }
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await coordinator.EndAsync(Guid.NewGuid(), ct: token));
+        await pump;
+    }
+
+    [Fact]
+    public async Task NativeRpcAudioLaneDoesNotFillSlowGeneralObserverQueue()
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "rtc_call", "v3", "voice-owner", Ct);
+        using var client = new CodexClient(auth);
+        var incoming = Channel.CreateUnbounded<string>();
+        var outgoing = Channel.CreateUnbounded<string>();
+        var controller = new CodexRealtimeSessionController(store, thread.Id, "voice", "voice-owner",
+            (request, ct) => client.AttachExistingRealtimeCallAsync(request.CallId,
+                new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), request.Protocol, request.StartBefore, ct));
+        var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+            Json("{}"), (_, _, _) => throw new InvalidOperationException("No reasoning expected."), (_, _) => Task.CompletedTask);
+        await using var coordinator = new CodexRealtimeCoordinator(store, Agent(store, auth, budget, server), rpc, controller,
+            thread.Id, "voice", "voice-owner", "account", _ => Options(thread.Id, Guid.NewGuid()), NoTools);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        var token = deadline.Token;
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await coordinator.AttachAsync(token));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var heard = Channel.CreateUnbounded<int>();
+        var audioCount = 0;
+        var observerCalls = 0;
+        var pump = coordinator.RunRpcAsync(async (_, ct) =>
+        {
+            Interlocked.Increment(ref observerCalls);
+            entered.TrySetResult();
+            await release.Task.WaitAsync(ct);
+        }, (_, audio, _) =>
+        {
+            Assert.Equal(4, audio.Pcm16.Length);
+            heard.Writer.TryWrite(Interlocked.Increment(ref audioCount));
+            return Task.CompletedTask;
+        }, token);
+        await coordinator.PumpReady.WaitAsync(token);
+        try
+        {
+            await incoming.Writer.WriteAsync("""{"type":"input_transcript.added","item":{"text":"blocked observer"}}""", token);
+            await entered.Task.WaitAsync(token);
+            for (var i = 1; i <= 300; i++)
+            {
+                await incoming.Writer.WriteAsync("""{"type":"output_audio.delta","audio":"AAAAAA=="}""", token);
+                Assert.Equal(i, await heard.Reader.ReadAsync(token));
+            }
+            Assert.Equal(1, Volatile.Read(ref observerCalls));
+        }
+        finally { release.TrySetResult(); }
+        Assert.Equal(CodexRealtimeLifecycleStatus.Detached, await coordinator.DetachAsync(token));
+        await pump;
+        Assert.Equal(300, audioCount);
+    }
+
+    [Fact]
     public async Task OrdinaryReasoningTurnCanSpeakAndSteerWithoutRebindingInflightResponse()
     {
         var (_, store, thread, auth, budget, server) = await Setup();

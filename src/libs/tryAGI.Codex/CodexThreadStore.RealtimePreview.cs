@@ -12,8 +12,17 @@ public sealed partial class CodexThreadStore
     // changing model input/output, dispatch receipts, or the compaction source.
     internal async Task<CodexThreadDocument> RecordRealtimeArtifactPreviewAsync(Guid threadId, long expectedRevision,
         Guid turnId, string ownerId, CodexRealtimeArtifactCandidate candidate, CancellationToken ct)
+        => await RecordRealtimeArtifactPreviewFromSnapshotAsync(
+            await CurrentAsync(threadId, expectedRevision, ct).ConfigureAwait(false),
+            turnId, ownerId, candidate, ct).ConfigureAwait(false);
+
+    // Only the owning executor's last validated journal receipt may enter this fast path.
+    // The exact expected revision is still enforced by the original storage CAS.
+    internal async Task<CodexThreadDocument> RecordRealtimeArtifactPreviewFromSnapshotAsync(CodexThreadDocument before,
+        Guid turnId, string ownerId, CodexRealtimeArtifactCandidate candidate, CancellationToken ct)
     {
-        var before = await CurrentAsync(threadId, expectedRevision, ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        if (before.AccountId != accountId) throw new InvalidOperationException("Realtime preview account changed.");
         var turn = Active(before, turnId, ownerId);
         if (!CodexRealtimeArtifactStream.ValidId(candidate.ItemId) ||
             !turn.Dispatches.Any(d => d.Kind == "inference" && d.CallId == candidate.Preview.RequestId && d.State == "dispatching"))
@@ -72,6 +81,42 @@ public sealed partial class CodexThreadStore
         {
             Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
         }, ct).ConfigureAwait(false);
+    }
+
+    // Once the full validated message contains an exact public checkpoint, the latter
+    // is redundant. Keep the immutable promotion proof and any divergent observed preview.
+    private static CodexThreadDocument DropRedundantArtifactPreviewUpdates(CodexThreadDocument document, CodexStoredTurn turn)
+    {
+        if (document.RealtimeSessions is not { } sessions ||
+            !sessions.Any(s => s.ArtifactPreviewUpdates?.Any(u => u.TurnId == turn.Id) == true)) return document;
+        var messages = turn.Output.Where(item => CodexRealtimeProtocol.Text(item, "type") == "message" &&
+            CodexRealtimeProtocol.Text(item, "role") == "assistant" && CodexRealtimeProtocol.Text(item, "id") is not null)
+            .GroupBy(item => CodexRealtimeProtocol.Text(item, "id")!, StringComparer.Ordinal)
+            .Where(group => group.Count() == 1).ToDictionary(group => group.Key, group => group.Single(), StringComparer.Ordinal);
+        bool Redundant(CodexStoredRealtimeArtifactUpdate update)
+        {
+            if (update.TurnId != turn.Id || !messages.TryGetValue(update.ItemId, out var message) ||
+                CodexRealtimeProtocol.Text(message, "phase") != update.Preview.Phase ||
+                !message.TryGetProperty("content", out var content) || content.ValueKind != System.Text.Json.JsonValueKind.Array)
+                return false;
+            var parts = content.EnumerateArray().ToArray();
+            if (parts.Any(part => CodexRealtimeProtocol.Text(part, "type") != "output_text" ||
+                CodexRealtimeProtocol.Text(part, "text") is null)) return false;
+            return string.Concat(parts.Select(part => CodexRealtimeProtocol.Text(part, "text")))
+                .StartsWith(update.Preview.Text, StringComparison.Ordinal);
+        }
+
+        foreach (var session in sessions)
+        {
+            if (session.ArtifactPreviewUpdates is not { } updates) continue;
+            var retained = updates.Where(update => !Redundant(update)).ToArray();
+            if (retained.Length != updates.Length)
+                document = ReplaceRealtimeSession(document, session with
+                {
+                    ArtifactPreviewUpdates = retained.Length == 0 ? null : retained,
+                });
+        }
+        return document;
     }
 
     // A promoted item is queryable even before its validated terminal output exists.

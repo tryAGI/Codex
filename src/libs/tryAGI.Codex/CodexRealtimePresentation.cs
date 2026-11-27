@@ -120,6 +120,8 @@ public sealed partial class CodexThreadStore
 
     private CodexThreadDocument PromoteRealtimeArtifacts(CodexThreadDocument document, CodexStoredTurn before, CodexStoredTurn after)
     {
+        if (!ReferenceEquals(before.Output, after.Output))
+            document = DropRedundantArtifactPreviewUpdates(document, after);
         var bound = document.RealtimeSessions?.LastOrDefault(s => s.PresentationTurnIds?.Contains(after.Id) == true);
         if (bound is null) return document;
         var prior = CodexRealtimePresentation.Eligible(before, bound.SessionId).ToHashSet();

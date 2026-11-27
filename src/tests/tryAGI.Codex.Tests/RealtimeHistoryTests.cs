@@ -10,6 +10,8 @@ public sealed class RealtimeHistoryTests
     {
         private readonly object gate = new();
         private readonly Dictionary<Guid, JsonElement> rows = [];
+        private int reads;
+        public int Reads => Volatile.Read(ref reads);
         public bool ThrowAfterCommit { get; set; }
         public bool ThrowBeforeCommit { get; set; }
         public Func<JsonElement, JsonElement, JsonElement>? CompetingWriteOnce { get; set; }
@@ -17,6 +19,7 @@ public sealed class RealtimeHistoryTests
         public Task<JsonElement?> ReadAsync(Guid id, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref reads);
             lock (gate)
                 return Task.FromResult(rows.TryGetValue(id, out var row) ? (JsonElement?)row.Clone() : null);
         }

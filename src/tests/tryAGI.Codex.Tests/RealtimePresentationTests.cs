@@ -17,6 +17,59 @@ public sealed class RealtimePresentationTests
     private static string Type(JsonObject item) => item["type"]!.GetValue<string>();
 
     [Fact]
+    public async Task PreviewSnapshotFastPathUsesNoReadsAndRejectsConcurrentJournalRevision()
+    {
+        var (storage, store, thread, attachment) = await RealtimeHistoryTests.Setup();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "request", "inference", Json("{}"), Ct)).Thread;
+        var candidate = new CodexRealtimeArtifactCandidate("preview", new("request", "::codex-realtime-inline{}\nStart"));
+        var reads = storage.Reads;
+        thread = await store.RecordRealtimeArtifactPreviewFromSnapshotAsync(thread, turn, "runner", candidate, Ct);
+        for (var i = 0; i < 12; i++)
+        {
+            candidate = candidate with { Preview = candidate.Preview with { Text = candidate.Preview.Text + "x" } };
+            thread = await store.RecordRealtimeArtifactPreviewFromSnapshotAsync(thread, turn, "runner", candidate, Ct);
+        }
+        Assert.Equal(reads, storage.Reads);
+        var stale = thread;
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "concurrent-voice",
+            """{"type":"input_transcript.added","item":{"text":"user"}}""");
+        var next = candidate with { Preview = candidate.Preview with { Text = candidate.Preview.Text + "y" } };
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => store.RecordRealtimeArtifactPreviewFromSnapshotAsync(
+            stale, turn, "runner", next, Ct));
+        var actual = await store.ReadAsync(thread.Id, Ct);
+        Assert.Equal(thread.Revision, actual.Revision);
+        Assert.Equal(candidate.Preview.Text, Assert.Single(CodexThreadStore.ProjectRealtimeArtifactPreviews(actual, turn))["text"]!.GetValue<string>());
+        Assert.Contains(RealtimeHistoryTests.Session(actual).History!.Frames, frame => frame.Text == "user");
+        actual = await store.RecordRealtimeArtifactPreviewFromSnapshotAsync(actual, turn, "runner", next, Ct);
+        Assert.Equal(next.Preview.Text, Assert.Single(CodexThreadStore.ProjectRealtimeArtifactPreviews(actual, turn))["text"]!.GetValue<string>());
+        var promoted = Assert.Single(Items(actual), item => Type(item) == "bemItemPromoted").ToJsonString();
+        actual = await store.SynchronizeOutputAsync(actual.Id, actual.Revision, turn, "runner",
+            [Message("preview", next.Preview.Text + " final")], Ct);
+        Assert.Null(RealtimeHistoryTests.Session(actual).ArtifactPreviewUpdates);
+        Assert.Equal(promoted, Assert.Single(Items(actual), item => Type(item) == "bemItemPromoted").ToJsonString());
+        Assert.Empty(CodexThreadStore.ProjectRealtimeArtifactPreviews(actual, turn));
+    }
+
+    [Fact]
+    public async Task DivergentTerminalOutputDoesNotEraseObservedPreviewEvidence()
+    {
+        var (_, store, thread, _) = await RealtimeHistoryTests.Setup();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "request", "inference", Json("{}"), Ct)).Thread;
+        var candidate = new CodexRealtimeArtifactCandidate("preview", new("request", "::codex-realtime-inline{}\nStart"));
+        thread = await store.RecordRealtimeArtifactPreviewFromSnapshotAsync(thread, turn, "runner", candidate, Ct);
+        var extended = candidate with { Preview = candidate.Preview with { Text = candidate.Preview.Text + " observed" } };
+        thread = await store.RecordRealtimeArtifactPreviewFromSnapshotAsync(thread, turn, "runner", extended, Ct);
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner",
+            [Message("preview", "::codex-realtime-inline{}\nDifferent terminal")], Ct);
+        Assert.Equal(extended.Preview, Assert.Single(RealtimeHistoryTests.Session(thread).ArtifactPreviewUpdates!).Preview);
+        Assert.Empty(CodexThreadStore.ProjectRealtimeArtifactPreviews(thread, turn));
+    }
+
+    [Fact]
     public async Task PreviewAdmissionRejectsUnknownRequestAndRetainsInterruptedArtifactWithoutModelOutput()
     {
         var (_, store, thread, _) = await RealtimeHistoryTests.Setup();

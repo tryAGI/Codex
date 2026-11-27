@@ -14,6 +14,7 @@ internal sealed class DirectRealtimeTestSocket : WebSocket
     internal int CloseCommands;
     internal int Disposals;
     internal string? FinalObservation { get; init; }
+    internal Func<string, CancellationToken, Task>? BeforeSend { get; init; }
 
     public override WebSocketCloseStatus? CloseStatus => state == WebSocketState.CloseReceived ? WebSocketCloseStatus.NormalClosure : null;
     public override string? CloseStatusDescription => null;
@@ -49,6 +50,7 @@ internal sealed class DirectRealtimeTestSocket : WebSocket
     {
         ct.ThrowIfCancellationRequested();
         var text = Encoding.UTF8.GetString(buffer.AsSpan());
+        if (BeforeSend is not null) await BeforeSend(text, ct);
         await Outgoing.Writer.WriteAsync(text, ct);
         using var json = JsonDocument.Parse(text);
         if (json.RootElement.GetProperty("type").GetString() == "session.close")

@@ -31,5 +31,11 @@ public sealed class RealtimeBoundedQueueTests
             release.TrySetResult();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Task.WhenAll(r, a));
         }
+        Assert.False(reasoning.TryWrite(5, 0));
+        Assert.False(audio.TryWrite(43, 0));
+        Assert.Equal(3, reasoning.Report.Accepted);
+        Assert.Equal(3, reasoning.Report.Processed + reasoning.Report.Abandoned);
+        Assert.True(reasoning.Report.Abandoned >= 2);
+        Assert.Equal(new CodexRealtimeQueueReport("audio", 1, 1, 0), audio.Report);
     }
 }

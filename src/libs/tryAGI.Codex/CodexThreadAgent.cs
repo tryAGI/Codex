@@ -397,8 +397,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                await JournalAsync(doc => store.RecordRealtimeArtifactPreviewAsync(doc.Id, doc.Revision,
-                    turnId, owner, candidate, ct), ct).ConfigureAwait(false);
+                await JournalAsync(doc => doc.RealtimeSessions?.Any(s => s.PresentationTurnIds?.Contains(turnId) == true) == true
+                    ? store.RecordRealtimeArtifactPreviewFromSnapshotAsync(doc, turnId, owner, candidate, ct)
+                    : store.RecordRealtimeArtifactPreviewAsync(doc.Id, doc.Revision, turnId, owner, candidate, ct), ct).ConfigureAwait(false);
             }
             finally { gate.Release(); }
         }

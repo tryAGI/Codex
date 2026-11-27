@@ -64,24 +64,25 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     private Binding? activeFeedback;
     private Task? ownedReasoning;
     private Exception? reasoningFailure;
+    private IReadOnlyList<CodexRealtimeQueueReport> lastQueueReport = [];
     private bool disposed;
 
     private sealed record Handoff(CodexRealtimeEvent Event, Guid Attachment, CodexRealtimeConnection Connection);
     private sealed record Binding(CodexRealtimeFeedbackHandoff Handoff, Guid TurnId,
         CodexRealtimeConnection Connection, CodexRealtimeConnection.FeedbackAdmission Admission, RunState Run, string? WireHandoffId)
     {
-        internal bool HasOutput;
+        internal CodexRealtimeFeedbackDelivery Delivery { get; init; } = new();
         internal bool Completed;
     }
     private sealed record Feedback(Binding Binding, string Text, string? Channel, CodexRealtimeFeedbackKind Kind = CodexRealtimeFeedbackKind.Progress, string? WireId = null);
-    private sealed record Control(string Text, bool Speech, string Role);
+    private sealed record Control(string Text, string Role, CodexRealtimeConnection.FeedbackAdmission? SpeechAdmission);
 
     private sealed class RunState(CodexRealtimeConnection connection)
     {
         internal CodexRealtimeConnection Connection { get; } = connection;
         internal readonly CodexRealtimeBoundedQueue<Handoff> Handoffs = new(64, 4 * 1024 * 1024, "handoff");
         internal readonly CodexRealtimeBoundedQueue<CodexRealtimeEvent> Events = new(256, 8 * 1024 * 1024, "observer");
-        internal readonly CodexRealtimeBoundedQueue<CodexRealtimeEvent> AudioEvents = new(256, 8 * 1024 * 1024, "audio observer");
+        internal readonly CodexRealtimeBoundedQueue<(CodexRealtimeEvent Event, CodexRealtimeAudio Audio)> AudioEvents = new(256, 8 * 1024 * 1024, "audio observer");
         internal readonly CodexRealtimeBoundedQueue<byte[]> Audio = new(256, 8 * 1024 * 1024, "audio");
         internal readonly CodexRealtimeBoundedQueue<Control> Control = new(64, 1024 * 1024, "control");
         internal readonly CodexRealtimeBoundedQueue<Feedback> Feedback = new(64, 1024 * 1024, "feedback");
@@ -124,6 +125,13 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     internal string? Protocol => controller.Connection?.Protocol;
     /// <summary>Last owned reasoning failure, if any. No remote action is automatically replayed.</summary>
     public Exception? ReasoningFailure { get { lock (gate) return reasoningFailure; } }
+
+    /// <summary>Accounting from the last finished attachment pump, including abandoned
+    /// admitted items. Processed callbacks do not imply provider or client delivery.</summary>
+    public IReadOnlyList<CodexRealtimeQueueReport> LastQueueReport
+    {
+        get { lock (gate) return lastQueueReport; }
+    }
 
     /// <summary>Attach to the registered call after validating its thread/account ownership.</summary>
     public async Task<CodexRealtimeLifecycleStatus> AttachAsync(CancellationToken ct = default)
@@ -178,7 +186,13 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         var bytes = Encoding.UTF8.GetByteCount(text);
         if (bytes > 16 * 1024) throw new ArgumentException("Realtime control text exceeds its bound.", nameof(text));
-        lock (gate) return current?.Control.TryWrite(new(text, speech, role), bytes) == true;
+        lock (gate)
+        {
+            if (current is not { } run) return false;
+            var admission = speech ? run.Connection.CaptureFeedbackAdmission() : null;
+            if (admission is not null && !run.Connection.IsFeedbackAdmissionCurrent(admission)) return false;
+            return run.Control.TryWrite(new(text, role, admission), bytes);
+        }
     }
 
     /// <summary>Interrupt the backing native turn without waiting for an already admitted tool.</summary>
@@ -186,10 +200,24 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
 
     /// <summary>Run the sole transport reader with independent bounded consumers. An overload
     /// or consumer failure is observable; durable pending history is never silently replayed.</summary>
-    public async Task<CodexRealtimeLifecycleStatus> RunAsync(
+    public Task<CodexRealtimeLifecycleStatus> RunAsync(
         Func<CodexRealtimeEvent, CancellationToken, Task>? observer = null,
         Func<CodexRealtimeEvent, CancellationToken, Task>? audioObserver = null,
         CancellationToken ct = default)
+        => RunCoreAsync(observer, audioObserver is null ? null : (item, _, cancel) => audioObserver(item, cancel), false, ct);
+
+    // The native RPC host already has an exclusive decoded-audio observer. Preserve the
+    // public all-event observer contract for other callers, but do not double-queue RPC audio.
+    internal Task<CodexRealtimeLifecycleStatus> RunRpcAsync(
+        Func<CodexRealtimeEvent, CancellationToken, Task> observer,
+        Func<CodexRealtimeEvent, CodexRealtimeAudio, CancellationToken, Task> audioObserver,
+        CancellationToken ct = default)
+        => RunCoreAsync(observer, audioObserver, true, ct);
+
+    private async Task<CodexRealtimeLifecycleStatus> RunCoreAsync(
+        Func<CodexRealtimeEvent, CancellationToken, Task>? observer,
+        Func<CodexRealtimeEvent, CodexRealtimeAudio, CancellationToken, Task>? audioObserver,
+        bool exclusiveAudio, CancellationToken ct)
     {
         await ReadBoundAsync(ct).ConfigureAwait(false);
         var connection = controller.Connection ?? throw new InvalidOperationException("Attach the realtime session first.");
@@ -209,12 +237,14 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         {
             run.Handoffs.RunAsync((handoff, cancel) => RouteAsync(run, handoff, cancel), token),
             run.Audio.RunAsync((bytes, cancel) => connection.AppendAudioAsync(bytes, cancel), token),
-            run.Control.RunAsync((command, cancel) => command.Speech
-                ? SendStandaloneAsync(connection, command.Text, cancel)
+            run.Control.RunAsync((command, cancel) => command.SpeechAdmission is { } admission
+                ? connection.SendReasoningFeedbackAsync(admission, CodexRealtimeFeedbackKind.Speech,
+                    command.Text, null, "speakable", null, cancel)
                 : connection.AppendRoleTextAsync(command.Text, command.Role, cancel), token),
             run.Feedback.RunAsync((feedback, cancel) => SendFeedbackAsync(feedback, cancel), token),
             run.Events.RunAsync((item, cancel) => observer is null ? Task.CompletedTask : observer(item, cancel).WaitAsync(cancel), token),
-            run.AudioEvents.RunAsync((item, cancel) => audioObserver is null ? Task.CompletedTask : audioObserver(item, cancel).WaitAsync(cancel), token),
+            run.AudioEvents.RunAsync((item, cancel) => audioObserver is null ? Task.CompletedTask :
+                audioObserver(item.Event, item.Audio, cancel).WaitAsync(cancel), token),
             FlushAsync(run, token),
         };
         Task<CodexRealtimeLifecycleStatus>? pump = null;
@@ -222,11 +252,17 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         {
             pump = controller.PumpAsync((item, _) =>
         {
+            var delegation = item.Delegation;
+            var audio = audioObserver is null ? null : item.Audio;
+            var observe = observer is not null && (!exclusiveAudio || audio is null);
+            var observeAudio = audio is not null && (!exclusiveAudio || !item.StaleForFeedback);
+            if (delegation is null && !observe && !observeAudio) return Task.CompletedTask;
             var bytes = Encoding.UTF8.GetByteCount(item.Payload.GetRawText());
-            if (item.Delegation is not null)
+            if (delegation is not null)
                 run.Handoffs.Write(new(item, attachment, connection), bytes);
-            if (item.Audio is not null && audioObserver is not null) run.AudioEvents.Write(item, bytes);
-            if (observer is not null) run.Events.Write(item, bytes);
+            if (observeAudio)
+                run.AudioEvents.Write((item, audio!), checked(bytes + audio!.Pcm16.Length));
+            if (observe) run.Events.Write(item, bytes);
             return Task.CompletedTask;
             }, token);
             var ended = await Task.WhenAny(workers.Append(pump)).ConfigureAwait(false);
@@ -235,7 +271,6 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         }
         finally
         {
-            await stop.CancelAsync().ConfigureAwait(false);
             lock (gate)
             {
                 if (activeFeedback?.Run == run) { stream.Retire(activeFeedback.Handoff); activeFeedback = null; }
@@ -245,8 +280,19 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
                     current = null;
                 }
             }
+            // Stop admitting new commands before cancelling consumers. The transport's
+            // admission token remains the final authority for any command already in flight.
+            await stop.CancelAsync().ConfigureAwait(false);
             try { await Task.WhenAll(pump is null ? workers : workers.Append(pump)).ConfigureAwait(false); }
             catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+            finally
+            {
+                lock (gate) lastQueueReport = Array.AsReadOnly(new[]
+                {
+                    run.Handoffs.Report, run.Audio.Report, run.Control.Report, run.Feedback.Report,
+                    run.Events.Report, run.AudioEvents.Report,
+                });
+            }
         }
     }
 
@@ -276,7 +322,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         if (session.AttachmentId != handoff.Attachment) throw new InvalidOperationException("Realtime attachment changed before handoff admission.");
         var input = CodexThreadStore.PrepareRealtimeHandoffInput(session, id);
         var submission = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(threadId + "\n" + sessionId + "\n" + id)).AsSpan(0, 16));
-        if (input is null || options.ClientManagedHandoffs)
+        if (input is null || options.ClientManagedHandoffs || handoff.Event.StaleForFeedback)
         {
             await store.RejectRealtimeHandoffAsync(thread.Id, thread.Revision, sessionId, ownerId, handoff.Attachment,
                 id, submission, input?.Text ?? "", cancellationToken: ct).ConfigureAwait(false);
@@ -343,10 +389,16 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
             if (current != run) return;
             var token = stream.Activate(handoff.Event.Delegation!.Id);
             var prior = activeFeedback;
-            var steer = handoff.Connection.Protocol == "v2" && prior is { Completed: false, WireHandoffId: not null } && prior.TurnId == turn && prior.Run == run;
-            var binding = new Binding(token, turn, handoff.Connection,
-                handoff.Event.Admission ?? handoff.Connection.CaptureFeedbackAdmission(), run,
-                steer ? prior!.WireHandoffId : token.Id);
+            var admission = handoff.Event.Admission ?? handoff.Connection.CaptureFeedbackAdmission();
+            var steer = handoff.Connection.Protocol == "v2" && prior is { Completed: false, WireHandoffId: not null } &&
+                prior.TurnId == turn && prior.Run == run &&
+                ReferenceEquals(prior.Admission.Stamp, admission.Stamp) &&
+                handoff.Connection.IsFeedbackAdmissionCurrent(prior.Admission);
+            var binding = new Binding(token, turn, handoff.Connection, admission, run,
+                steer ? prior!.WireHandoffId : token.Id)
+            {
+                Delivery = steer ? prior!.Delivery : new(),
+            };
             activeFeedback = binding;
             if (steer) Queue(binding, "", null, CodexRealtimeFeedbackKind.SteerAck, token.Id);
         }
@@ -380,7 +432,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
                 stream.Retire(binding.Handoff);
                 return;
             }
-            if (binding.WireHandoffId is not null && binding.Connection.Protocol == "v2" && binding.HasOutput)
+            if (binding.WireHandoffId is not null && binding.Connection.Protocol == "v2")
                 Queue(binding, options.ResponsesAsItems ? "" : "complete", null, CodexRealtimeFeedbackKind.Complete);
         }
     }
@@ -444,8 +496,6 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         CodexRealtimeFeedbackKind kind = CodexRealtimeFeedbackKind.Progress, string? wireId = null)
     {
         binding.Run.Feedback.Write(new(binding, text, channel, kind, wireId), Encoding.UTF8.GetByteCount(text));
-        if (kind is CodexRealtimeFeedbackKind.Progress or CodexRealtimeFeedbackKind.Final or CodexRealtimeFeedbackKind.Item)
-            binding.HasOutput = true;
     }
 
     private async Task FlushAsync(RunState run, CancellationToken ct)
@@ -463,13 +513,16 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
 
     private async Task SendFeedbackAsync(Feedback feedback, CancellationToken ct)
     {
-        if (!stream.IsCurrent(feedback.Binding.Handoff)) return;
-        await feedback.Binding.Connection.SendReasoningFeedbackAsync(feedback.Binding.Admission, feedback.Kind,
-            feedback.Text, feedback.WireId ?? feedback.Binding.WireHandoffId, feedback.Channel, options.ResponseItemPrefix, ct).ConfigureAwait(false);
+        var binding = feedback.Binding;
+        bool streamCurrent;
+        lock (gate)
+        {
+            if (current != binding.Run) return;
+            streamCurrent = stream.IsCurrent(binding.Handoff);
+        }
+        await binding.Delivery.SendAsync(binding.Connection, binding.Admission, feedback.Kind, feedback.Text,
+            feedback.WireId ?? binding.WireHandoffId, feedback.Channel, options.ResponseItemPrefix, streamCurrent, ct).ConfigureAwait(false);
     }
-
-    private static Task SendStandaloneAsync(CodexRealtimeConnection connection, string text, CancellationToken ct)
-        => connection.SendReasoningFeedbackAsync(connection.CaptureFeedbackAdmission(), CodexRealtimeFeedbackKind.Speech, text, null, "speakable", null, ct);
 
     /// <summary>Detach transport without ending the logical call or backing reasoning turn.</summary>
     public Task<CodexRealtimeLifecycleStatus> DetachAsync(CancellationToken ct = default) => controller.DetachAsync(ct);

@@ -213,8 +213,8 @@ public sealed partial class CodexThreadRpc
         string? reason = null;
         try
         {
-            var status = await run.Binding.Coordinator.RunAsync((item, _) => PublishRealtimeEventAsync(id, item, false),
-                (item, _) => PublishRealtimeEventAsync(id, item, true)).ConfigureAwait(false);
+            var status = await run.Binding.Coordinator.RunRpcAsync((item, _) => PublishRealtimeEventAsync(id, item),
+                (item, audio, _) => PublishRealtimeAudioAsync(id, item, audio)).ConfigureAwait(false);
             reason = status.ToString();
         }
         catch (Exception error) when (error is not OutOfMemoryException)
@@ -226,18 +226,16 @@ public sealed partial class CodexThreadRpc
         await EmitAsync("thread/realtime/closed", new JsonObject { ["threadId"] = id.ToString(), ["reason"] = reason }).ConfigureAwait(false);
     }
 
-    private async Task PublishRealtimeEventAsync(Guid id, CodexRealtimeEvent item, bool audioOnly)
+    private Task PublishRealtimeAudioAsync(Guid id, CodexRealtimeEvent item, CodexRealtimeAudio audio)
+        => item.StaleForFeedback ? Task.CompletedTask : EmitAsync("thread/realtime/outputAudio/delta",
+            new JsonObject { ["threadId"] = id.ToString(),
+                ["audio"] = new JsonObject { ["data"] = Convert.ToBase64String(audio.Pcm16.Span),
+                    ["sampleRate"] = audio.SampleRate, ["numChannels"] = audio.Channels,
+                    ["samplesPerChannel"] = audio.SamplesPerChannel, ["itemId"] = audio.ItemId } });
+
+    private async Task PublishRealtimeEventAsync(Guid id, CodexRealtimeEvent item)
     {
         var thread = id.ToString();
-        if (audioOnly)
-        {
-            if (item.Audio is { } audio && !item.StaleForFeedback)
-                await EmitAsync("thread/realtime/outputAudio/delta", new JsonObject { ["threadId"] = thread,
-                    ["audio"] = new JsonObject { ["data"] = Convert.ToBase64String(audio.Pcm16.Span),
-                        ["sampleRate"] = audio.SampleRate, ["numChannels"] = audio.Channels,
-                        ["samplesPerChannel"] = audio.SamplesPerChannel, ["itemId"] = audio.ItemId } }).ConfigureAwait(false);
-            return;
-        }
         if (item.ConversationItem is { } conversation)
             await EmitAsync("thread/realtime/itemAdded", new JsonObject { ["threadId"] = thread,
                 ["item"] = JsonNode.Parse(conversation.Item.GetRawText()) }).ConfigureAwait(false);
