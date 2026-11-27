@@ -109,10 +109,10 @@ public sealed class CodexConfigurationReadRpc
         return Element(response);
     }
 
-    private static JsonObject Metadata(CodexConfigurationRpcLayerMetadata item) =>
+    internal static JsonObject Metadata(CodexConfigurationRpcLayerMetadata item) =>
         new() { ["name"] = JsonNode.Parse(item.SourceName.GetRawText()), ["version"] = item.Version };
 
-    private static void ValidateSource(CodexConfigurationRpcLayerMetadata item)
+    internal static void ValidateSource(CodexConfigurationRpcLayerMetadata item)
     {
         var name = item.SourceName;
         if (name.ValueKind != JsonValueKind.Object || Encoding.UTF8.GetByteCount(name.GetRawText()) > 8192)
