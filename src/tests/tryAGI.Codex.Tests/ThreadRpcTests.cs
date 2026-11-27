@@ -799,6 +799,43 @@ public sealed class ThreadRpcTests
     }
 
     [Fact]
+    public async Task ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        var initial = await f.Store.ReadAsync(id, ct);
+        var response = await host.InvokeAsync("thread/name/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["name"] = "  Scheduled task  "
+        }), ct);
+        Assert.Empty(response.EnumerateObject());
+        var notification = Assert.Single(f.Events, e => e.Method == "thread/name/updated").Params;
+        Assert.Equal(id.ToString(), notification.GetProperty("threadId").GetString());
+        Assert.Equal("Scheduled task", notification.GetProperty("threadName").GetString());
+        var persisted = await f.Store.ReadAsync(id, ct);
+        Assert.Equal("Scheduled task", persisted.Name);
+        Assert.Equal(initial.Revision + 1, persisted.Revision);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => f.Store.SetNameAsync(id, initial.Revision, "Stale", ct));
+
+        var cold = f.Host();
+        var parameters = Args(new JsonObject { ["threadId"] = id.ToString() });
+        var read = await cold.InvokeAsync("thread/read", parameters, ct);
+        Assert.Equal("Scheduled task", read.GetProperty("thread").GetProperty("name").GetString());
+        var listed = await cold.InvokeAsync("thread/list", Json("{}"), ct);
+        Assert.Equal("Scheduled task", Assert.Single(listed.GetProperty("data").EnumerateArray()).GetProperty("name").GetString());
+        var resumed = await cold.InvokeAsync("thread/resume", parameters, ct);
+        Assert.Equal("Scheduled task", resumed.GetProperty("thread").GetProperty("name").GetString());
+        var fork = await cold.InvokeAsync("thread/fork", parameters, ct);
+        Assert.Equal("Scheduled task", fork.GetProperty("thread").GetProperty("name").GetString());
+
+        var invalid = await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/name/set",
+            Args(new JsonObject { ["threadId"] = id.ToString(), ["name"] = " \t " }), ct));
+        Assert.Equal(-32602, invalid.Code);
+        Assert.Equal("Scheduled task", (await f.Store.ReadAsync(id, ct)).Name);
+        Assert.Empty(f.Provider.Requests);
+    }
+
+    [Fact]
     public async Task StoredReadsDoNotLoadOrExecuteAndPolicyRejectionDoesNotWrite()
     {
         var f = new Fixture(); var id = await Create(f.Host()); var cold = f.Host();

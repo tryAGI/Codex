@@ -64,7 +64,7 @@ public sealed partial class CodexThreadRpc(
     private bool stopping;
     /// <summary>Returns <see langword="true"/> for the thread and turn methods this host serves.</summary>
     public static bool Handles(string method) => method is "thread/start" or "thread/resume" or "thread/fork"
-        or "thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list" or "thread/items/read"
+        or "thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list" or "thread/items/read" or "thread/name/set"
         or "turn/start" or "turn/steer" or "turn/interrupt" or "turn/settings/update"
         or "thread/realtime/start" or "thread/realtime/stop" or "thread/realtime/list" or "thread/realtime/listVoices"
         or "thread/realtime/appendAudio" or "thread/realtime/appendText" or "thread/realtime/appendSpeech";
@@ -94,6 +94,7 @@ public sealed partial class CodexThreadRpc(
                 "thread/turns/list" => await HistoryAsync(p, false, ct).ConfigureAwait(false),
                 "thread/items/list" => await HistoryAsync(p, true, ct).ConfigureAwait(false),
                 "thread/items/read" => await ReadItemsAsync(p, ct).ConfigureAwait(false),
+                "thread/name/set" => await SetNameAsync(p, ct).ConfigureAwait(false),
                 "turn/start" => await StartAsync(p, ct).ConfigureAwait(false),
                 "turn/steer" => Steer(p),
                 "turn/interrupt" => await InterruptAsync(p, ct).ConfigureAwait(false),

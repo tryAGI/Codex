@@ -29,7 +29,7 @@ public interface ICodexThreadStorage
 /// <param name="Turns">Turns in order.</param>
 /// <param name="ForkedFromId">Source thread of a fork.</param>
 /// <param name="ForkedFromRevision">Source revision of a fork.</param>
-public sealed record CodexThreadDocument(
+public sealed partial record CodexThreadDocument(
     [property: JsonRequired] int Format,
     [property: JsonRequired] Guid Id,
     [property: JsonRequired] string AccountId,
