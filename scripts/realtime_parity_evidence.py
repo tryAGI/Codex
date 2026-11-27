@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from functools import lru_cache
 
 ROOT = Path(__file__).resolve().parent.parent
 PIN = "3d86e43b075adeba2193ec5c22ac92f55afd82e6"
@@ -36,6 +37,7 @@ OFFLINE_CLASSES = (
     "CodexSilentResponseValidationTests", "CodexCompactionTests", "RealtimeBoundedQueueTests",
     "RealtimeFeedbackWireTests", "RealtimeStartupContextTests", "RealtimeModelIdentityTests",
     "ThreadAgentTests", "ThreadRpcTests", "CodexResponsesInterruptionTests",
+    "DirectRealtimeLifecycleTests",
 )
 TRX_NS = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 HEX40 = re.compile(r"[a-f0-9]{40}")
@@ -46,12 +48,24 @@ def git(*args):
     return subprocess.run(["git", *args], cwd=ROOT, check=True, capture_output=True).stdout
 
 
-def source_revision(revision="HEAD"):
-    commit = git("rev-parse", "--verify", revision + "^{commit}").decode().strip()
+@lru_cache(maxsize=64)
+def immutable_source_revision(commit):
+    # A full verified Git commit identifies an immutable tree. Never cache
+    # HEAD or symbolic refs, including between pre/post-test observations.
+    resolved = git("rev-parse", "--verify", commit + "^{commit}").decode().strip()
+    if resolved != commit or not HEX40.fullmatch(resolved):
+        raise ValueError("Expected an immutable source commit")
     tree = git("ls-tree", "-z", commit, "--", *SOURCE_PATHS)
-    if not HEX40.fullmatch(commit) or not tree:
+    if not tree:
         raise ValueError("Could not resolve source revision")
     return commit, hashlib.sha256(tree).hexdigest()
+
+
+def source_revision(revision="HEAD"):
+    if HEX40.fullmatch(revision):
+        return immutable_source_revision(revision)
+    commit = git("rev-parse", "--verify", revision + "^{commit}").decode().strip()
+    return immutable_source_revision(commit)
 
 
 def source_is_clean():
@@ -217,7 +231,38 @@ def validate_receipt(row, evidence, root=ROOT):
     return receipt["sourceTree"]
 
 
+def test_revision_cache():
+    from unittest.mock import patch
+
+    first, second = "a" * 40, "b" * 40
+    head = first
+    calls = []
+
+    def fake_git(*args):
+        calls.append(args)
+        if args[0] == "rev-parse":
+            return (head if args[-1] == "HEAD^{commit}" else args[-1].split("^")[0]).encode()
+        if args[0] == "ls-tree":
+            return ("tree for " + args[2]).encode()
+        raise AssertionError(f"Unexpected Git command: {args}")
+
+    immutable_source_revision.cache_clear()
+    try:
+        with patch(__name__ + ".git", side_effect=fake_git):
+            old = source_revision()
+            assert old == source_revision(first)
+            assert sum(call[0] == "ls-tree" for call in calls) == 1
+            head = second
+            new = source_revision()
+            assert new[0] == second and new[1] != old[1]
+            assert old == source_revision(first)
+            assert sum(call[0] == "ls-tree" for call in calls) == 2
+    finally:
+        immutable_source_revision.cache_clear()
+
+
 def self_test():
+    test_revision_cache()
     def document(outcome, total=1):
         return f"""<TestRun xmlns="{TRX_NS['t']}">
           <Results><UnitTestResult testId="a" testName="{NAMESPACE}RustParityFixtureTests.Example" outcome="{outcome}"/></Results>
