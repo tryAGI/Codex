@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+  "provenance": "Synthetic inputs transcribed from the pinned Rust unit/integration tests; not a provider capture. No credentials, personal information or model-generated text.",
+  "websocket": [
+    {
+      "id": "v1-direct-raw",
+      "protocol": "v1",
+      "route": "direct-mock",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/realtime_conversation.rs#L281-L307",
+      "description": "Rust V1 reference input, raw event and ordering only; typed audio and handoff are tracked separately.",
+      "incoming": [
+        {
+          "type": "session.updated",
+          "session": {
+            "id": "sess_1",
+            "instructions": "backend prompt"
+          }
+        },
+        {
+          "type": "conversation.output_audio.delta",
+          "delta": "AQID",
+          "sample_rate": 24000,
+          "channels": 1
+        },
+        {
+          "type": "conversation.item.added",
+          "item": {
+            "type": "message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "hi"
+              }
+            ]
+          }
+        }
+      ],
+      "outgoing": [],
+      "projections": {}
+    },
+    {
+      "id": "v2-direct-transcript",
+      "protocol": "v2",
+      "route": "direct-mock",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/realtime_conversation.rs#L480-L499",
+      "incoming": [
+        {
+          "type": "session.updated",
+          "session": {
+            "id": "voice-1"
+          }
+        },
+        {
+          "type": "response.output_text.delta",
+          "delta": "assistant first"
+        },
+        {
+          "type": "conversation.item.input_audio_transcription.delta",
+          "delta": "user second"
+        }
+      ],
+      "outgoing": [],
+      "projections": {
+        "1": {
+          "role": "assistant",
+          "text": "assistant first",
+          "final": false
+        },
+        "2": {
+          "role": "user",
+          "text": "user second",
+          "final": false
+        }
+      }
+    },
+    {
+      "id": "v3-direct-transcript-audio",
+      "protocol": "v3",
+      "route": "direct-mock",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs#L35-L64",
+      "incoming": [
+        {
+          "type": "input_transcript.added",
+          "item": {
+            "id": "input-1",
+            "type": "input_transcript",
+            "text": "hello"
+          }
+        },
+        {
+          "type": "turn.done",
+          "turn": {
+            "id": "turn-1",
+            "role": "user",
+            "transcript": "hello"
+          }
+        },
+        {
+          "type": "output_audio.delta",
+          "audio": "AAE=",
+          "start_ms": 0,
+          "end_ms": 100
+        }
+      ],
+      "outgoing": [],
+      "projections": {
+        "0": {
+          "role": "user",
+          "text": "hello",
+          "final": false
+        },
+        "1": {
+          "role": "user",
+          "text": "hello",
+          "final": true,
+          "replaceFinalText": true
+        },
+        "2": {
+          "pcm": "AAE=",
+          "sampleRate": 24000,
+          "channels": 1
+        }
+      }
+    },
+    {
+      "id": "v3-sideband-delegation",
+      "protocol": "v3",
+      "route": "sideband-mock",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs#L7-L32",
+      "incoming": [
+        {
+          "type": "delegation.created",
+          "offset_ms": 1000,
+          "item": {
+            "id": "handoff-123",
+            "type": "delegation",
+            "target": "client",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "check the weather"
+              }
+            ]
+          }
+        }
+      ],
+      "outgoing": [],
+      "projections": {
+        "0": {
+          "id": "handoff-123",
+          "transcript": "check the weather"
+        }
+      },
+      "detach": true
+    }
+  ],
+  "http": {
+    "call": {
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_call.rs#L709-L763",
+      "url": "https://chatgpt.com/backend-api/codex/realtime/calls?intent=quicksilver&architecture=avas",
+      "offer": "v=offer\r\n",
+      "answer": "v=0\r\n",
+      "location": "/v1/live/rtc_backend_frameless",
+      "callId": "rtc_backend_frameless",
+      "expected": {
+        "/session/delegation/type": "client",
+        "/session/audio/output/voice": "cove",
+        "/session/initial_items": [
+          {
+            "type": "message",
+            "role": "developer",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Remember this."
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "Understood."
+              }
+            ]
+          }
+        ]
+      },
+      "absent": [
+        "/session/id"
+      ]
+    },
+    "responses": {
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client.rs#L2159-L2163",
+      "additionalSource": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client.rs#L3825-L3838",
+      "expected": {
+        "/store": false,
+        "/stream": true,
+        "/include": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "incoming": [
+        {
+          "type": "response.created",
+          "response": {
+            "id": "resp_fixture"
+          }
+        },
+        {
+          "type": "response.completed",
+          "response": {
+            "id": "resp_fixture",
+            "output": [
+              {
+                "type": "reasoning",
+                "id": "rs_fixture",
+                "encrypted_content": "synthetic-opaque-continuation"
+              }
+            ]
+          }
+        }
+      ],
+      "description": "Request assertions from Rust; sanitized synthetic SSE completion envelope, not a captured Rust/provider trace."
+    }
+  }
+}

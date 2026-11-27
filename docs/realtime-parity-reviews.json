@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+  "rows": {
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.input_audio_transcription.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "divergent",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "failed",
+        "receipt": "codex-rust-parity-tests-49-r2-20261127",
+        "detail": "xUnit Assert.IsType: CodexRealtimeTranscript was null; 6 passed, 1 failed, 0 skipped in fixture suite. Tested shared working tree, not a revision-bound acceptance receipt."
+      }
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_text.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)"
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:input_transcript.added": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)"
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:turn.done": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)"
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:output_audio.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadAudio",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)"
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:delegation.created": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadDelegation",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-sideband-delegation)"
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs:frameless_transcript_and_audio_events_reuse_existing_internal_events": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)"
+    },
+    "rust-test:codex-api/src/endpoint/realtime_call.rs:sends_backend_frameless_session_call_to_realtime_calls": {
+      "ownerIssue": 27,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient.CreateRealtimeCallAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "v2-user-transcript-delta-projection",
+      "anchor": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.input_audio_transcription.delta",
+      "ownerIssue": 31,
+      "status": "divergent",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "failed",
+        "receipt": "codex-rust-parity-tests-49-r2-20261127",
+        "detail": "xUnit Assert.IsType: CodexRealtimeTranscript was null; 6 passed, 1 failed, 0 skipped in fixture suite. Tested shared working tree, not a revision-bound acceptance receipt."
+      }
+    },
+    {
+      "id": "handoff-start-or-steer",
+      "anchor": "rust-function:core/src/session/realtime_handoff.rs:route_realtime_handoff",
+      "ownerIssue": 35
+    },
+    {
+      "id": "handoff-turn-correlation",
+      "anchor": "rust-function:core/src/session/realtime_handoff.rs:bind_realtime_handoffs_to_turn",
+      "ownerIssue": 35
+    },
+    {
+      "id": "stream-feedback",
+      "anchor": "rust-function:core/src/realtime_conversation.rs:stream_handoff_delta",
+      "ownerIssue": 37
+    },
+    {
+      "id": "final-feedback",
+      "anchor": "rust-function:core/src/realtime_conversation.rs:handoff_complete",
+      "ownerIssue": 38
+    },
+    {
+      "id": "flush-transcript-tail-once",
+      "anchor": "rust-test:core/tests/suite/realtime_conversation.rs:conversation_close_routes_only_remaining_transcript_tail_once",
+      "ownerIssue": 41
+    },
+    {
+      "id": "observer-only-detach",
+      "anchor": "rust-test:core/tests/suite/realtime_conversation.rs:conversation_existing_call_stop_closes_only_observer_transport",
+      "ownerIssue": 32
+    },
+    {
+      "id": "sideband-reconnect",
+      "anchor": "rust-test:core/tests/suite/realtime_conversation.rs:conversation_webrtc_live_reconnects_sideband_after_unclean_disconnect",
+      "ownerIssue": 42
+    },
+    {
+      "id": "sticky-auth-owner-routing",
+      "anchor": "rust-function:core/src/client.rs:turn_state_with_auth_owner",
+      "ownerIssue": 43
+    },
+    {
+      "id": "responses-prewarm",
+      "anchor": "rust-function:core/src/client.rs:prewarm_websocket",
+      "ownerIssue": 44
+    },
+    {
+      "id": "retained-context-policy",
+      "anchor": "rust-function:core/src/compact_remote_v2.rs:is_retained_for_remote_compaction_v2",
+      "ownerIssue": 45
+    },
+    {
+      "id": "atomic-compaction-install",
+      "anchor": "rust-function:core/src/compact_remote_v2_installation.rs:build_and_install_compaction",
+      "ownerIssue": 46
+    },
+    {
+      "id": "compaction-usage",
+      "anchor": "rust-function:core/src/compact_remote_v2.rs:report_usage",
+      "ownerIssue": 47
+    },
+    {
+      "id": "background-reasoning-output-requests-speech",
+      "anchor": "rust-test:app-server/tests/suite/v2/realtime_conversation.rs:websocket_v2_background_agent_steering_ack_requests_response_create",
+      "ownerIssue": 38
+    },
+    {
+      "id": "no-observer-history",
+      "anchor": "rust-test:core/tests/suite/realtime_conversation.rs:conversation_records_history_without_an_event_observer",
+      "ownerIssue": 41
+    }
+  ]
+}
