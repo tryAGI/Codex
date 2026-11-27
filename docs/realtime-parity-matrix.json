@@ -22101,18 +22101,24 @@
       "kind": "rust-test",
       "symbol": "conversation_records_history_without_an_event_observer",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/realtime_conversation.rs#L480",
-      "ownerIssue": 50,
+      "ownerIssue": 41,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexThreadAgent.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/ThreadAgentTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeSessionController.cs::CodexRealtimeSessionController.PumpAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityLifecycleTests.cs::RustParityLifecycleTests.TwoSequentialSessionsWithoutObserverRetainOrderedSpeechExactlyOnce",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "diagnostic-passed",
+        "receipt": "codex-parity-lifecycle-r1-20261127",
+        "detail": "Independent synthetic controller test passed both clean and unclean transport closure cases; shared working tree, not a revision-bound receipt."
+      },
+      "rationale": "Exercises native session controller, persistence and carryover with two sessions and no observer, including repeated event identity. Full reasoning/tool integration remains separate."
     },
     {
       "id": "rust-test:core/tests/suite/realtime_conversation.rs:conversation_rejects_voice_for_wrong_realtime_version",
@@ -28351,8 +28357,11 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.Compaction.cs::CodexThreadStore.InstallCompactionAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/ThreadCompactionCheckpointTests.cs::ThreadCompactionCheckpointTests.CasInstallRestartContinuationAndForkPreserveOriginalHistory",
+        "src/tests/tryAGI.Codex.Tests/ThreadCompactionCheckpointTests.cs::ThreadCompactionCheckpointTests.ConcurrentTurnAndSteerRejectStaleBackgroundCandidate"
+      ],
       "evidence": null
     },
     {
@@ -28450,8 +28459,8 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadAgent.cs::CodexThreadAgent.RunRealtimeHandoffAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHandoffAdmissionTests.cs::RealtimeHandoffAdmissionTests.StartThenSteerAreAtomicAndRepeatedReceiptCannotAdmitAgain",
       "evidence": null
     },
     {
@@ -28469,8 +28478,8 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHandoff.cs::CodexThreadStore.AdmitRealtimeHandoffAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHandoffAdmissionTests.cs::RealtimeHandoffAdmissionTests.DuplicateConcurrentRevisionAndReplacementAreFenced",
       "evidence": null
     },
     {
@@ -28548,10 +28557,15 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
-      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.VoiceOnlySessionSealsTailBeforeEndAndPreservesInterleavedOrder",
-      "evidence": null,
-      "rationale": "Persistence primitive is mapped; the complete native coordinator no-observer case is still required."
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeSessionController.cs::CodexRealtimeSessionController.PumpAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityLifecycleTests.cs::RustParityLifecycleTests.TwoSequentialSessionsWithoutObserverRetainOrderedSpeechExactlyOnce",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "diagnostic-passed",
+        "receipt": "codex-parity-lifecycle-r1-20261127",
+        "detail": "Independent synthetic controller test passed both clean and unclean transport closure cases; shared working tree, not a revision-bound receipt."
+      },
+      "rationale": "Exercises native session controller, persistence and carryover with two sessions and no observer, including repeated event identity. Full reasoning/tool integration remains separate."
     },
     {
       "id": "scenario:observer-only-detach",
@@ -28650,8 +28664,11 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeSessionController.cs::CodexRealtimeSessionController.RecoverAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RealtimeSessionControllerTests.cs::RealtimeSessionControllerTests.ReconnectSameCallAfterTransportLossAndPreserveVoiceOnlyHistory",
+        "src/tests/tryAGI.Codex.Tests/RealtimeSessionControllerTests.cs::RealtimeSessionControllerTests.CloseDuringJoinCancelsRetryAndDoesNotOpenAnotherTransport"
+      ],
       "evidence": null
     },
     {
@@ -28712,8 +28729,12 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeFeedbackStream.cs::CodexRealtimeFeedbackStream",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RealtimeFeedbackStreamTests.cs::RealtimeFeedbackStreamTests.FlushesAtTwoHundredMillisecondsAndImmediatelyFinishes",
+        "src/tests/tryAGI.Codex.Tests/RealtimeFeedbackStreamTests.cs::RealtimeFeedbackStreamTests.PreservesSplitBemEnvelopeAndRoutesRecognizedPhase",
+        "src/tests/tryAGI.Codex.Tests/RealtimeFeedbackStreamTests.cs::RealtimeFeedbackStreamTests.BoundedHeadAndTailRemainValidUnicodeAcrossManyFlushes"
+      ],
       "evidence": null
     },
     {
@@ -28773,16 +28794,16 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "divergent",
+      "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
       "evidence": {
         "lane": "offline",
-        "outcome": "failed",
-        "receipt": "codex-rust-parity-tests-49-r2-20261127",
-        "detail": "xUnit Assert.IsType: CodexRealtimeTranscript was null; 6 passed, 1 failed, 0 skipped in fixture suite. Tested shared working tree, not a revision-bound acceptance receipt."
+        "outcome": "diagnostic-passed",
+        "receipt": "codex-parity-independent-r5-20261127",
+        "detail": "Earlier fixture run r2 failed typed V2 input delta; after #31 the expanded offline suite passed 216 cases, zero failed or skipped. Shared build inputs changed, so this is not revision-bound acceptance."
       },
-      "rationale": "The earlier failed independent case is retained until rerun against the new #31 event projection."
+      "rationale": "The original divergence was not reproduced after #31; the diagnostic pass still requires revision-bound evidence."
     },
     {
       "id": "wire-symbol:app-server-protocol/src/protocol/common.rs:error",
@@ -29954,16 +29975,16 @@
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "divergent",
+      "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
       "evidence": {
         "lane": "offline",
-        "outcome": "failed",
-        "receipt": "codex-rust-parity-tests-49-r2-20261127",
-        "detail": "xUnit Assert.IsType: CodexRealtimeTranscript was null; 6 passed, 1 failed, 0 skipped in fixture suite. Tested shared working tree, not a revision-bound acceptance receipt."
+        "outcome": "diagnostic-passed",
+        "receipt": "codex-parity-independent-r5-20261127",
+        "detail": "Earlier fixture run r2 failed typed V2 input delta; after #31 the expanded offline suite passed 216 cases, zero failed or skipped. Shared build inputs changed, so this is not revision-bound acceptance."
       },
-      "rationale": "The earlier failed independent case is retained until rerun against the new #31 event projection."
+      "rationale": "The original divergence was not reproduced after #31; the diagnostic pass still requires revision-bound evidence."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:error",

@@ -30,6 +30,8 @@ OFFLINE_CLASSES = (
     "CodexResponsesWebSocketTests", "CodexResponsesRoutingTests", "CodexRetainedContextTests",
     "CodexObservedUsageTests", "RealtimeFeedbackCorrelationTests",
     "NativeProtocolTests", "RealtimeModelRouteTests", "RealtimeHistoryTests",
+    "RustParityLifecycleTests", "RealtimeHandoffAdmissionTests", "RealtimeDelegationInputTests",
+    "RealtimeSessionControllerTests", "RealtimeResponseLifecycleTests", "ThreadCompactionCheckpointTests",
 )
 TRX_NS = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 HEX40 = re.compile(r"[a-f0-9]{40}")
@@ -103,9 +105,9 @@ def run(output, host_admission):
         if host_admission:
             command = ["host-build-admission", "--", *command]
         completed = subprocess.run(command, cwd=ROOT)
-        after = require_clean_source()
-        if before[1] != after[1]:
-            raise ValueError("Source tree changed during the test run; receipt discarded")
+        clean_after = source_is_clean()
+        after = source_revision()
+        eligible = clean_after and before[1] == after[1]
         trx = Path(tmp) / "parity.trx"
         if not trx.is_file():
             raise ValueError(f"No completed test artifact (exit {completed.returncode})")
@@ -114,6 +116,8 @@ def run(output, host_admission):
         receipt = {
             "schemaVersion": 1, "upstreamCommit": PIN, "lane": "offline",
             "csharpCommit": before[0], "sourceTree": before[1],
+            "sourceCleanAtStart": True, "sourceCleanAtEnd": clean_after,
+            "sourceTreeAtEnd": after[1], "acceptanceEligible": eligible,
             "artifactSha256": hashlib.sha256(raw).hexdigest(),
             "exitCode": completed.returncode, "cases": cases,
         }
@@ -126,7 +130,11 @@ def run(output, host_admission):
         for case in cases.values():
             counts[case["outcome"]] = counts.get(case["outcome"], 0) + 1
         print(json.dumps({"csharpCommit": before[0], "sourceTree": before[1],
-                          "counts": counts, "exitCode": completed.returncode}, sort_keys=True))
+                          "counts": counts, "exitCode": completed.returncode,
+                          "acceptanceEligible": eligible}, sort_keys=True))
+        if not eligible:
+            print("Build inputs changed during execution; receipt is diagnostic only.")
+            return 1
         return completed.returncode
 
 
@@ -151,6 +159,9 @@ def validate_receipt(row, evidence, root=ROOT):
         raise ValueError(f"Invalid receipt provenance: {location}")
     if row["lane"] == "live":
         raise ValueError("Offline TRX cannot certify live provider scenarios")
+    if (receipt.get("acceptanceEligible") is not True or receipt.get("sourceCleanAtStart") is not True
+            or receipt.get("sourceCleanAtEnd") is not True or receipt.get("sourceTreeAtEnd") != receipt["sourceTree"]):
+        raise ValueError("Concurrent source changes make this receipt diagnostic only")
     if receipt.get("exitCode") != 0:
         raise ValueError("A failed suite is diagnostic, not acceptance evidence")
     cases = evidence.get("cases")
@@ -210,6 +221,8 @@ def self_test():
         receipt = {"schemaVersion": 1, "upstreamCommit": PIN, "lane": "offline",
                    "csharpCommit": "a" * 40, "sourceTree": "b" * 64,
                    "artifactSha256": "c" * 64, "exitCode": 0,
+                   "sourceCleanAtStart": True, "sourceCleanAtEnd": True,
+                   "sourceTreeAtEnd": "b" * 64, "acceptanceEligible": True,
                    "cases": {case_name: {"method": case_name, "outcome": "Passed"}}}
         row = {"lane": "wire", "test": "test.cs::RustParityFixtureTests.Example"}
         evidence = {"receipt": location, "csharpCommit": receipt["csharpCommit"], "cases": [case_name]}
@@ -225,6 +238,14 @@ def self_test():
             raise AssertionError("Invalid acceptance receipt was accepted")
         save()
         assert validate_receipt(row, evidence, root) == "b" * 64
+        receipt["sourceCleanAtEnd"] = False
+        save()
+        rejects()
+        receipt["sourceCleanAtEnd"] = True
+        receipt["sourceTreeAtEnd"] = "d" * 64
+        save()
+        rejects()
+        receipt["sourceTreeAtEnd"] = "b" * 64
         receipt["cases"][case_name]["outcome"] = "NotExecuted"
         save()
         rejects()
