@@ -102,6 +102,7 @@ public sealed partial class CodexClient
         var dispatchStarted = false;
         CodexResponsesInterruption? interruption = null;
         CodexObservedUsage? incompleteUsage = null;
+        JsonElement? incompleteEvidence = null;
         CancellationToken requestCancellation = default;
         try
         {
@@ -234,6 +235,12 @@ public sealed partial class CodexClient
             {
                 incompleteUsage = CodexObservedUsage.Read(payload, identity, accountingId) is { } observed
                     ? observed with { ResponseId = observed.ResponseId ?? correlation.ResponseId } : null;
+                if (type is "response.failed" or "response.incomplete" && incompleteUsage is not null &&
+                    correlation.ResponseId is { } incompleteId &&
+                    payload.TryGetProperty("response", out var incompleteResponse) &&
+                    incompleteResponse.ValueKind == JsonValueKind.Object &&
+                    CodexRealtimeProtocol.Text(incompleteResponse, "id") == incompleteId)
+                    incompleteEvidence = payload;
                 var category = diagnostics.Failure(type, payload);
                 var error = payload.TryGetProperty("response", out var failed) && failed.ValueKind == JsonValueKind.Object &&
                     failed.TryGetProperty("error", out var nested) ? nested :
@@ -272,6 +279,11 @@ public sealed partial class CodexClient
                     if (validated && correlation.ResponseId is { } responseId && nativeObserver is not null)
                         await nativeObserver.CompleteValidatedAsync(accountingId, settings, responseId,
                             accountingResponse, outputValidation.CompletedOutput!, save.Token).ConfigureAwait(false);
+                    else if (usageObserver is ICodexAbnormalResponseObserver abnormal &&
+                        correlation.ResponseId is { } abnormalId &&
+                        CodexRealtimeProtocol.Text(accountingResponse, "id") == abnormalId)
+                        await abnormal.CompleteUnvalidatedAsync(accountingId, settings, type, abnormalId,
+                            accountingResponse, save.Token).ConfigureAwait(false);
                     else
                         await usageObserver.CompleteAsync(accountingId, settings.Model, accountingResponse, save.Token).ConfigureAwait(false);
                     accountingComplete = true;
@@ -320,7 +332,13 @@ public sealed partial class CodexClient
                 {
                     // The terminal may have arrived before a rejected or lost interrupt acknowledgement.
                     // Do not regenerate or discard its provider usage when retiring the socket.
-                    await usageObserver.CompleteAsync(accountingId, settings.Model, terminalResponse, save.Token).ConfigureAwait(false);
+                    if (usageObserver is ICodexAbnormalResponseObserver abnormal &&
+                        CodexRealtimeProtocol.Text(receipt, "type") is { } receiptType &&
+                        CodexRealtimeProtocol.Text(terminalResponse, "id") is { } receiptId)
+                        await abnormal.CompleteUnvalidatedAsync(accountingId, settings, receiptType, receiptId,
+                            terminalResponse, save.Token).ConfigureAwait(false);
+                    else
+                        await usageObserver.CompleteAsync(accountingId, settings.Model, terminalResponse, save.Token).ConfigureAwait(false);
                     diagnostics.Mark("usage.persisted_after_interrupt");
                 }
                 else if (dispatchStarted)
@@ -329,7 +347,11 @@ public sealed partial class CodexClient
                     finally
                     {
                         // Diagnostic callbacks must not prevent conservative accounting.
-                        await usageObserver.IncompleteWithUsageAsync(accountingId, settings.Model, incompleteUsage, save.Token).ConfigureAwait(false);
+                        if (!accountingAttempted && usageObserver is ICodexAbnormalResponseObserver abnormal &&
+                            incompleteEvidence is { } evidence && incompleteUsage is { } usage)
+                            await abnormal.ObserveIncompleteAsync(accountingId, settings, evidence, usage, save.Token).ConfigureAwait(false);
+                        else
+                            await usageObserver.IncompleteWithUsageAsync(accountingId, settings.Model, incompleteUsage, save.Token).ConfigureAwait(false);
                     }
                 }
                 else

@@ -23,6 +23,14 @@ public sealed record CodexStoredInferenceAccounting(
     /// Compaction's wire turn may refer to a not-yet-admitted or already completed turn.</summary>
     public string? RequestKind { get; init; }
 
+    /// <summary>Null for validated completion; otherwise an explicitly separate accounting-only
+    /// terminal or incomplete observation. Never use either kind as model output or sampling proof.</summary>
+    public string? AccountingKind { get; init; }
+    /// <summary>Original provider event type when accounting is not a validated completion.</summary>
+    public string? TerminalEventType { get; init; }
+    /// <summary>Original observation time of incomplete usage, if reported.</summary>
+    public DateTimeOffset? ObservedAt { get; init; }
+
     /// <summary>Calculate the same funding-owner digest when reserving usage. No token is retained.</summary>
     public static string FundingOwnerDigest(CodexCredentials credentials)
     {
@@ -48,9 +56,9 @@ public enum CodexInferenceAccountingOutcome
     NoEvidence,
     /// <summary>The receipt belongs to the source of a fork; reconcile the source instead.</summary>
     InheritedReceipt,
-    /// <summary>The matching existing reservation was atomically completed.</summary>
+    /// <summary>The matching existing reservation was atomically reconciled according to its accounting kind.</summary>
     Settled,
-    /// <summary>The exact matching completion was already committed.</summary>
+    /// <summary>The exact matching accounting evidence was already committed.</summary>
     AlreadySettled,
     /// <summary>No matching reservation exists; do not create one during recovery.</summary>
     MissingReservation,
@@ -82,6 +90,7 @@ internal static class CodexInferenceAccounting
     internal static bool Valid(CodexStoredInferenceAccounting binding, Guid turnId) =>
         binding.OriginThreadId != Guid.Empty && turnId != Guid.Empty && binding.OriginTurnId == turnId &&
         binding.RequestKind is null or "compaction" &&
+        CodexAbnormalInferenceAccounting.ValidKind(binding) &&
         ValidToken(binding.AccountId) && ValidToken(binding.RequestedModel) &&
         ValidHash(binding.AuthOwnerSha256) && ValidHash(binding.TerminalSha256);
 
@@ -100,6 +109,12 @@ internal static class CodexInferenceAccounting
         writer.WriteString("requested_model", binding.RequestedModel);
         writer.WriteString("terminal_sha256", binding.TerminalSha256);
         if (binding.RequestKind is { } kind) writer.WriteString("request_kind", kind);
+        if (binding.AccountingKind is { } accountingKind)
+        {
+            writer.WriteString("accounting_kind", accountingKind);
+            writer.WriteString("terminal_event_type", binding.TerminalEventType);
+            if (binding.ObservedAt is { } observed) writer.WriteString("observed_at", observed);
+        }
         writer.WriteEndObject();
     }
 }
@@ -139,7 +154,7 @@ public sealed partial class CodexThreadStore
             throw new InvalidDataException("Inference accounting belongs to another account.");
         if (binding.OriginThreadId != thread.Id)
             return CodexInferenceAccountingOutcome.InheritedReceipt;
-        if (!CodexInferenceAccounting.Valid(binding, turnId) ||
+        if (!CodexInferenceAccounting.Valid(binding, turnId) || binding.AccountingKind is not null ||
             CodexRealtimeProtocol.Text(terminal, "id") != responseId ||
             binding.TerminalSha256 != CodexRetainedJournalMetadata.ItemHash(terminal))
             throw new InvalidDataException("Durable inference accounting evidence is inconsistent.");

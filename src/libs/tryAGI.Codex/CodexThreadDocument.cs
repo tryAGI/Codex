@@ -105,6 +105,7 @@ public sealed record CodexStoredTurn(
         CodexRetainedJournalMetadata.Validate(this);
         CodexInferenceRecovery.Validate(this);
         CodexDetachedCompactionAccounting.ValidateInline(this);
+        CodexAbnormalInferenceAccounting.Validate(this);
     }
 }
 
@@ -131,6 +132,10 @@ public sealed record CodexStoredDispatch(
 
     /// <summary>Validated inline compaction accounting, never a normal inference output or sampling proof.</summary>
     public CodexStoredInferenceAccounting? CompactionAccounting { get; init; }
+
+    /// <summary>Correlated accounting-only evidence. Billed unvalidated terminals retain the raw
+    /// response; incomplete observations retain the raw event. Neither proves executable output.</summary>
+    public CodexStoredInferenceAccounting? AbnormalAccounting { get; init; }
 }
 
 /// <summary>Result of <see cref="CodexThreadStore.AdmitAsync"/>.</summary>

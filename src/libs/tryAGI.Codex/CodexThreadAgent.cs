@@ -301,7 +301,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         }
     }
 
-    private sealed class Execution : ICodexUsageObserver, ICodexValidatedResponseObserver, IDisposable
+    private sealed class Execution : ICodexUsageObserver, ICodexValidatedResponseObserver, ICodexAbnormalResponseObserver, IDisposable
     {
         private readonly CodexThreadStore store;
         private readonly Guid turnId;
@@ -329,6 +329,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private readonly Dictionary<string, CodexStoredMailSampling> observedMailSampling = new(StringComparer.Ordinal);
         private readonly Dictionary<string, CodexStoredInferenceCompletion> observedInferenceCompletions = new(StringComparer.Ordinal);
         private readonly Dictionary<string, CodexStoredInferenceAccounting> observedInlineCompaction = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (CodexStoredInferenceAccounting Binding, JsonElement Evidence)> observedAbnormal = new(StringComparer.Ordinal);
         internal CodexContextWindowStatus? ContextWindow { get; private set; }
         private readonly SemaphoreSlim gate = new(1, 1);
         private readonly ConcurrentDictionary<string, JsonElement> observed = new(StringComparer.Ordinal);
@@ -738,6 +739,49 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             }
             finally { await budget.CompleteAsync(id, settings.Model, response, ct).ConfigureAwait(false); }
         }
+        private bool CaptureAbnormalAccounting(string id, CodexResponseOptions settings, string eventType,
+            string responseId, JsonElement evidence, CodexObservedUsage? usage = null)
+        {
+            // The caller's private redaction projection must never be bypassed by a recovery sidecar.
+            if (projection is not null || (settings.RequestKind == "compaction"
+                    ? inlineCandidate is null || inlineCallId != id
+                    : settings.RequestKind != "turn" || preparedInferenceRequestId != id))
+                return false;
+            var binding = CodexAbnormalInferenceAccounting.Classify(
+                CodexInferenceAccounting.Capture(Current, turnId, authOwner, settings.Model, evidence) with
+                { RequestKind = settings.RequestKind == "compaction" ? "compaction" : null }, eventType, usage);
+            if (!CodexInferenceAccounting.Valid(binding, turnId) ||
+                !CodexAbnormalInferenceAccounting.ValidId(responseId) ||
+                CodexAbnormalInferenceAccounting.ResponseId(binding, evidence) != responseId) return false;
+            observedAbnormal.Add(id, (binding, evidence.Clone()));
+            return true;
+        }
+
+        public async Task CompleteUnvalidatedAsync(string id, CodexResponseOptions settings, string eventType,
+            string responseId, JsonElement response, CancellationToken ct)
+        {
+            if (!CaptureAbnormalAccounting(id, settings, eventType, responseId, response))
+            {
+                await CompleteAsync(id, settings.Model, response, ct).ConfigureAwait(false);
+                return;
+            }
+            try { await SettleAsync(id, false, ct).ConfigureAwait(false); }
+            finally { await budget.CompleteAsync(id, settings.Model, response, ct).ConfigureAwait(false); }
+        }
+
+        public async Task ObserveIncompleteAsync(string id, CodexResponseOptions settings, JsonElement payload,
+            CodexObservedUsage usage, CancellationToken ct)
+        {
+            if (usage.ResponseId is not { } responseId ||
+                !CaptureAbnormalAccounting(id, settings, usage.EventType, responseId, payload, usage))
+            {
+                await IncompleteWithUsageAsync(id, settings.Model, usage, ct).ConfigureAwait(false);
+                return;
+            }
+            try { await SettleAsync(id, false, ct, reconcile: true).ConfigureAwait(false); }
+            finally { await budget.IncompleteWithUsageAsync(id, settings.Model, usage, ct).ConfigureAwait(false); }
+        }
+
         public async Task IncompleteAsync(string id, string model, CancellationToken ct)
         {
             try { await budget.IncompleteAsync(id, model, ct).ConfigureAwait(false); }
@@ -771,10 +815,13 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 if (reconcile) Current = await store.ReadAsync(Current.Id, ct).ConfigureAwait(false);
                 if (Turn.OwnerId != owner) throw new InvalidOperationException("Native turn owner changed.");
                 var prior = Turn.Dispatches.SingleOrDefault(d => d.CallId == id);
-                if (prior is null || prior.State is "succeeded" or "failed") return;
+                if (prior is null || prior.State is "succeeded" or "failed" || prior.AbnormalAccounting is not null) return;
                 var result = observed.GetValueOrDefault(id);
                 var known = result.ValueKind != JsonValueKind.Undefined;
-                if (known && observedInferenceCompletions.TryGetValue(id, out var completion))
+                if (observedAbnormal.TryGetValue(id, out var abnormal))
+                    await JournalAsync(doc => store.SettleAbnormalInferenceAccountingAsync(doc.Id, doc.Revision, turnId,
+                        owner, id, abnormal.Evidence, abnormal.Binding, ct), ct).ConfigureAwait(false);
+                else if (known && observedInferenceCompletions.TryGetValue(id, out var completion))
                     await JournalAsync(doc => store.SettleValidatedInferenceAsync(doc.Id, doc.Revision, turnId,
                         owner, id, result, completion, observedMailSampling.GetValueOrDefault(id), ct), ct).ConfigureAwait(false);
                 else if (known && observedInlineCompaction.TryGetValue(id, out var compaction))

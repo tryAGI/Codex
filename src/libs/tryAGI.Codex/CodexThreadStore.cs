@@ -168,7 +168,7 @@ public sealed partial class CodexThreadStore
             if (outcome is not ("succeeded" or "failed" or "unknown")) throw new ArgumentException("Invalid dispatch outcome.", nameof(outcome));
             var prior = turn.Dispatches.FirstOrDefault(d => d.CallId == callId)
                 ?? throw new KeyNotFoundException("Native dispatch receipt not found.");
-            if (prior.State is "succeeded" or "failed")
+            if (prior.State is "succeeded" or "failed" || prior.AbnormalAccounting is not null)
                 throw new InvalidOperationException("An observed terminal dispatch result cannot be replaced.");
             var updated = turn with { Dispatches = turn.Dispatches.Select(d => d.CallId == callId
                 ? d with { State = outcome, Result = result?.Clone() } : d).ToArray() };

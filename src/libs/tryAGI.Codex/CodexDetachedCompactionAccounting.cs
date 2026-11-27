@@ -36,7 +36,8 @@ internal static class CodexDetachedCompactionAccounting
             if (receipt?.CompactionAccounting is { } binding &&
                 (receipt.Kind != "inference" || receipt.State != "succeeded" ||
                  receipt.InferenceCompletion is not null || receipt.MailSampling is not null ||
-                 binding.RequestKind != "compaction" || !CodexInferenceAccounting.Valid(binding, turn.Id) ||
+                 binding.RequestKind != "compaction" || binding.AccountingKind is not null ||
+                 receipt.AbnormalAccounting is not null || !CodexInferenceAccounting.Valid(binding, turn.Id) ||
                  receipt.Result is not { ValueKind: JsonValueKind.Object } terminal ||
                  !ValidId(CodexRealtimeProtocol.Text(terminal, "id"))))
                 throw new InvalidDataException("Invalid inline compaction accounting receipt.");
@@ -56,7 +57,7 @@ internal static class CodexDetachedCompactionAccounting
                 binding.OriginThreadId != thread.Id || binding.AccountId != thread.AccountId ||
                 !CodexInferenceAccounting.Valid(binding, binding.OriginTurnId) ||
                 receipt.Terminal.ValueKind != JsonValueKind.Object ||
-                CodexRealtimeProtocol.Text(receipt.Terminal, "id") != receipt.ResponseId)
+                CodexAbnormalInferenceAccounting.ResponseId(binding, receipt.Terminal) != receipt.ResponseId)
                 throw new InvalidDataException("Invalid detached compaction accounting receipt.");
         if ((thread.Turns ?? []).Any(turn => (turn?.Dispatches ?? []).Any(receipt =>
             receipt is not null && ids.Contains(receipt.CallId))))
@@ -90,7 +91,7 @@ internal static class CodexDetachedCompactionAccounting
 // Its terminal accounting is an append-only observation, independent of adoption.
 internal sealed class CodexDetachedCompactionObserver(
     CodexThreadStore store, ICodexUsageObserver budget, CodexThreadCompactionCandidate candidate,
-    CodexThreadCompactionScheduler.AuthOwner owner) : ICodexUsageObserver, ICodexValidatedResponseObserver
+    CodexThreadCompactionScheduler.AuthOwner owner) : ICodexUsageObserver, ICodexValidatedResponseObserver, ICodexAbnormalResponseObserver
 {
     private string? requestId;
     private string? requestHash;
@@ -115,25 +116,50 @@ internal sealed class CodexDetachedCompactionObserver(
     public async Task CompleteValidatedAsync(string id, CodexResponseOptions settings, string responseId,
         JsonElement response, IReadOnlyList<JsonElement> output, CancellationToken ct)
     {
-        try
-        {
-            if (id != requestId || requestHash is null || settings.RequestKind != "compaction" ||
-                settings.Model != candidate.Model || settings.Identity is not { } identity ||
-                !Guid.TryParse(identity.ThreadId, out var threadId) || threadId != candidate.ThreadId ||
-                !Guid.TryParse(identity.TurnId, out var turnId) || turnId == Guid.Empty ||
-                CodexRealtimeProtocol.Text(response, "id") != responseId)
-                throw new CodexProtocolException("Detached compaction terminal does not match its original reservation.");
-            var binding = new CodexStoredInferenceAccounting(candidate.ThreadId, turnId, owner.AccountId,
-                CodexContextWindow.AuthHash(owner), settings.Model, CodexRetainedJournalMetadata.ItemHash(response))
-            { RequestKind = "compaction" };
-            await store.RecordDetachedCompactionAccountingAsync(candidate.ThreadId,
-                new(id, requestHash, responseId, candidate.Revision, binding, response.Clone()), ct).ConfigureAwait(false);
-        }
+        try { await RecordTerminalAsync(id, settings, responseId, response, ct).ConfigureAwait(false); }
         finally
         {
             // Even a failed native journal write must not suppress known provider usage.
             await budget.CompleteAsync(id, settings.Model, response, ct).ConfigureAwait(false);
         }
+    }
+
+    private async Task RecordTerminalAsync(string id, CodexResponseOptions settings, string responseId,
+        JsonElement evidence, CancellationToken ct, string? abnormalEventType = null, CodexObservedUsage? usage = null)
+    {
+        if (id != requestId || requestHash is null || settings.RequestKind != "compaction" ||
+            settings.Model != candidate.Model || settings.Identity is not { } identity ||
+            !Guid.TryParse(identity.ThreadId, out var threadId) || threadId != candidate.ThreadId ||
+            !Guid.TryParse(identity.TurnId, out var turnId) || turnId == Guid.Empty)
+            throw new CodexProtocolException("Detached compaction terminal does not match its original reservation.");
+        var binding = new CodexStoredInferenceAccounting(candidate.ThreadId, turnId, owner.AccountId,
+            CodexContextWindow.AuthHash(owner), settings.Model, CodexRetainedJournalMetadata.ItemHash(evidence))
+        { RequestKind = "compaction" };
+        if (abnormalEventType is not null)
+            binding = CodexAbnormalInferenceAccounting.Classify(binding, abnormalEventType, usage);
+        if (!CodexInferenceAccounting.Valid(binding, turnId) || !CodexAbnormalInferenceAccounting.ValidId(responseId) ||
+            CodexAbnormalInferenceAccounting.ResponseId(binding, evidence) != responseId)
+            throw new CodexProtocolException("Detached compaction evidence identity mismatch.");
+        await store.RecordDetachedCompactionAccountingAsync(candidate.ThreadId,
+            new(id, requestHash, responseId, candidate.Revision, binding, evidence.Clone()), ct).ConfigureAwait(false);
+    }
+
+    public async Task CompleteUnvalidatedAsync(string id, CodexResponseOptions settings, string eventType,
+        string responseId, JsonElement response, CancellationToken ct)
+    {
+        try { await RecordTerminalAsync(id, settings, responseId, response, ct, eventType).ConfigureAwait(false); }
+        finally { await budget.CompleteAsync(id, settings.Model, response, ct).ConfigureAwait(false); }
+    }
+
+    public async Task ObserveIncompleteAsync(string id, CodexResponseOptions settings, JsonElement payload,
+        CodexObservedUsage usage, CancellationToken ct)
+    {
+        try
+        {
+            if (usage.ResponseId is { } responseId)
+                await RecordTerminalAsync(id, settings, responseId, payload, ct, usage.EventType, usage).ConfigureAwait(false);
+        }
+        finally { await budget.IncompleteWithUsageAsync(id, settings.Model, usage, ct).ConfigureAwait(false); }
     }
 
     public Task CompleteAsync(string id, string model, JsonElement response, CancellationToken ct)
@@ -205,7 +231,7 @@ public sealed partial class CodexThreadStore
         Token(requestId);
         var thread = await CurrentAsync(threadId, expectedRevision, cancellationToken).ConfigureAwait(false);
         var receipt = thread.DetachedCompactionReceipts?.SingleOrDefault(item => item.RequestId == requestId);
-        if (receipt is null) return CodexInferenceAccountingOutcome.NoEvidence;
+        if (receipt is null || receipt.Binding.AccountingKind is not null) return CodexInferenceAccountingOutcome.NoEvidence;
         return await ReconcileAccountingCoreAsync(thread, receipt.Binding.OriginTurnId, receipt.RequestId,
             receipt.RequestSha256, receipt.ResponseId, receipt.Terminal, receipt.Binding, reconciler, cancellationToken)
             .ConfigureAwait(false);

@@ -84,7 +84,8 @@ internal static class CodexInferenceRecovery
                 completion.OutputCount < 0 || completion.OutputCount > MaximumResponseItems ||
                 completion.OutputStart > MaximumOutput - completion.OutputCount ||
                 !ValidHash(completion.PrefixSha256) || !ValidHash(completion.OutputSha256) ||
-                completion.Accounting is { } accounting && !CodexInferenceAccounting.Valid(accounting, turn.Id))
+                completion.Accounting is { } accounting &&
+                    (accounting.AccountingKind is not null || !CodexInferenceAccounting.Valid(accounting, turn.Id)))
                 throw new InvalidDataException("Invalid validated inference recovery boundary.");
             var rawCount = 0;
             if (response.TryGetProperty("output", out var raw))
