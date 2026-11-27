@@ -57,6 +57,7 @@ def run(archive, output, parent_namespace):
         executable_digest = sha(executable)
         home = root / "home"
         home.mkdir()
+        (home / "codex").mkdir()
         # No inherited auth, provider or GitHub credentials. The only network
         # interface is loopback, and the fixture issues filesystem RPCs only.
         env = {"PATH": str(executable.parent) + os.pathsep + os.environ["PATH"],
@@ -78,10 +79,16 @@ def run(archive, output, parent_namespace):
              "--results-directory", str(root), "--logger", "trx;LogFileName=differential.trx"],
             cwd=ROOT, env=env, timeout=240)
         trx = root / "differential.trx"
-        if not trx.is_file():
-            raise ValueError(f"No completed differential test artifact (exit {completed.returncode})")
-        raw = trx.read_bytes()
-        cases = parse_trx(raw, offline_classes=CLASSES)
+        raw = trx.read_bytes() if trx.is_file() else None
+        cases = {}
+        diagnostic = None
+        if raw is None:
+            diagnostic = "No completed differential test artifact"
+        else:
+            try:
+                cases = parse_trx(raw, offline_classes=CLASSES)
+            except ValueError as error:
+                diagnostic = str(error)
         after_commit, after_tree = source_revision()
         clean_after = source_is_clean()
         namespace_after = network_namespace(parent_namespace)
@@ -89,7 +96,8 @@ def run(archive, output, parent_namespace):
         eligible = (before_commit == after_commit and before_tree == after_tree and clean_after
                     and namespace == namespace_after and sha(executable) == executable_digest
                     and sha(archive) == ASSET_SHA256 and completed.returncode == 0
-                    and len(cases) == expected_cases and all(c["outcome"] == "Passed" for c in cases.values()))
+                    and diagnostic is None and len(cases) == expected_cases
+                    and all(c["outcome"] == "Passed" for c in cases.values()))
         receipt = {"schemaVersion": 1, "lane": "rust-runtime-differential", "scope": "filesystem",
                    "upstreamCommit": PIN, "upstreamRelease": TAG, "releaseAsset": ASSET,
                    "releaseAssetSha256": ASSET_SHA256, "rustExecutableSha256": executable_digest,
@@ -98,7 +106,8 @@ def run(archive, output, parent_namespace):
                    "csharpCommit": before_commit, "sourceTree": before_tree,
                    "sourceTreeAtEnd": after_tree, "sourceCleanAtStart": True,
                    "sourceCleanAtEnd": clean_after, "acceptanceEligible": eligible,
-                   "artifactSha256": hashlib.sha256(raw).hexdigest(),
+                   "artifactSha256": hashlib.sha256(raw).hexdigest() if raw is not None else None,
+                   "diagnostic": diagnostic,
                    "exitCode": completed.returncode, "cases": cases}
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open("x", encoding="utf-8") as file:

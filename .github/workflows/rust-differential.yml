@@ -31,11 +31,16 @@ jobs:
         run: |
           set -euo pipefail
           parent_netns="$(readlink /proc/self/ns/net)"
-          sudo unshare --net --setgid "$(id -g)" --setuid "$(id -u)" \
-            env -i PATH="$PATH" DOTNET_ROOT="$DOTNET_ROOT" HOME="$HOME" NUGET_PACKAGES="$HOME/.nuget/packages" \
-            python3 -B scripts/rust_differential_receipt.py \
-            --archive "$RUNNER_TEMP/codex-package-x86_64-unknown-linux-musl.tar.gz" \
-            --parent-netns "$parent_netns" --output "$RUNNER_TEMP/rust-differential-receipt.json"
+          # VSTest communicates with its child over loopback. Enable only
+          # loopback inside the fresh network namespace, then drop privileges.
+          sudo unshare --net -- /bin/bash -euc '
+            ip link set dev lo up
+            exec setpriv --reuid "$1" --regid "$2" --clear-groups --no-new-privs \
+              env -i PATH="$3" DOTNET_ROOT="$4" HOME="$5" NUGET_PACKAGES="$5/.nuget/packages" \
+              python3 -B scripts/rust_differential_receipt.py \
+              --archive "$6/codex-package-x86_64-unknown-linux-musl.tar.gz" \
+              --parent-netns "$7" --output "$6/rust-differential-receipt.json"
+          ' bash "$(id -u)" "$(id -g)" "$PATH" "$DOTNET_ROOT" "$HOME" "$RUNNER_TEMP" "$parent_netns"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
