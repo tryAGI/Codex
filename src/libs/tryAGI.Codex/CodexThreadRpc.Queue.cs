@@ -60,15 +60,7 @@ public sealed partial class CodexThreadRpc
                 var selected = selectedId is { } requested ? thread.QueuedSubmissions?.SingleOrDefault(item => item.Id == requested)
                     : thread.QueuedSubmissions?.FirstOrDefault();
                 if (selected is null) throw Invalid("Queued submission not found.");
-                // Native Responses routing uses trusted identity metadata. Do not silently discard or forward
-                // arbitrary client-supplied provider metadata before the host has a dedicated resolver.
-                if (selected.ResponsesApiClientMetadata is { } metadata && metadata.EnumerateObject().Any())
-                    throw new CodexThreadRpcException(-32601, "Queued provider metadata requires a host resolver.");
-                return await StartAsync(Element(new JsonObject
-                {
-                    ["threadId"] = id.ToString(), ["input"] = JsonNode.Parse(selected.Input.GetRawText()),
-                    ["clientUserMessageId"] = selected.ClientUserMessageId
-                }), ct, selected.Id, thread.Revision).ConfigureAwait(false);
+                return await StartQueuedAsync(thread, selected, ct).ConfigureAwait(false);
             }
         }
 
@@ -114,12 +106,27 @@ public sealed partial class CodexThreadRpc
         }
         finally { admission.Release(); }
         if (change.Changed) await NotifyQueueChangedAsync(id).ConfigureAwait(false);
+        if (change.Changed && method == "thread/queue/add")
+            await TryWakeQueueAsync(id).ConfigureAwait(false);
         return method switch
         {
             "thread/queue/add" or "thread/queue/update" => Element(new JsonObject { ["queuedSubmission"] = QueuedSubmission(change.Submission!) }),
             "thread/queue/delete" => Element(new JsonObject { ["deleted"] = change.Changed }),
             _ => Json("{}")
         };
+    }
+
+    private async Task<JsonElement> StartQueuedAsync(CodexThreadDocument thread, CodexStoredQueuedSubmission selected, CancellationToken ct)
+    {
+        // Native Responses routing uses trusted identity metadata. Do not silently discard or forward
+        // arbitrary client-supplied provider metadata before the host has a dedicated resolver.
+        if (selected.ResponsesApiClientMetadata is { } metadata && metadata.EnumerateObject().Any())
+            throw new CodexThreadRpcException(-32601, "Queued provider metadata requires a host resolver.");
+        return await StartAsync(Element(new JsonObject
+        {
+            ["threadId"] = thread.Id.ToString(), ["input"] = JsonNode.Parse(selected.Input.GetRawText()),
+            ["clientUserMessageId"] = selected.ClientUserMessageId
+        }), ct, selected.Id, thread.Revision).ConfigureAwait(false);
     }
 
     private Task NotifyQueueChangedAsync(Guid id)

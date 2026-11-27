@@ -123,6 +123,7 @@ public sealed partial class CodexThreadRpc
     private async Task RunAsync(CodexThreadDocument thread, Running running, IReadOnlyList<JsonElement> input)
     {
         CodexTurnEvents? events = null;
+        var wakeQueue = false;
         try
         {
             events = new CodexTurnEvents(thread.Id.ToString(), running.Id.ToString(), PublishAsync);
@@ -145,6 +146,7 @@ public sealed partial class CodexThreadRpc
             }, running.Control.Token).ConfigureAwait(false);
             await PublishItemsAsync(thread.Id, running, CancellationToken.None).ConfigureAwait(false);
             await CompletedAsync(result, running).ConfigureAwait(false);
+            wakeQueue = result.Turns.LastOrDefault() is { Status: "completed" } terminal && terminal.Id == running.Id;
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
@@ -167,6 +169,7 @@ public sealed partial class CodexThreadRpc
                 coordinator.CompleteReasoning(running.Id, "failed");
             RemoveActive(thread.Id, running); running.Control.Dispose();
         }
+        if (wakeQueue) await TryWakeQueueAsync(thread.Id, running.Id).ConfigureAwait(false);
     }
 
     /// <summary>Bind a real host worker to this catalog and control plane. The caller supplies

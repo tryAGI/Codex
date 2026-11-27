@@ -126,6 +126,16 @@ public sealed partial class CodexThreadStore
     private static bool SameQueueMetadata(JsonElement? a, JsonElement? b)
         => a is { } left && b is { } right ? JsonElement.DeepEquals(left, right) : a is null && b is null;
 
+    internal static bool SameQueuedSubmissions(CodexThreadDocument before, CodexThreadDocument after)
+    {
+        var left = before.QueuedSubmissions ?? [];
+        var right = after.QueuedSubmissions ?? [];
+        return left.Length == right.Length && left.Zip(right).All(pair =>
+            pair.First.Id == pair.Second.Id && pair.First.ClientUserMessageId == pair.Second.ClientUserMessageId
+            && JsonElement.DeepEquals(pair.First.Input, pair.Second.Input)
+            && SameQueueMetadata(pair.First.ResponsesApiClientMetadata, pair.Second.ResponsesApiClientMetadata));
+    }
+
     private static CodexThreadDocument ConsumeQueuedSubmission(CodexThreadDocument thread, Guid turnId, string?[]? clients, string? trigger)
     {
         var queue = thread.QueuedSubmissions ?? [];

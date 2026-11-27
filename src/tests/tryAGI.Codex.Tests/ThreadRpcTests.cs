@@ -887,6 +887,138 @@ public sealed class ThreadRpcTests
         => (await host.InvokeAsync("thread/queue/add", QueueArgs(id, client, text, metadata), TestContext.Current.CancellationToken))
             .GetProperty("queuedSubmission");
 
+    private static async Task<CodexThreadDocument> WaitForQueueDrain(Fixture fixture, Guid threadId, int turns)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        deadline.CancelAfter(Timeout);
+        while (true)
+        {
+            var current = await fixture.Store.ReadAsync(threadId, deadline.Token);
+            if (current.Turns.Length == turns && current.Turns.All(turn => turn.Status != "inProgress")
+                && current.QueuedSubmissions is not { Length: > 0 }) return current;
+            await Task.Delay(10, deadline.Token);
+        }
+    }
+
+    [Fact]
+    public async Task QueueAutomaticWakeDrainsLoadedIdleAndCompletedTurnsInOrder()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); host.EnableAutomaticThreadQueue();
+        var id = await Create(host);
+        var entered = Signal(); var release = Signal(); var ordinary = f.Provider.Reply;
+        f.Provider.Reply = async (n, token) =>
+        {
+            if (n == 1) { entered.TrySetResult(); await release.Task.WaitAsync(token); }
+            return await ordinary(n, token);
+        };
+        var first = await AddQueue(host, id, "first", "first");
+        await entered.Task.WaitAsync(Timeout, ct);
+        var second = await AddQueue(host, id, "second", "second");
+        var third = await AddQueue(host, id, "third", "third");
+        var pending = await f.Store.ReadAsync(id, ct);
+        Assert.Single(pending.Turns);
+        Assert.Equal("inProgress", pending.Turns[0].Status);
+        Assert.Equal(new[] { "second", "third" }, pending.QueuedSubmissions!.Select(item => item.ClientUserMessageId));
+        Assert.Single(f.Provider.Requests);
+        release.TrySetResult();
+        var final = await WaitForQueueDrain(f, id, 3);
+        Assert.Equal(new[] { first, second, third }.Select(item => item.GetProperty("id").GetString()),
+            final.Turns.Select(turn => turn.Id.ToString()));
+        Assert.Equal(new[] { "first", "second", "third" }, final.Turns.Select(turn => Assert.Single(turn.ClientUserMessageIds!)));
+        Assert.All(final.Turns, turn => Assert.Equal("completed", turn.Status));
+        Assert.Equal(3, f.Provider.Requests.Count);
+        Assert.Equal(0, host.QueueWakeFailures);
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task QueueColdResumeWakesPersistedInputButMetadataReadsNeverExecute()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var writer = f.Host(); writer.EnableThreadQueue();
+        var id = await Create(writer);
+        var first = await AddQueue(writer, id, "first", "cold first");
+        await writer.StopAsync(ct);
+
+        var cold = f.Host(); cold.EnableAutomaticThreadQueue();
+        var second = await AddQueue(cold, id, "second", "cold second");
+        var args = Args(new JsonObject { ["threadId"] = id.ToString() });
+        await cold.InvokeAsync("thread/read", args, ct);
+        await cold.InvokeAsync("thread/list", Json("{}"), ct);
+        var queue = await cold.InvokeAsync("thread/queue/list", args, ct);
+        Assert.Equal(2, queue.GetProperty("data").GetArrayLength());
+        Assert.Empty(f.Provider.Requests);
+
+        await cold.InvokeAsync("thread/resume", args, ct);
+        var final = await WaitForQueueDrain(f, id, 2);
+        Assert.Equal(new[] { first, second }.Select(item => item.GetProperty("id").GetString()),
+            final.Turns.Select(turn => turn.Id.ToString()));
+        Assert.Equal(2, f.Provider.Requests.Count);
+        await cold.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task QueueAutomaticWakeRemainsPausedAfterInterruptAcrossAddAndColdResume()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); host.EnableAutomaticThreadQueue();
+        var id = await Create(host);
+        var entered = Signal(); var ordinary = f.Provider.Reply;
+        f.Provider.Reply = async (n, token) =>
+        {
+            if (n == 1) { entered.TrySetResult(); await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, token); }
+            return await ordinary(n, token);
+        };
+        var started = await host.InvokeAsync("turn/start", Input(id), ct);
+        await entered.Task.WaitAsync(Timeout, ct);
+        var first = await AddQueue(host, id, "first", "first");
+        var second = await AddQueue(host, id, "second", "second");
+        await host.InvokeAsync("turn/interrupt", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["turnId"] = started.GetProperty("turn").GetProperty("id").GetString()
+        }), ct);
+        var third = await AddQueue(host, id, "third", "third");
+        var args = Args(new JsonObject { ["threadId"] = id.ToString() });
+        await host.InvokeAsync("thread/resume", args, ct);
+        await host.StopAsync(ct);
+        var cold = f.Host(); cold.EnableAutomaticThreadQueue();
+        await cold.InvokeAsync("thread/resume", args, ct);
+        Assert.Equal(3, (await f.Store.ReadAsync(id, ct)).QueuedSubmissions!.Length);
+        Assert.Single(f.Provider.Requests);
+
+        await cold.InvokeAsync("thread/queue/start", QueueStartArgs(id, second.GetProperty("id").GetString()), ct);
+        var final = await WaitForQueueDrain(f, id, 4);
+        Assert.Equal("interrupted", final.Turns[0].Status);
+        Assert.Equal(new[] { second, first, third }.Select(item => item.GetProperty("id").GetString()),
+            final.Turns.Skip(1).Select(turn => turn.Id.ToString()));
+        Assert.All(final.Turns.Skip(1), turn => Assert.Equal("completed", turn.Status));
+        Assert.Equal(4, f.Provider.Requests.Count);
+        await cold.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task QueueAutomaticWakeDoesNotRetryUncertainAdmission()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); host.EnableAutomaticThreadQueue();
+        var id = await Create(host);
+        f.Storage.AfterQueueAdmission = () => throw new IOException("Lost durable admission acknowledgment.");
+        var first = await AddQueue(host, id, "first", "first");
+        var second = await AddQueue(host, id, "second", "second");
+        var snapshot = await f.Store.ReadAsync(id, ct);
+        var admitted = Assert.Single(snapshot.Turns);
+        Assert.Equal(first.GetProperty("id").GetString(), admitted.Id.ToString());
+        Assert.Equal("inProgress", admitted.Status);
+        Assert.Equal(second.GetProperty("id").GetString(), Assert.Single(snapshot.QueuedSubmissions!).Id.ToString());
+        Assert.Empty(f.Provider.Requests);
+        Assert.Equal(1, host.QueueWakeFailures);
+        var cold = f.Host(); cold.EnableAutomaticThreadQueue();
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/resume",
+            Args(new JsonObject { ["threadId"] = id.ToString() }), ct));
+        Assert.Empty(f.Provider.Requests);
+    }
+
     [Fact]
     public async Task QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages()
     {

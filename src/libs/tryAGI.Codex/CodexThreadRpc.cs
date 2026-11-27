@@ -170,6 +170,7 @@ public sealed partial class CodexThreadRpc(
         var settings = rejoin ? Resolve(p, thread.Settings, fields)
             : await ResolveLifecycleAsync("thread/resume", p, thread.Settings, fields, thread.Id, ct).ConfigureAwait(false);
         // Source I/O never holds the turn admission gate. Recheck identity/state before CAS.
+        JsonElement response;
         await admission.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -185,9 +186,11 @@ public sealed partial class CodexThreadRpc(
                     current = await store.UpdateSettingsAsync(current.Id, current.Revision, settings, ct).ConfigureAwait(false);
             }
             loaded.TryAdd(current.Id, 0);
-            return Lifecycle(current, !Flag(p, "excludeTurns"));
+            response = Lifecycle(current, !Flag(p, "excludeTurns"));
         }
         finally { admission.Release(); }
+        await TryWakeQueueAsync(thread.Id).ConfigureAwait(false);
+        return response;
     }
 
     private async Task<JsonElement> ForkAsync(JsonElement p, CancellationToken ct)
