@@ -64,7 +64,7 @@ public sealed partial class CodexThreadRpc(
     private bool stopping;
     /// <summary>Returns <see langword="true"/> for the thread and turn methods this host serves.</summary>
     public static bool Handles(string method) => method is "thread/start" or "thread/resume" or "thread/fork"
-        or "thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list" or "thread/items/read" or "thread/name/set" or "thread/metadata/update"
+        or "thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list" or "thread/items/read" or "thread/name/set" or "thread/metadata/update" or "thread/archive" or "thread/unarchive"
         or "thread/attachment/add" or "thread/attachment/list" or "thread/attachment/remove" or "thread/attachmentOwner/list"
         or "turn/start" or "turn/steer" or "turn/interrupt" or "turn/settings/update"
         or "thread/realtime/start" or "thread/realtime/stop" or "thread/realtime/list" or "thread/realtime/listVoices"
@@ -97,6 +97,8 @@ public sealed partial class CodexThreadRpc(
                 "thread/items/read" => await ReadItemsAsync(p, ct).ConfigureAwait(false),
                 "thread/name/set" => await SetNameAsync(p, ct).ConfigureAwait(false),
                 "thread/metadata/update" => await UpdateMetadataAsync(p, ct).ConfigureAwait(false),
+                "thread/archive" => await ArchiveAsync(p, true, ct).ConfigureAwait(false),
+                "thread/unarchive" => await ArchiveAsync(p, false, ct).ConfigureAwait(false),
                 "thread/attachment/add" => await AddAttachmentAsync(p, ct).ConfigureAwait(false),
                 "thread/attachment/list" => await ListAttachmentsAsync(p, ct).ConfigureAwait(false),
                 "thread/attachment/remove" => await RemoveAttachmentAsync(p, ct).ConfigureAwait(false),
@@ -153,7 +155,7 @@ public sealed partial class CodexThreadRpc(
     {
         string[] fields = ["threadId", "excludeTurns", "model", "modelProvider", "cwd", "baseInstructions", "developerInstructions", "approvalPolicy", "sandbox", "approvalsReviewer", "serviceTier", "personality", "config"];
         ValidateFields(p, fields);
-        var thread = await store.ReadAsync(Id(p, "threadId"), ct).ConfigureAwait(false);
+        var thread = CodexThreadStore.RequireUnarchived(await store.ReadAsync(Id(p, "threadId"), ct).ConfigureAwait(false));
         if (Flag(thread.Settings, "ephemeral") && !Flag(p, "excludeTurns")) throw Invalid("Ephemeral resume requires excludeTurns.");
         var rejoin = active.ContainsKey(thread.Id);
         var settings = rejoin ? Resolve(p, thread.Settings, fields)
@@ -163,7 +165,8 @@ public sealed partial class CodexThreadRpc(
         try
         {
             if (Volatile.Read(ref stopping)) throw new CodexThreadRpcException(-32010, "Native thread host is draining.");
-            var current = await store.ReadAsync(thread.Id, ct).ConfigureAwait(false);
+            RequireNoArchiveTransition(thread.Id);
+            var current = CodexThreadStore.RequireUnarchived(await store.ReadAsync(thread.Id, ct).ConfigureAwait(false));
             if (current.Turns.LastOrDefault()?.Status == "inProgress" && !active.ContainsKey(thread.Id))
                 throw new CodexThreadRpcException(-32010, "Recorded execution owner is not this host; explicit owner reconciliation is required.");
             if (!rejoin && !active.ContainsKey(thread.Id))

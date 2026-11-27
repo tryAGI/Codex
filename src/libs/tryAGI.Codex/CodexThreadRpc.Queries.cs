@@ -21,9 +21,9 @@ public sealed partial class CodexThreadRpc
         IReadOnlyList<CodexThreadDocument> documents = await list(ct).ConfigureAwait(false);
         if (onlyLoaded) documents = documents.Concat(store.EphemeralThreads).DistinctBy(d => d.Id).ToArray();
         if (documents.Count > 1000) throw new CodexThreadRpcException(-32010, "Native discovery exceeds its bounded catalog; no incomplete success returned.");
-        IEnumerable<CodexThreadDocument> selected = documents;
+        var archived = !onlyLoaded && Flag(p, "archived");
+        IEnumerable<CodexThreadDocument> selected = documents.Where(d => store.OwnsThread(d) && (d.ArchivedAt is not null) == archived);
         if (onlyLoaded) selected = selected.Where(d => loaded.ContainsKey(d.Id));
-        if (Flag(p, "archived")) selected = [];
         if (p.TryGetProperty("sectionId", out _))
         {
             var section = Text(p, "sectionId");
@@ -169,9 +169,9 @@ public sealed partial class CodexThreadRpc
         ["reasoningEffort"] = Text(thread.Settings, "effort"), ["createdAt"] = thread.CreatedAt.ToUnixTimeSeconds(),
         ["updatedAt"] = thread.UpdatedAt.ToUnixTimeSeconds(), ["cwd"] = Text(thread.Settings, "cwd"),
         ["cliVersion"] = "tryagi-codex", ["source"] = "appServer", ["originator"] = "tryagi-codex", ["threadSource"] = Text(thread.Settings, "threadSource"),
-        ["path"] = null, ["historyMode"] = "paginated", ["status"] = loaded.ContainsKey(thread.Id) && active.ContainsKey(thread.Id)
+        ["path"] = null, ["historyMode"] = "paginated", ["status"] = thread.ArchivedAt is null && loaded.ContainsKey(thread.Id) && active.ContainsKey(thread.Id)
             ? new JsonObject { ["type"] = "active", ["activeFlags"] = new JsonArray() }
-            : new JsonObject { ["type"] = loaded.ContainsKey(thread.Id) ? "idle" : "notLoaded" },
+            : new JsonObject { ["type"] = thread.ArchivedAt is null && loaded.ContainsKey(thread.Id) ? "idle" : "notLoaded" },
         ["turns"] = new JsonArray(includeTurns ? thread.Turns.Select(t => (JsonNode)Turn(t, "full")).ToArray() : [])
     };
 

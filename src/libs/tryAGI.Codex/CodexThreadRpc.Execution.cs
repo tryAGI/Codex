@@ -58,6 +58,7 @@ public sealed partial class CodexThreadRpc
         try
         {
             if (Volatile.Read(ref stopping)) throw new CodexThreadRpcException(-32010, "Native thread host is draining.");
+            RequireNoArchiveTransition(id);
             if (!loaded.ContainsKey(id)) throw Invalid("Resume the native thread before starting a turn.");
             if (active.TryGetValue(id, out var running))
             {
@@ -67,7 +68,7 @@ public sealed partial class CodexThreadRpc
                 running.Control.Steer(input, clientId);
                 return Element(new JsonObject { ["turn"] = Turn((await store.ReadAsync(id, ct).ConfigureAwait(false)).Turns.Single(t => t.Id == running.Id), "notLoaded") });
             }
-            var thread = await store.ReadAsync(id, ct).ConfigureAwait(false);
+            var thread = CodexThreadStore.RequireUnarchived(await store.ReadAsync(id, ct).ConfigureAwait(false));
             var effectiveSettings = TurnSettings(thread.Settings, p);
             if (maximumConcurrentTurns is < 1 or > 64 || active.Count >= maximumConcurrentTurns)
                 throw new CodexThreadRpcException(-32010, "Native thread host concurrent-turn capacity is exhausted.");
@@ -170,7 +171,8 @@ public sealed partial class CodexThreadRpc
         {
             if (Volatile.Read(ref stopping) || active.Count >= maximumConcurrentTurns)
                 throw new CodexThreadRpcException(-32010, "Native thread host is draining or at capacity.");
-            var actual = await store.ReadAsync(thread.Id, cancellationToken).ConfigureAwait(false);
+            RequireNoArchiveTransition(thread.Id);
+            var actual = CodexThreadStore.RequireUnarchived(await store.ReadAsync(thread.Id, cancellationToken).ConfigureAwait(false));
             if (actual.Revision != thread.Revision) throw new CodexThreadConflictException();
             var constraints = actual.Settings.TryGetProperty("nativeConfigurationRequirements", out var required) ? required.Clone() : (JsonElement?)null;
             ValidateConfigurationOptions(options, constraints);
@@ -206,6 +208,7 @@ public sealed partial class CodexThreadRpc
         ValidateFields(p, ["threadId", "expectedTurnId", "input", "clientUserMessageId"]);
         var clientId = InputIdentity(p, "clientUserMessageId");
         var id = Id(p, "threadId"); var turn = Id(p, "expectedTurnId");
+        RequireNoArchiveTransition(id);
         if (!active.TryGetValue(id, out var running) || running.Id != turn || !running.Started.Task.IsCompletedSuccessfully)
             throw Invalid("Expected active native turn is unavailable.");
         var input = Input(p); validateInput?.Invoke(input); running.Control.Steer(input, clientId);

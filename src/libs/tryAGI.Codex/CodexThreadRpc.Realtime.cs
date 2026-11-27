@@ -174,7 +174,8 @@ public sealed partial class CodexThreadRpc
             if (Volatile.Read(ref stopping) || realtime.ContainsKey(id))
                 throw Invalid("Thread already has a realtime binding or host is draining.");
             if (realtime.Count >= maximumConcurrentTurns) throw Invalid("Native realtime capacity exhausted.");
-            var request = RealtimeStart(await store.ReadAsync(id, ct).ConfigureAwait(false), p);
+            RequireNoArchiveTransition(id);
+            var request = RealtimeStart(CodexThreadStore.RequireUnarchived(await store.ReadAsync(id, ct).ConfigureAwait(false)), p);
             var binding = await factory(request, ct).ConfigureAwait(false);
             var coordinator = binding.Coordinator;
             var expectedKind = request.CoordinatorOptions.DirectAudio

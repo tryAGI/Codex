@@ -109,6 +109,7 @@ public sealed class ThreadRpcTests
                 Events.Enqueue((method, value));
                 RequiredRoot(value, method switch
                 {
+                    "thread/archived" => "ThreadArchivedNotification", "thread/unarchived" => "ThreadUnarchivedNotification",
                     "turn/started" => "TurnStartedNotification", "turn/completed" => "TurnCompletedNotification",
                     "item/started" => "ItemStartedNotification", "item/completed" => "ItemCompletedNotification",
                     "turn/plan/updated" => "TurnPlanUpdatedNotification", "turn/diff/updated" => "TurnDiffUpdatedNotification",
@@ -862,6 +863,81 @@ public sealed class ThreadRpcTests
             Add(id, new string('x', 257), "invalid"), ct));
         Assert.Equal(-32602, invalid.Code);
         Assert.Empty(f.Provider.Requests);
+    }
+
+    [Fact]
+    public async Task ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        var args = Args(new JsonObject { ["threadId"] = id.ToString() });
+        await host.InvokeAsync("thread/name/set", Args(new JsonObject { ["threadId"] = id.ToString(), ["name"] = "archive me" }), ct);
+        await host.InvokeAsync("thread/attachment/add", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["attachmentType"] = "test", ["identityKey"] = "one", ["payload"] = "payload"
+        }), ct);
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        await f.Completed.Task.WaitAsync(Timeout, ct);
+        var before = await f.Store.ReadAsync(id, ct);
+        var archived = await host.InvokeAsync("thread/archive", args, ct);
+        Assert.Empty(archived.EnumerateObject());
+        var saved = await f.Store.ReadAsync(id, ct);
+        Assert.NotNull(saved.ArchivedAt);
+        Assert.Equal(before.Revision + 1, saved.Revision);
+        Assert.Single(saved.Turns);
+        Assert.Single(saved.Attachments!);
+        Assert.Single(f.Events, e => e.Method == "thread/archived");
+
+        var cold = f.Host();
+        Assert.Empty((await cold.InvokeAsync("thread/list", Json("{}"), ct)).GetProperty("data").EnumerateArray());
+        Assert.Single((await cold.InvokeAsync("thread/list", Json("""{"archived":true}"""), ct)).GetProperty("data").EnumerateArray());
+        var read = (await cold.InvokeAsync("thread/read", Args(new JsonObject
+        { ["threadId"] = id.ToString(), ["includeTurns"] = true }), ct)).GetProperty("thread");
+        Assert.Equal("notLoaded", read.GetProperty("status").GetProperty("type").GetString());
+        Assert.Single(read.GetProperty("turns").EnumerateArray());
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/resume", args, ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Store.StartTurnAsync(id, saved.Revision, Guid.NewGuid(), "owner", [], cancellationToken: ct));
+        var owners = (await cold.InvokeAsync("thread/attachmentOwner/list",
+            Json("""{"attachmentType":"test","identityKey":"one","archived":true}"""), ct)).GetProperty("data");
+        Assert.True(Assert.Single(owners.EnumerateArray()).GetProperty("archived").GetBoolean());
+        Assert.Empty((await cold.InvokeAsync("thread/attachmentOwner/list",
+            Json("""{"attachmentType":"test","identityKey":"one","archived":false}"""), ct)).GetProperty("data").EnumerateArray());
+
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => f.Store.UnarchiveAsync(id, before.Revision, ct));
+        var restored = (await cold.InvokeAsync("thread/unarchive", args, ct)).GetProperty("thread");
+        Assert.Equal("archive me", restored.GetProperty("name").GetString());
+        Assert.Equal("notLoaded", restored.GetProperty("status").GetProperty("type").GetString());
+        Assert.Null((await f.Store.ReadAsync(id, ct)).ArchivedAt);
+        Assert.Single(f.Events, e => e.Method == "thread/unarchived");
+        await cold.InvokeAsync("thread/resume", args, ct);
+        Assert.Single(f.Provider.Requests);
+    }
+
+    [Fact]
+    public async Task ArchiveInterruptsOwnedTurnAndRejectsForeignWriter()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        var entered = Signal();
+        f.Provider.Reply = async (_, token) =>
+        {
+            entered.TrySetResult();
+            await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, token);
+            throw new InvalidOperationException("Unreachable");
+        };
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        await entered.Task.WaitAsync(Timeout, ct);
+        var args = Args(new JsonObject { ["threadId"] = id.ToString() });
+        var foreign = f.Host();
+        var before = await f.Store.ReadAsync(id, ct);
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => foreign.InvokeAsync("thread/archive", args, ct));
+        Assert.Null((await f.Store.ReadAsync(id, ct)).ArchivedAt);
+        Assert.Equal(before.Revision, (await f.Store.ReadAsync(id, ct)).Revision);
+        await host.InvokeAsync("thread/archive", args, ct).WaitAsync(Timeout, ct);
+        var saved = await f.Store.ReadAsync(id, ct);
+        Assert.NotNull(saved.ArchivedAt);
+        Assert.Equal("interrupted", Assert.Single(saved.Turns).Status);
+        Assert.Single(f.Provider.Requests);
     }
 
     [Fact]

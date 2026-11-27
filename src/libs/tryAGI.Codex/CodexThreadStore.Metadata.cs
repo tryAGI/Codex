@@ -10,7 +10,7 @@ public sealed partial class CodexThreadStore
         ArgumentNullException.ThrowIfNull(name);
         var normalized = name.Trim();
         if (normalized.Length == 0) throw new ArgumentException("Thread name must not be empty.", nameof(name));
-        return ChangeAsync(threadId, expectedRevision, thread => thread with { Name = normalized }, cancellationToken);
+        return ChangeAsync(threadId, expectedRevision, thread => RequireUnarchived(thread) with { Name = normalized }, cancellationToken);
     }
 
     internal Task<CodexThreadDocument> UpdateMetadataAsync(Guid id, long revision, JsonElement? git, bool? daybreakEnabled, CancellationToken ct)

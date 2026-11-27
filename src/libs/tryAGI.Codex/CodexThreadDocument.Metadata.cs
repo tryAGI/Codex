@@ -10,6 +10,9 @@ public sealed partial record CodexThreadDocument
 
     /// <summary>Saved client preference; never grants execution privileges.</summary>
     public bool? DaybreakEnabled { get; init; }
+
+    /// <summary>Durable archive timestamp; null for an unarchived thread.</summary>
+    public DateTimeOffset? ArchivedAt { get; init; }
 }
 
 /// <summary>Persisted Git identity with credentials removed from the remote.</summary>

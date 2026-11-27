@@ -69,6 +69,7 @@ public sealed partial class CodexThreadStore
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             Id(turnId); Token(ownerId);
+            RequireUnarchived(document);
             if (document.Turns.Any(t => t.Id == turnId) || document.Turns.LastOrDefault()?.Status == "inProgress")
                 throw new InvalidOperationException("Thread already has this turn or another active turn.");
             document = SealRealtimeBeforeTurn(document, turnId);
@@ -100,6 +101,7 @@ public sealed partial class CodexThreadStore
         CancellationToken cancellationToken = default)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
+            RequireUnarchived(document);
             if (document.Turns.LastOrDefault()?.Status == "inProgress")
                 throw new InvalidOperationException("Cannot replace defaults of an active native thread.");
             if (settings.ValueKind != JsonValueKind.Object) throw new ArgumentException("Resolved settings must be an object.");
@@ -230,7 +232,7 @@ public sealed partial class CodexThreadStore
         if (selected.Any(t => t.Status == "inProgress")) throw new InvalidOperationException("Cannot fork an active turn.");
         var now = time.GetUtcNow();
         return await PublishAsync(null, source with { Id = destinationId, Revision = 1, CreatedAt = now, UpdatedAt = now,
-            ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected, RealtimeSessions = null,
+            ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected, RealtimeSessions = null, ArchivedAt = null,
             InheritedRealtimeCarryover = ForkRealtimeCarryover(source, count, cutoff is null), CompactionCheckpoint = null,
             Attachments = ForkAttachments(source, effectiveSettings ?? source.Settings, now),
             Settings = effectiveSettings?.Clone() ?? source.Settings }, cancellationToken).ConfigureAwait(false);
@@ -264,6 +266,8 @@ public sealed partial class CodexThreadStore
     private async Task<CodexThreadDocument> PublishAsync(long? expected, CodexThreadDocument value, CancellationToken ct)
     {
         if (value.Revision != checked((expected ?? 0) + 1)) throw new InvalidOperationException("Invalid next native thread revision.");
+        // Archive is a durable execution fence, including writers entering through other hosts.
+        if (value.ArchivedAt is not null) RequireSettledArchiveWriter(value);
         // Round-trip validation produces an owned copy before handing bytes to storage.
         var body = Encode(value); var next = Decode(body);
         if (value.Settings.TryGetProperty("ephemeral", out var transient) && transient.ValueKind == JsonValueKind.True)

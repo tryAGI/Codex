@@ -123,17 +123,16 @@ public sealed partial class CodexThreadRpc
         }
         var documents = await list(ct).ConfigureAwait(false);
         if (documents.Count > 1000) throw new CodexThreadRpcException(-32010, "Native discovery exceeds its bounded catalog; no incomplete success returned.");
-        // Archived owners will use the same predicate once the archive lifecycle is implemented.
-        var owners = documents.Where(d => store.OwnsThread(d) && !Flag(d.Settings, "ephemeral") && archived != true
+        var owners = documents.Where(d => store.OwnsThread(d) && !Flag(d.Settings, "ephemeral") && (archived is null || (d.ArchivedAt is not null) == archived)
             && d.Attachments?.Any(a => CodexThreadStore.MatchesAttachment(a, type, key)) == true
             && (anchor is null || string.CompareOrdinal(d.Id.ToString(), anchor) > 0))
-            .Select(d => d.Id.ToString()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Take(limit + 1).ToArray();
+            .DistinctBy(d => d.Id).OrderBy(d => d.Id.ToString(), StringComparer.Ordinal).Take(limit + 1).ToArray();
         var page = owners.Take(limit).ToArray();
         var next = owners.Length > limit ? new JsonObject { ["attachment_type"] = type, ["identity_key"] = key,
-            ["archived"] = archived, ["thread_id"] = page[^1] }.ToJsonString() : null;
+            ["archived"] = archived, ["thread_id"] = page[^1].Id.ToString() }.ToJsonString() : null;
         return Element(new JsonObject
         {
-            ["data"] = new JsonArray(page.Select(id => (JsonNode)new JsonObject { ["threadId"] = id, ["archived"] = false }).ToArray()),
+            ["data"] = new JsonArray(page.Select(d => (JsonNode)new JsonObject { ["threadId"] = d.Id.ToString(), ["archived"] = d.ArchivedAt is not null }).ToArray()),
             ["nextCursor"] = next
         });
     }
