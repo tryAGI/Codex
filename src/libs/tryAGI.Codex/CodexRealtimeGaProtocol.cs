@@ -98,7 +98,10 @@ internal static class CodexRealtimeGaProtocol
         if (type is not ("response.output_audio.delta" or "response.audio.delta" or "conversation.output_audio.delta")) return null;
         var v1 = type == "conversation.output_audio.delta";
         var sampleRate = CodexRealtimeEventProjections.Unsigned(payload, "sample_rate");
-        var channels = CodexRealtimeEventProjections.Unsigned(payload, "channels") ?? CodexRealtimeEventProjections.Unsigned(payload, "num_channels");
+        // Rust selects the alias by field presence, not by whether its value parses.
+        var channels = payload.TryGetProperty("channels", out _)
+            ? CodexRealtimeEventProjections.Unsigned(payload, "channels")
+            : CodexRealtimeEventProjections.Unsigned(payload, "num_channels");
         if (v1 && (sampleRate is null or 0 or > int.MaxValue || channels is null or 0 or > ushort.MaxValue)) return null;
         var rate = sampleRate is > 0 and <= int.MaxValue ? (int)sampleRate.Value : 24000;
         var count = channels is > 0 and <= ushort.MaxValue ? (int)channels.Value : 1;
@@ -127,7 +130,7 @@ internal static class CodexRealtimeGaProtocol
             } : null;
         if (type is "response.output_audio_transcript.done" or "response.output_text.done")
         {
-            var final = CodexRealtimeProtocol.Text(payload, "transcript") ?? CodexRealtimeProtocol.Text(payload, "text");
+            var final = CodexRealtimeProtocol.Text(payload, type == "response.output_text.done" ? "text" : "transcript");
             return new("assistant", final ?? "", true) { ReplaceFinalText = final is not null };
         }
         if (type is "conversation.item.input_audio_transcription.completed" or "conversation.input_transcript.turn_marked")

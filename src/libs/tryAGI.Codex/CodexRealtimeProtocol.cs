@@ -147,15 +147,19 @@ public sealed record CodexRealtimeEvent(string Type, JsonElement Payload, double
 
     /// <summary>The transcript fragment carried by this event, if any.</summary>
     public CodexRealtimeTranscript? Transcript => Protocol == "v3" ? CodexRealtimeProtocol.ReadTranscript(Payload)
-        : Protocol is "v1" or "v2" ? CodexRealtimeGaProtocol.ReadTranscript(Payload)
+        : Protocol is "v1" or "v2" ? (RecognizedByRust ? CodexRealtimeGaProtocol.ReadTranscript(Payload) : null)
         : CodexRealtimeProtocol.ReadTranscript(Payload) ?? CodexRealtimeGaProtocol.ReadTranscript(Payload);
 
     /// <summary>The provider error carried by this event, if any.</summary>
     public CodexRealtimeError? Error => CodexRealtimeProtocol.ReadError(Payload);
 
+    /// <summary>Returns the upstream error message or raw error JSON. May contain sensitive provider text;
+    /// use the redacted <see cref="Error"/> projection for logs and exceptions.</summary>
+    public string? GetProviderErrorText() => CodexRealtimeEventProjections.ProviderErrorText(Payload);
+
     /// <summary>The output audio carried by this event, if any.</summary>
     public CodexRealtimeAudio? Audio => Protocol == "v3" ? CodexRealtimeProtocol.ReadAudio(Payload)
-        : Protocol is "v1" or "v2" ? CodexRealtimeGaProtocol.ReadAudio(Payload)
+        : Protocol is "v1" or "v2" ? (RecognizedByRust ? CodexRealtimeGaProtocol.ReadAudio(Payload) : null)
         : CodexRealtimeProtocol.ReadAudio(Payload) ?? CodexRealtimeGaProtocol.ReadAudio(Payload);
 }
 
@@ -250,7 +254,9 @@ internal static class CodexRealtimeProtocol
         var error = payload.TryGetProperty("error", out var nested) && nested.ValueKind == JsonValueKind.Object ? nested : payload;
         static string? Safe(JsonElement item, string key) => Text(item, key) is { Length: > 0 and <= 128 } text &&
             text.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '.') ? text : null;
-        return new(Safe(error, "event_id") ?? Safe(payload, "event_id"), Safe(error, "code"), Safe(error, "type"), Safe(error, "param"));
+        // The top-level type is the event discriminator, not a provider error classification.
+        var kind = nested.ValueKind == JsonValueKind.Object ? Safe(nested, "type") : null;
+        return new(Safe(error, "event_id") ?? Safe(payload, "event_id"), Safe(error, "code"), kind, Safe(error, "param"));
     }
     internal static void ValidateSessionOptions(CodexRealtimeSessionOptions options)
     {

@@ -58,7 +58,208 @@ public sealed class RealtimeEventParityTests
         var receipt = Event(protocol, json);
         Assert.True(receipt.RecognizedByRust);
         Assert.Equal(json, receipt.Payload.GetRawText());
-        Assert.False(Event(protocol, """{"type":"future.event"}""").RecognizedByRust);
+        var unknown = Event(protocol, """{"type":"future.event","future":42}""");
+        Assert.False(unknown.RecognizedByRust);
+        Assert.Null(unknown.Audio);
+        Assert.Null(unknown.Transcript);
+        Assert.Null(unknown.Delegation);
+        Assert.Null(unknown.Response);
+        Assert.Null(unknown.GetProviderErrorText());
+        VerifyProjectionVariants(protocol, type);
+    }
+
+    // Every parser match arm is exercised with valid, omitted and wrong-typed fields.
+    // The SDK deliberately keeps raw events and stricter PCM validation even when Rust
+    // would discard an event or accept undecoded audio. Legacy textless finals retain
+    // the existing delta-fallback projection without pretending to supply final text.
+    private static void VerifyProjectionVariants(string protocol, string type)
+    {
+        CodexRealtimeEvent Frame(string fields = "{}")
+        {
+            var body = System.Text.Json.Nodes.JsonNode.Parse(fields)!.AsObject();
+            body["type"] = type;
+            body["future"] = 42;
+            var json = body.ToJsonString();
+            var frame = Event(protocol, json);
+            Assert.Equal(json, frame.Payload.GetRawText());
+            return frame;
+        }
+
+        var absent = Frame();
+        switch (type)
+        {
+            case "session.updated":
+            case "session.started":
+                Assert.Equal(new CodexRealtimeSessionReceipt("s", "instructions", "model"),
+                    Frame("""{"session":{"id":"s","instructions":"instructions","model":"model"}}""").Session);
+                Assert.Equal(new CodexRealtimeSessionReceipt("s", null, null), Frame("""{"session":{"id":"s"}}""").Session);
+                Assert.Equal(new CodexRealtimeSessionReceipt("s", null, null), Frame("""{"session":{"id":"s","instructions":5,"model":false}}""").Session);
+                Assert.Null(absent.Session);
+                Assert.Null(Frame("""{"session":{"id":1}}""").Session);
+                Assert.Null(Frame("""{"session":[]}""").Session);
+                break;
+            case "conversation.output_audio.delta":
+            case "response.output_audio.delta":
+            case "response.audio.delta":
+            case "output_audio.delta":
+            {
+                var field = protocol == "v3" ? "audio" : "delta";
+                var valid = Frame("{\"" + field + "\":\"AQACAA==\",\"sample_rate\":16000,\"channels\":2,\"samples_per_channel\":1,\"item_id\":\"i\"}");
+                var audio = Assert.IsType<CodexRealtimeAudio>(valid.Audio);
+                Assert.Equal(new byte[] { 1, 0, 2, 0 }, audio.Pcm16.ToArray());
+                Assert.Equal(protocol == "v3" ? 24000 : 16000, audio.SampleRate);
+                Assert.Equal(protocol == "v3" ? 1 : 2, audio.Channels);
+                Assert.Equal(protocol == "v2" ? "i" : null, audio.ItemId);
+                Assert.Equal(protocol == "v3" ? (uint?)null : 1u, audio.SamplesPerChannel);
+                var noMetadata = Frame("{\"" + field + "\":\"AQACAA==\"}");
+                var badMetadata = Frame("{\"" + field + "\":\"AQACAA==\",\"sample_rate\":\"invalid\",\"channels\":null,\"num_channels\":2,\"samples_per_channel\":-1,\"item_id\":false}");
+                if (protocol == "v1")
+                {
+                    Assert.Null(absent.Audio);
+                    Assert.Null(noMetadata.Audio);
+                    Assert.Null(badMetadata.Audio);
+                }
+                else
+                {
+                    Assert.Equal(24000, noMetadata.Audio!.SampleRate);
+                    Assert.Equal(1, noMetadata.Audio.Channels);
+                    Assert.Equal(1, badMetadata.Audio!.Channels);
+                    Assert.Equal(24000, badMetadata.Audio.SampleRate);
+                    Assert.Null(badMetadata.Audio.SamplesPerChannel);
+                    Assert.Null(badMetadata.Audio.ItemId);
+                    Assert.Throws<CodexProtocolException>(() => absent.Audio);
+                }
+                var invalid = Frame("{\"" + field + "\":false,\"sample_rate\":24000,\"channels\":1}");
+                Assert.Throws<CodexProtocolException>(() => invalid.Audio);
+                break;
+            }
+            case "conversation.input_transcript.delta":
+            case "conversation.item.input_audio_transcription.delta":
+            case "conversation.output_transcript.delta":
+            case "response.output_text.delta":
+            case "response.output_audio_transcript.delta":
+                Assert.Equal(type.Contains("input", StringComparison.Ordinal) ? "user" : "assistant",
+                    Frame("""{"delta":"words","item_id":"i"}""").Transcript!.Role);
+                Assert.Equal("words", Frame("""{"delta":"words"}""").Transcript!.Text);
+                Assert.False(Frame("""{"delta":"words"}""").Transcript!.Final);
+                Assert.Null(absent.Transcript);
+                Assert.Null(Frame("""{"delta":4}""").Transcript);
+                break;
+            case "conversation.input_transcript.turn_marked":
+            case "conversation.item.input_audio_transcription.completed":
+            case "response.output_audio_transcript.done":
+            case "response.output_text.done":
+            {
+                var field = type == "response.output_text.done" ? "text" : "transcript";
+                var final = Assert.IsType<CodexRealtimeTranscript>(Frame("{\"" + field + "\":\"final\"}").Transcript);
+                Assert.Equal(type.Contains("input", StringComparison.Ordinal) ? "user" : "assistant", final.Role);
+                Assert.Equal("final", final.Text);
+                Assert.True(final.Final);
+                Assert.True(final.ReplaceFinalText);
+                Assert.False(absent.Transcript!.ReplaceFinalText);
+                Assert.False(Frame("{\"" + field + "\":false}").Transcript!.ReplaceFinalText);
+                Assert.True(Frame("{\"" + field + "\":\"\"}").Transcript!.ReplaceFinalText);
+                // A wrong field must not masquerade as canonical transcript text.
+                Assert.False(Frame(field == "text" ? """{"transcript":"wrong"}""" : """{"text":"wrong"}""").Transcript!.ReplaceFinalText);
+                break;
+            }
+            case "input_transcript.added":
+            case "output_transcript.added":
+            {
+                var value = Assert.IsType<CodexRealtimeTranscript>(Frame("""{"item":{"text":"words","id":"i"},"start_ms":1,"end_ms":2}""").Transcript);
+                Assert.Equal(type == "input_transcript.added" ? "user" : "assistant", value.Role);
+                Assert.Equal("words", value.Text);
+                Assert.False(value.Final);
+                Assert.Null(absent.Transcript);
+                Assert.Null(Frame("""{"item":{"text":false}}""").Transcript);
+                Assert.Null(Frame("""{"item":"invalid"}""").Transcript);
+                Assert.Null(Frame("""{"item":{"text":"words","id":false},"start_ms":"bad"}""").Transcript!.InputFragmentId);
+                break;
+            }
+            case "turn.done":
+                Assert.Equal(new CodexRealtimeTurn("user", "words", "t"),
+                    Frame("""{"turn":{"role":"user","transcript":"words","id":"t"}}""").Turn);
+                Assert.Equal(new CodexRealtimeTurn("assistant", "words", null),
+                    Frame("""{"turn":{"role":"assistant","transcript":"words"}}""").Turn);
+                Assert.True(Frame("""{"turn":{"role":"user","transcript":"words"}}""").Transcript!.ReplaceFinalText);
+                Assert.Null(absent.Turn);
+                Assert.Null(absent.Transcript);
+                Assert.Null(Frame("""{"turn":{"role":"developer","transcript":"words"}}""").Turn);
+                Assert.Null(Frame("""{"turn":{"role":"user","transcript":false}}""").Transcript);
+                break;
+            case "conversation.item.added":
+            case "conversation.item.created":
+                Assert.Equal("i", Frame("""{"item":{"id":"i"}}""").ConversationItem!.Id);
+                Assert.False(Frame("""{"item":{"id":"i"}}""").ConversationItem!.Done);
+                Assert.Null(Frame("""{"item":{}}""").ConversationItem!.Id);
+                Assert.Null(absent.ConversationItem);
+                // Rust clones the item as Value, even if it is not an object.
+                Assert.Equal(JsonValueKind.String, Frame("""{"item":"opaque"}""").ConversationItem!.Item.ValueKind);
+                break;
+            case "conversation.item.done":
+                Assert.Equal("i", Frame("""{"item":{"id":"i"}}""").ConversationItem!.Id);
+                Assert.True(Frame("""{"item":{"id":"i"}}""").ConversationItem!.Done);
+                Assert.Null(absent.ConversationItem);
+                Assert.Null(Frame("""{"item":{"id":false}}""").ConversationItem);
+                Assert.Null(Frame("""{"item":"invalid"}""").ConversationItem);
+                break;
+            case "conversation.handoff.requested":
+                Assert.Equal(new CodexRealtimeHandoff("h", "i", "words"),
+                    Frame("""{"handoff_id":"h","item_id":"i","input_transcript":"words"}""").Handoff);
+                Assert.Null(absent.Handoff);
+                Assert.Null(Frame("""{"handoff_id":"h","item_id":"i"}""").Handoff);
+                Assert.Null(Frame("""{"handoff_id":3,"item_id":"i","input_transcript":"words"}""").Handoff);
+                break;
+            case "delegation.created":
+                Assert.Equal(new CodexRealtimeHandoff("h", "h", "words"),
+                    Frame("""{"item":{"type":"delegation","target":"client","id":"h","content":[{"type":"input_text","text":"words"},{"type":"input_text","text":3},{"type":"other","text":"ignored"}]}}""").Handoff);
+                Assert.Equal(new CodexRealtimeHandoff("h", "h", ""),
+                    Frame("""{"item":{"type":"delegation","target":"client","id":"h","content":[]}}""").Handoff);
+                Assert.Null(absent.Handoff);
+                Assert.Null(Frame("""{"item":{"type":"delegation","target":"client","id":"h","content":false}}""").Handoff);
+                Assert.Null(Frame("""{"item":{"type":"delegation","target":"other","id":"h","content":[]}}""").Handoff);
+                break;
+            case "input_audio_buffer.speech_started":
+                Assert.Equal(new CodexRealtimeSpeechStarted("i", 12), Frame("""{"item_id":"i","audio_start_ms":12}""").SpeechStarted);
+                Assert.Equal(new CodexRealtimeSpeechStarted(null, null), absent.SpeechStarted);
+                Assert.Equal(new CodexRealtimeSpeechStarted(null, null), Frame("""{"item_id":false,"audio_start_ms":-1}""").SpeechStarted);
+                break;
+            case "response.created":
+            case "response.cancelled":
+            case "response.done":
+                Assert.Equal(new CodexRealtimeResponseReceipt(type, "r", "completed"), Frame("""{"response":{"id":"r","status":"completed"},"response_id":"ignored"}""").Response);
+                Assert.Equal(new CodexRealtimeResponseReceipt(type, "r", null), Frame("""{"response_id":"r","response":{"id":false}}""").Response);
+                Assert.Equal(new CodexRealtimeResponseReceipt(type, null, null), absent.Response);
+                Assert.Equal(new CodexRealtimeResponseReceipt(type, null, null), Frame("""{"response":false,"response_id":42}""").Response);
+                break;
+            case "error":
+                Assert.Equal("top", Frame("""{"message":"top","error":{"message":"nested"}}""").GetProviderErrorText());
+                Assert.Equal("nested", Frame("""{"error":{"message":"nested","code":"invalid"}}""").GetProviderErrorText());
+                Assert.Equal("invalid", Frame("""{"error":{"code":"invalid"}}""").Error!.Code);
+                Assert.Equal("false", Frame("""{"error":false}""").GetProviderErrorText());
+                Assert.Equal("null", Frame("""{"error":null}""").GetProviderErrorText());
+                Assert.Null(absent.GetProviderErrorText());
+                Assert.Null(absent.Error!.Kind);
+                Assert.Null(Frame("""{"message":4}""").GetProviderErrorText());
+                break;
+            default:
+                throw new InvalidOperationException("Missing fixture for " + protocol + "/" + type);
+        }
+    }
+
+    [Theory]
+    [InlineData("v1", """{"type":"response.output_audio.delta","delta":"AQACAA=="}""")]
+    [InlineData("v2", """{"type":"conversation.output_audio.delta","delta":"AQACAA==","sample_rate":24000,"channels":1}""")]
+    [InlineData("v1", """{"type":"response.output_text.done","text":"unexpected"}""")]
+    [InlineData("v2", """{"type":"conversation.input_transcript.delta","delta":"unexpected"}""")]
+    [InlineData("v3", """{"type":"response.output_text.delta","delta":"unexpected"}""")]
+    public void OtherAdapterAudioAndTranscriptEventsRemainRaw(string protocol, string json)
+    {
+        var value = Event(protocol, json);
+        Assert.False(value.RecognizedByRust);
+        Assert.Null(value.Audio);
+        Assert.Null(value.Transcript);
+        Assert.Equal(json, value.Payload.GetRawText());
     }
 
     [Theory]

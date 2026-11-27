@@ -129,6 +129,15 @@ internal static class CodexRealtimeEventProjections
             ? new(Text(turn, "role")!, transcript, Text(turn, "id")) : null;
     }
 
+    internal static string? ProviderErrorText(JsonElement e)
+    {
+        if (Text(e, "type") != "error") return null;
+        // Rust first reads a top-level message, then a nested message, then the raw error value.
+        var error = Child(e, "error");
+        return Text(e, "message") ?? Text(error, "message") ??
+            (error.ValueKind == JsonValueKind.Undefined ? null : error.GetRawText());
+    }
+
     internal static uint? Unsigned(JsonElement e, string key) =>
         Child(e, key) is { ValueKind: JsonValueKind.Number } value && value.TryGetUInt32(out var n) ? n : null;
 }
