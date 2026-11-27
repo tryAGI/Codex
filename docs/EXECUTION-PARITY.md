@@ -24,7 +24,7 @@ All paths in the Rust column are relative to `codex-rs` at the pinned revision.
 | `apply-patch/src/lib.rs`, `apply-patch/src/file_update_tests.rs`, `apply-patch/tests/suite`; command_exec apply_patch line endings test | Existing `CodexPatch`, `CodexPatchUpdate`, `CodexWorkspacePatch`, `CodexWorkspacePatchTransport` and related tests; preconditions and plan digest already represented. | Preserve; differential coverage and authorization integration pending #79, #80 |
 | `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. Compiled enforcement, scoped grants, legacy routing and actual dispatch remain separate. | #80, #111–#113; coordinate #64 |
 | `execpolicy`, `sandboxing`, `network-proxy`; sandboxing platform tests, network-proxy authorization_path_tests and host_policy_tests | `CodexMacOsLeafCommandAdapter` provides actual deny-default Seatbelt for a restricted macOS single-process lane (no fork, no PTY, no direct network, approved stable workspace). General OS and network policy compilation and tree containment remain open. | #81, #104, #132; coordinate #86 and #98 |
-| `app-server-protocol/src/protocol/v2/review.rs`; `app-server/tests/suite/v2/review.rs`; `core/src/guardian`; app-server guardian_v2 / guardian_v3_sync_tests | `CodexReviewRpc` validates inline review targets, verifies a committed correlated turn, routes advisory Guardian assessment and exact denial escalation through a trusted adapter and approval store. Actual runner, history and auto-review notifications remain separate. | #82, #129, #130 |
+| `app-server-protocol/src/protocol/v2/review.rs`; `app-server/tests/suite/v2/review.rs`; `core/src/guardian`; app-server guardian_v2 / guardian_v3_sync_tests | `CodexReviewRpc` validates inline review targets, verifies a committed correlated turn, routes advisory Guardian assessment and exact denial escalation through a trusted adapter and approval store. `CodexGuardianReviewJournal` commits ordered auto-review lifecycle records and binds exact recorded denials to one pending approval. Actual runner, host storage/reviewer integration and strict-review dispatch fence remain separate. | #82, #129, #130, #142 |
 
 ## Adapter rules
 
@@ -204,3 +204,28 @@ Real fixture traversal, explicit root lease and ignore filtering, relative path 
 top-50 ranking, Unicode indices, session isolation, revocation, query replacement,
 one-shot cancellation and notification draining were checked. No real mutable-root or
 exact Rust matcher acceptance is claimed.
+
+## Durable Guardian review lifecycle (#130)
+
+`CodexGuardianReviewJournal` implements item/autoApprovalReview/started and
+item/autoApprovalReview/completed with account/connection/thread/turn/review/action
+correlation. It retains raw extension fields and all seven pinned action variants, validates
+terminal status and timestamps, commits with host-owned durable CAS before notification, and
+records notification acceptance separately. A duplicate or ambiguous commit is never a reason
+to replay delivery. If the start delivery is uncertain, a terminal decision is durably retained
+without overtaking the start. Explicit host reconciliation is still required.
+
+Trusted denial evidence is matched to the original core review identity, timestamps, status,
+action type and shared identity-bearing fields. The exact event digest is retained; PathUri
+and permission materialization are independently resolved by the trusted adapter. One denial
+can bind to only one existing matching pending approval. A reviewer must still authenticate
+and decide through `CodexApprovalStore`, and dispatch must consume the approval separately.
+An approved, denied, timed-out or aborted review never creates an execution grant.
+
+Local validation on macOS arm64 / .NET 10: 15 focused Guardian journal tests passed,
+0 failed, 0 skipped; 55 combined Guardian/review/approval tests passed, 0 failed, 0 skipped.
+Admitted receipt native-20261127-13ed91c03d1c4f2389cfb937dd609923.
+Storage round-trips through source-generated metadata in the CAS test adapter; this does not
+certify real host persistence, actual reviewer execution or live delivery. Strict-review
+dispatch fencing, warning notifications and uncertain-publication reconciliation remain #142;
+review runner and real history integration remain #129/#130/#113.
