@@ -8,9 +8,9 @@ namespace tryAGI.Codex;
 /// <summary>Concrete encrypted account directory over the same durable vault protocol as OAuth credentials.
 /// The host provisions the owner scope, private key, credential ID mapping, and a policy lease that remains
 /// authoritative until disposed. Consumers must fence credential admission by the persisted SelectionEpoch.
-/// Registration requires already committed credentials; provider login, revocation and atomic cross-record
-/// logout remain host lifecycle operations, not implicit effects of this directory.</summary>
-public sealed class CodexEncryptedAccountSessionDirectory : ICodexAccountSessionDirectoryStorage, IDisposable
+/// The local durable lifecycle uses an encrypted cleanup journal; all cooperating readers and writers
+/// must use its journal-aware directory and credential admission. Remote OAuth revocation remains a host concern.</summary>
+public sealed partial class CodexEncryptedAccountSessionDirectory : ICodexAccountSessionDirectoryStorage, IDisposable
 {
     private const int MaximumPayload = 262_144;
     private const int NonceSize = 12;
@@ -187,49 +187,57 @@ public sealed class CodexEncryptedAccountSessionDirectory : ICodexAccountSession
     {
         var record = await lease.ReadAsync(ct).ConfigureAwait(false);
         if (record is null) return new(EmptyRevision, EmptyRevision, null, Array.Empty<CodexAccountSessionEntry>());
-        return Decrypt(record);
+        var state = Decrypt(record);
+        var snapshot = state.Snapshot;
+        if (state.Cleanup is { Count: > 0 })
+            return await RecoverCleanupAsync(lease, snapshot, state.Cleanup, ct).ConfigureAwait(false);
+        return snapshot;
     }
 
     private async Task<bool> PersistAsync(ICodexOAuthVaultLease lease, CodexAccountSessionDirectorySnapshot before,
-        CodexAccountSessionDirectorySnapshot next, CancellationToken ct)
+        CodexAccountSessionDirectorySnapshot next, CancellationToken ct, IReadOnlyList<CodexAccountDirectoryCleanup>? cleanup = null)
     {
         ct.ThrowIfCancellationRequested();
-        var replacement = Encrypt(next);
+        var replacement = Encrypt(next, cleanup);
         return await lease.CompareExchangeAsync(before.Revision == EmptyRevision ? null : before.Revision, replacement, ct).ConfigureAwait(false);
     }
 
-    private CodexOAuthVaultRecord Encrypt(CodexAccountSessionDirectorySnapshot snapshot)
+    private CodexOAuthVaultRecord Encrypt(CodexAccountSessionDirectorySnapshot snapshot, IReadOnlyList<CodexAccountDirectoryCleanup>? cleanup)
     {
-        var plain = JsonSerializer.SerializeToUtf8Bytes(snapshot, CodexAccountDirectoryJson.Default.CodexAccountSessionDirectorySnapshot);
+        var state = new CodexAccountDirectoryState(snapshot.Revision, snapshot.SelectionEpoch, snapshot.ActiveSessionId, snapshot.Sessions, cleanup);
+        var plain = JsonSerializer.SerializeToUtf8Bytes(state, CodexAccountDirectoryJson.Default.CodexAccountDirectoryState);
         try
         {
             if (plain.Length > MaximumPayload || !Guid.TryParseExact(snapshot.Revision, "N", out _)) throw Invalid();
             var cipher = new byte[1 + NonceSize + TagSize + plain.Length];
-            cipher[0] = 1;
+            // Older readers must fail closed during an incomplete lifecycle transaction.
+            cipher[0] = cleanup is { Count: > 0 } ? (byte)2 : (byte)1;
             RandomNumberGenerator.Fill(cipher.AsSpan(1, NonceSize));
             using var aes = CreateCipher();
             aes.Encrypt(cipher.AsSpan(1, NonceSize), plain, cipher.AsSpan(1 + NonceSize + TagSize),
-                cipher.AsSpan(1 + NonceSize, TagSize), AssociatedData(snapshot.Revision));
+                cipher.AsSpan(1 + NonceSize, TagSize), AssociatedData(snapshot.Revision, cipher[0]));
             return new(snapshot.Revision, cipher);
         }
         finally { CryptographicOperations.ZeroMemory(plain); }
     }
 
-    private CodexAccountSessionDirectorySnapshot Decrypt(CodexOAuthVaultRecord record)
+    private CodexAccountDirectoryState Decrypt(CodexOAuthVaultRecord record)
     {
         var cipher = record.Ciphertext.Span;
         if (!Guid.TryParseExact(record.Version, "N", out _) || cipher.Length <= 1 + NonceSize + TagSize ||
-            cipher.Length > 1 + NonceSize + TagSize + MaximumPayload || cipher[0] != 1) throw Invalid();
+            cipher.Length > 1 + NonceSize + TagSize + MaximumPayload || cipher[0] is not (1 or 2)) throw Invalid();
         var plain = new byte[cipher.Length - 1 - NonceSize - TagSize];
         try
         {
             using var aes = CreateCipher();
             aes.Decrypt(cipher.Slice(1, NonceSize), cipher[(1 + NonceSize + TagSize)..],
-                cipher.Slice(1 + NonceSize, TagSize), plain, AssociatedData(record.Version));
-            var snapshot = JsonSerializer.Deserialize(plain, CodexAccountDirectoryJson.Default.CodexAccountSessionDirectorySnapshot);
-            if (snapshot is null || snapshot.Revision != record.Version) throw Invalid();
+                cipher.Slice(1 + NonceSize, TagSize), plain, AssociatedData(record.Version, cipher[0]));
+            var state = JsonSerializer.Deserialize(plain, CodexAccountDirectoryJson.Default.CodexAccountDirectoryState);
+            if (state is null || state.Revision != record.Version || state.Cleanup is { Count: > 256 } ||
+                (cipher[0] == 2) != (state.Cleanup is { Count: > 0 })) throw Invalid();
+            var snapshot = state.Snapshot;
             CodexAccountSessionsRpc.Validate(snapshot);
-            return snapshot with { Sessions = Array.AsReadOnly(snapshot.Sessions.Select(entry =>
+            return state with { Sessions = Array.AsReadOnly(snapshot.Sessions.Select(entry =>
                 entry with { Workspaces = Array.AsReadOnly(entry.Workspaces.ToArray()) }).ToArray()) };
         }
         catch (Exception error) when (error is CryptographicException or JsonException or CodexThreadRpcException or
@@ -238,7 +246,10 @@ public sealed class CodexEncryptedAccountSessionDirectory : ICodexAccountSession
         finally { CryptographicOperations.ZeroMemory(plain); }
     }
 
-    private byte[] AssociatedData(string version) => Encoding.UTF8.GetBytes("codex-account-directory-v1\n" + directoryId + "\n" + version);
+    // Bind the journal format as well as its owner and revision to the authentication tag.
+    // Preserve the original v1 domain for settled records and legacy directories.
+    private byte[] AssociatedData(string version, byte format) => Encoding.UTF8.GetBytes(
+        (format == 2 ? "codex-account-directory-v2\n" : "codex-account-directory-v1\n") + directoryId + "\n" + version);
     private static string NewRevision() => Guid.NewGuid().ToString("N");
     private static CodexProtocolException Invalid() => new("Invalid encrypted account session directory.");
 
@@ -263,5 +274,14 @@ public sealed class CodexEncryptedAccountSessionDirectory : ICodexAccountSession
     }
 }
 
-[JsonSerializable(typeof(CodexAccountSessionDirectorySnapshot))]
+// The first four members preserve the original on-disk directory schema.
+internal sealed record CodexAccountDirectoryState(string Revision, string SelectionEpoch, string? ActiveSessionId,
+    IReadOnlyList<CodexAccountSessionEntry> Sessions, IReadOnlyList<CodexAccountDirectoryCleanup>? Cleanup = null)
+{
+    [JsonIgnore] internal CodexAccountSessionDirectorySnapshot Snapshot => new(Revision, SelectionEpoch, ActiveSessionId, Sessions);
+}
+
+internal sealed record CodexAccountDirectoryCleanup(string SessionId, string AccountId, string UserId, string CredentialId, string Revision);
+
+[JsonSerializable(typeof(CodexAccountDirectoryState))]
 internal sealed partial class CodexAccountDirectoryJson : JsonSerializerContext;

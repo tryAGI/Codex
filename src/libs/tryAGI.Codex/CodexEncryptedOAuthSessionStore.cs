@@ -57,7 +57,7 @@ public sealed class CodexEncryptedOAuthSessionStore : ICodexOAuthSessionStore, I
     public async ValueTask<ICodexOAuthSessionLease> AcquireAsync(string sessionId, CancellationToken cancellationToken)
         => await AcquireCoreAsync(sessionId, cancellationToken).ConfigureAwait(false);
 
-    private async ValueTask<Lease> AcquireCoreAsync(string sessionId, CancellationToken ct)
+    internal async ValueTask<Lease> AcquireCoreAsync(string sessionId, CancellationToken ct)
     {
         ValidateSessionId(sessionId);
         lock (keyGate) ObjectDisposedException.ThrowIf(disposed, this);
@@ -97,7 +97,7 @@ public sealed class CodexEncryptedOAuthSessionStore : ICodexOAuthSessionStore, I
             await lease.WriteAsync(current.Record, null, cancellationToken).ConfigureAwait(false);
     }
 
-    private sealed class Lease(CodexEncryptedOAuthSessionStore owner, string id, ICodexOAuthVaultLease inner) : ICodexOAuthSessionLease
+    internal sealed class Lease(CodexEncryptedOAuthSessionStore owner, string id, ICodexOAuthVaultLease inner) : ICodexOAuthSessionLease
     {
         public async ValueTask<CodexOAuthSessionState?> ReadAsync(CancellationToken cancellationToken)
             => (await ReadCurrentAsync(cancellationToken).ConfigureAwait(false)).State;
@@ -113,6 +113,24 @@ public sealed class CodexEncryptedOAuthSessionStore : ICodexOAuthSessionStore, I
         {
             ct.ThrowIfCancellationRequested();
             return inner.CompareExchangeAsync(previous?.Version, next is null ? null : owner.Encrypt(id, next), ct);
+        }
+
+        // Only the owner-directory lifecycle calls these while holding both directory and credential leases.
+        internal async ValueTask<bool> TryInstallNewAsync(string revision, CodexOAuthTokens tokens, CancellationToken ct)
+        {
+            ValidateTokens(tokens);
+            if (!Guid.TryParseExact(revision, "N", out _)) throw InvalidRecord();
+            var current = await ReadCurrentAsync(ct).ConfigureAwait(false);
+            return current.State is null && await WriteAsync(null, new(revision, tokens), ct).ConfigureAwait(false);
+        }
+
+        internal async ValueTask<bool> TryDeleteGenerationAsync(string revision, string accountId, string userId, CancellationToken ct)
+        {
+            var current = await ReadCurrentAsync(ct).ConfigureAwait(false);
+            if (current.State is null) return true;
+            if (current.State.Revision != revision || current.State.Tokens.AccountId != accountId ||
+                current.State.Tokens.ChatGptUserId != userId) return false;
+            return await WriteAsync(current.Record, null, ct).ConfigureAwait(false);
         }
 
         public async ValueTask<bool> TryBeginRefreshAsync(string expectedRevision, Guid attemptId, CancellationToken cancellationToken)
