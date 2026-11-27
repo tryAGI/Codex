@@ -1,0 +1,572 @@
+{
+  "acceptanceEligible": true,
+  "artifactSha256": "4025f036e3c3b927baadcef0473f4961425b080d78ffb9972074534106070f54",
+  "cases": {
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerAgentMessageDelta\", definition: \"AgentMessageDeltaNotification\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerEmpty\", definition: \"ThreadArchiveResponse\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerEmpty\", definition: \"ThreadSetNameResponse\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerEmpty\", definition: \"TurnInterruptResponse\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerErrorNotification\", definition: \"ErrorNotification\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThread\", definition: \"Thread\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadIdParams\", definition: \"ThreadArchiveParams\", sent: True)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadIdParams\", definition: \"ThreadUnarchiveParams\", sent: True)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNameNotification\", definition: \"ThreadNameUpdatedNotification\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadArchivedNotification\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadClosedNotification\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadUnarchivedNotification\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadSetNameParams\", definition: \"ThreadSetNameParams\", sent: True)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadStartParams\", definition: \"ThreadStartParams\", sent: True)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadStartResponse\", definition: \"ThreadStartResponse\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadUnarchiveResponse\", definition: \"ThreadUnarchiveResponse\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerTurn\", definition: \"Turn\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerTurnError\", definition: \"TurnError\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerTurnInterruptParams\", definition: \"TurnInterruptParams\", sent: True)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerTurnNotification\", definition: \"TurnCompletedNotification\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerTurnNotification\", definition: \"TurnStartedNotification\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerTurnStartParams\", definition: \"TurnStartParams\", sent: True)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerTurnStartResponse\", definition: \"TurnStartResponse\", sent: False)": {
+      "method": "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods": {
+      "method": "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData": {
+      "method": "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.IncompleteCreditFlagsAreNotFabricated": {
+      "method": "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.IncompleteCreditFlagsAreNotFabricated",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.ProjectionPreservesBucketsAndDoesNotInferEntitlement": {
+      "method": "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.ProjectionPreservesBucketsAndDoesNotInferEntitlement",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected(validation: \"auth_unavailable\")": {
+      "method": "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected(validation: \"mismatch\")": {
+      "method": "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected(validation: \"missing_identity\")": {
+      "method": "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected(validation: \"restricted\")": {
+      "method": "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected(validation: null)": {
+      "method": "tryAGI.Codex.Tests.CodexAccountRateLimitsTests.UnverifiedAccountUsageIsNeverProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.FreeformMessageTrimsAndPreservesNoQuestionPayload": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.FreeformMessageTrimsAndPreservesNoQuestionPayload",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem(name: \"request_user_input_async\", arguments: \"{\\\"questions\\\":[]}\")": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem(name: \"request_user_input_async\", arguments: \"{\\\"questions\\\":[{\\\"title\\\":\\\" \\\"}]}\")": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem(name: \"request_user_input_async\", arguments: \"{\\\"questions\\\":[{\\\"title\\\":\\\"Q\\\",\\\"options\\\":[\\\" \\\"]}]}\")": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem(name: \"request_user_input_async\", arguments: \"{\\\"questions\\\":[{\\\"title\\\":\\\"Q\\\",\\\"options\\\":[]}]}\")": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem(name: \"request_user_input_async\", arguments: \"{\\\"questions\\\":[{\\\"title\\\":\\\"Q\\\",\\\"unexpected\\\":true}]}\")": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem(name: \"request_user_input_async\", arguments: \"{\\\"questions\\\":[{\\\"title\\\":\\\"Q\\\"}],\\\"approval\\\":true}\")": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem(name: \"send_message_to_user_async\", arguments: \"{\\\"message\\\":\\\" \\\"}\")": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem(name: \"send_message_to_user_async\", arguments: \"{\\\"message\\\":\\\"one\\\",\\\"message\\\":\\\"two\\\"}\")": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.InvalidArgumentsNeverPrepareAnItem",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.QuestionsPublishAsyncAgentMessageAndReturnAcceptedWithoutWaitingForAnswer": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.QuestionsPublishAsyncAgentMessageAndReturnAcceptedWithoutWaitingForAnswer",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy(restricted: False, questions: False, feature: False, capability: \"send_user_message_async\", expectQuestion: False, expectMessage: False)": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy(restricted: False, questions: True, feature: False, capability: \"\", expectQuestion: False, expectMessage: False)": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy(restricted: False, questions: True, feature: False, capability: \"request_user_input_async\", expectQuestion: True, expectMessage: False)": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy(restricted: False, questions: True, feature: False, capability: \"send_message_to_user_async\", expectQuestion: False, expectMessage: True)": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy(restricted: False, questions: True, feature: False, capability: \"send_user_message_async\", expectQuestion: True, expectMessage: False)": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy(restricted: False, questions: True, feature: True, capability: \"\", expectQuestion: False, expectMessage: True)": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy(restricted: True, questions: True, feature: True, capability: \"request_user_input_async\", expectQuestion: False, expectMessage: False)": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy(restricted: True, questions: True, feature: True, capability: \"send_message_to_user_async\", expectQuestion: False, expectMessage: False)": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RegistrationMatchesRootFeatureAndCatalogPolicy",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RestrictedOrDeniedPublicationCannotReturnAccepted": {
+      "method": "tryAGI.Codex.Tests.CodexAsyncUserMessageTests.RestrictedOrDeniedPublicationCannotReturnAccepted",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.ContainmentRecognizesFilesystemRootAndRejectsSiblingPrefixes": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.ContainmentRecognizesFilesystemRootAndRejectsSiblingPrefixes",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.CopyLinkNeverCopiesItsTargetAndCannotOverwriteExistingLink": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.CopyLinkNeverCopiesItsTargetAndCannotOverwriteExistingLink",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.DeniedOrCancelledCallCannotTouchFiles": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.DeniedOrCancelledCallCannotTouchFiles",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.DirectoryCopyMergesPreservesLinksAndRejectsResolvedDescendants": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.DirectoryCopyMergesPreservesLinksAndRejectsResolvedDescendants",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.DirectoryCopyRejectsCaseAliasesOnCaseInsensitiveVolumes": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.DirectoryCopyRejectsCaseAliasesOnCaseInsensitiveVolumes",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation(encoded: \"Zg\")": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation(encoded: \"Zg==\\n\")": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation(encoded: \"Zh==\")": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation(encoded: \"____\")": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.MetadataAndListingFollowTargetsButRetainLinkIdentity": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.MetadataAndListingFollowTargetsButRetainLinkIdentity",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.MissingFieldsNullCopyOptionAndRelativePathsAreInvalid": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.MissingFieldsNullCopyOptionAndRelativePathsAreInvalid",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.PosixFifoReadDoesNotWaitForWriter": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.PosixFifoReadDoesNotWaitForWriter",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion(length: 0)": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion(length: 257)": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.ReadRejectsDirectoryAndOversizedSparseFileWithoutPartialSuccess": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.ReadRejectsDirectoryAndOversizedSparseFileWithoutPartialSuccess",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.RecursiveDefaultsAndExclusiveSingleDirectoryMatchRust": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.RecursiveDefaultsAndExclusiveSingleDirectoryMatchRust",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.RemoveDefaultsIgnoreOnlyMissingAndNeverTraverseFinalDirectoryLink": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.RemoveDefaultsIgnoreOnlyMissingAndNeverTraverseFinalDirectoryLink",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexFileSystemTests.WriteDoesNotCreateParentsAndFollowsFinalSymlink": {
+      "method": "tryAGI.Codex.Tests.CodexFileSystemTests.WriteDoesNotCreateParentsAndFollowsFinalSymlink",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpClientTests.AuthorizationIsIndependentOfToolDiscoveryAndPreservesExactArguments": {
+      "method": "tryAGI.Codex.Tests.CodexMcpClientTests.AuthorizationIsIndependentOfToolDiscoveryAndPreservesExactArguments",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpClientTests.CancellationCorrelatesWireIdAndLateResultCannotCompleteAnotherRequest": {
+      "method": "tryAGI.Codex.Tests.CodexMcpClientTests.CancellationCorrelatesWireIdAndLateResultCannotCompleteAnotherRequest",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpClientTests.NegotiatesOnceAndCorrelatesConcurrentResponsesOutOfOrder": {
+      "method": "tryAGI.Codex.Tests.CodexMcpClientTests.NegotiatesOnceAndCorrelatesConcurrentResponsesOutOfOrder",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpClientTests.RefreshRejectsDuplicatesAndUnknownServerRequestsWithoutExecuting": {
+      "method": "tryAGI.Codex.Tests.CodexMcpClientTests.RefreshRejectsDuplicatesAndUnknownServerRequestsWithoutExecuting",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpClientTests.RefreshUsesPaginationAndInvalidationInTransportOrder": {
+      "method": "tryAGI.Codex.Tests.CodexMcpClientTests.RefreshUsesPaginationAndInvalidationInTransportOrder",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpClientTests.RepeatedCursorDoesNotPublishPartialCatalog": {
+      "method": "tryAGI.Codex.Tests.CodexMcpClientTests.RepeatedCursorDoesNotPublishPartialCatalog",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpClientTests.ResourcesAndPromptsRetainRawResultsAndRpcErrors": {
+      "method": "tryAGI.Codex.Tests.CodexMcpClientTests.ResourcesAndPromptsRetainRawResultsAndRpcErrors",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpClientTests.UnsupportedHandshakeFailsClosedWithoutInitializedOrToolCalls": {
+      "method": "tryAGI.Codex.Tests.CodexMcpClientTests.UnsupportedHandshakeFailsClosedWithoutInitializedOrToolCalls",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.AccountConnectionThreadAndEnvironmentAreDistinctPartitions": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.AccountConnectionThreadAndEnvironmentAreDistinctPartitions",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.CancellingOneWaiterDoesNotCancelSharedStartup": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.CancellingOneWaiterDoesNotCancelSharedStartup",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.ChainedReplacementCannotSkipUnsettledPredecessor": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.ChainedReplacementCannotSkipUnsettledPredecessor",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.ConfigurationAndStatusNeverConnectAndConcurrentOpenReusesExactGeneration": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.ConfigurationAndStatusNeverConnectAndConcurrentOpenReusesExactGeneration",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.FactoryCannotAccidentallyShareClientAcrossAccounts": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.FactoryCannotAccidentallyShareClientAcrossAccounts",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.InvalidScopeAndUnregisteredGenerationCannotStartFactory": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.InvalidScopeAndUnregisteredGenerationCannotStartFactory",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.ReplacementCancelsStartupAndFencesEvenLateReadyClient": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.ReplacementCancelsStartupAndFencesEvenLateReadyClient",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.RevisionFencesStaleOpensAndDisablingClosesPreviousConnection": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.RevisionFencesStaleOpensAndDisablingClosesPreviousConnection",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.UnauthorizedStartupIsNotAutomaticallyRetriedOrAuthenticated": {
+      "method": "tryAGI.Codex.Tests.CodexMcpConnectionPoolTests.UnauthorizedStartupIsNotAutomaticallyRetriedOrAuthenticated",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.ExpiredSessionFailsClosedWithoutReinitialization": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.ExpiredSessionFailsClosedWithoutReinitialization",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.MismatchedSseResponseCannotBeDeliveredToAnotherCall": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.MismatchedSseResponseCannotBeDeliveredToAnotherCall",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.OptionalGetAndExplicitDeleteUseExactSession": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.OptionalGetAndExplicitDeleteUseExactSession",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.ParsesMultilineSseAndCorrelatesResponseAfterNotification": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.ParsesMultilineSseAndCorrelatesResponseAfterNotification",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RejectsRedirectWithoutAnotherNetworkRequest": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RejectsRedirectWithoutAnotherNetworkRequest",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RejectsUnsafeEndpointBeforeCallingSender(endpoint: \"http://example.test/mcp\")": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RejectsUnsafeEndpointBeforeCallingSender",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RejectsUnsafeEndpointBeforeCallingSender(endpoint: \"https://example.test/mcp#fragment\")": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RejectsUnsafeEndpointBeforeCallingSender",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RejectsUnsafeEndpointBeforeCallingSender(endpoint: \"https://user:secret@example.test/mcp\")": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RejectsUnsafeEndpointBeforeCallingSender",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RoundTripsSessionHeadersNotificationsAndJsonResults": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.RoundTripsSessionHeadersNotificationsAndJsonResults",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.SessionChangeFailsClosedBeforeDeliveringResponse": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.SessionChangeFailsClosedBeforeDeliveringResponse",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.TruncatedSseCannotCompleteCall": {
+      "method": "tryAGI.Codex.Tests.CodexMcpHttpTransportTests.TruncatedSseCannotCompleteCall",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.DynamicPaidProviderIsNeverSelectedImplicitlyAndFailureDoesNotFallback": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.DynamicPaidProviderIsNeverSelectedImplicitlyAndFailureDoesNotFallback",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ExplicitProviderSelectionFiltersApiModelsAndDoesNotChangeDefault": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ExplicitProviderSelectionFiltersApiModelsAndDoesNotChangeDefault",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ProviderMismatchIsRejected": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ProviderMismatchIsRejected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"cursor\\\":\\\"-1\\\"}\")": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"cursor\\\":\\\"999\\\"}\")": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"includeHidden\\\":\\\"false\\\"}\")": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"limit\\\":-1}\")": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"limit\\\":1,\\\"limit\\\":2}\")": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.StaticCatalogProjectsRustWireShapeAndPriorityDefaultBeforePagination": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.StaticCatalogProjectsRustWireShapeAndPriorityDefaultBeforePagination",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogTests.AccountSwitchDuringDiscoveryDoesNotExposeOldCatalog": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogTests.AccountSwitchDuringDiscoveryDoesNotExposeOldCatalog",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogTests.CacheRevalidatesOnlyForMatchingAccountUserAndClientVersion": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogTests.CacheRevalidatesOnlyForMatchingAccountUserAndClientVersion",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogTests.CustomOriginCannotReceiveChatGptCredentials": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogTests.CustomOriginCannotReceiveChatGptCredentials",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogTests.MissingCapabilitiesStayUnknownAndDuplicateSlugsAreRejected": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogTests.MissingCapabilitiesStayUnknownAndDuplicateSlugsAreRejected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexModelCatalogTests.UnknownUserIdentityCannotReuseAnAccountCatalog": {
+      "method": "tryAGI.Codex.Tests.CodexModelCatalogTests.UnknownUserIdentityCannotReuseAnAccountCatalog",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.BuiltInShadowingCannotReachEvaluator": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.BuiltInShadowingCannotReachEvaluator",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.BuiltInsAndConfiguredProfilesHavePinnedOrderingPaginationAndDescriptions": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.BuiltInsAndConfiguredProfilesHavePinnedOrderingPaginationAndDescriptions",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"cursor\\\":\\\"-1\\\"}\")": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"cursor\\\":\\\"01\\\"}\")": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"grant\\\":true}\")": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"limit\\\":0}\")": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"limit\\\":1,\\\"limit\\\":2}\")": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"limit\\\":513}\")": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.MalformedAndCyclicProfilesNeverReachAuthorityEvaluator": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.MalformedAndCyclicProfilesNeverReachAuthorityEvaluator",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.RawProfileConstraintsReachHostButAreNotExposedInWireSummary": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.RawProfileConstraintsReachHostButAreNotExposedInWireSummary",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.SelectionRevalidatesWorkingDirectoryAndCurrentRevision": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.SelectionRevalidatesWorkingDirectoryAndCurrentRevision",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.UnauthorizedOrRelativeDirectoryCannotTriggerConfigurationRead": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.UnauthorizedOrRelativeDirectoryCannotTriggerConfigurationRead",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.UntrustedProjectLayerCannotInjectOrBroadenProfiles": {
+      "method": "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.UntrustedProjectLayerCannotInjectOrBroadenProfiles",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRegistryTests.CustomAndFunctionDefinitionsRetainKindsAndSnapshotInput": {
+      "method": "tryAGI.Codex.Tests.CodexToolRegistryTests.CustomAndFunctionDefinitionsRetainKindsAndSnapshotInput",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRegistryTests.DefaultNamespacesCollideButDistinctNamespacesAndCaseRemainSeparate": {
+      "method": "tryAGI.Codex.Tests.CodexToolRegistryTests.DefaultNamespacesCollideButDistinctNamespacesAndCaseRemainSeparate",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRegistryTests.SearchCoalescesNamespacesWithoutAdmittingDeferredTools": {
+      "method": "tryAGI.Codex.Tests.CodexToolRegistryTests.SearchCoalescesNamespacesWithoutAdmittingDeferredTools",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRegistryTests.SearchDefaultsAndLimitsAreDeterministic": {
+      "method": "tryAGI.Codex.Tests.CodexToolRegistryTests.SearchDefaultsAndLimitsAreDeterministic",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.CancelAndExpiryExcludeLateDynamicResponses": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.CancelAndExpiryExcludeLateDynamicResponses",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ConcurrentResponsesCommitAtMostOneAndDeadlineIsRecheckedAfterAuthorization": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ConcurrentResponsesCommitAtMostOneAndDeadlineIsRecheckedAfterAuthorization",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ExactAdmissionAndTerminalResponseSurviveNewLedgerAndCannotBeReapplied": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ExactAdmissionAndTerminalResponseSurviveNewLedgerAndCannotBeReapplied",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.FormElicitationRetainsExtensionsAndDeclineCannotSmuggleContent": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.FormElicitationRetainsExtensionsAndDeclineCannotSmuggleContent",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.HostDenialAndNativeVerificationProofAreIndependentOfElicitationAction": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.HostDenialAndNativeVerificationProofAreIndependentOfElicitationAction",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.InvalidWireResponsesAndDuplicateMembersFailWithoutMutatingRequest": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.InvalidWireResponsesAndDuplicateMembersFailWithoutMutatingRequest",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.LegacyUserInputDefaultsToBlockingAndDoesNotAutoResolve": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.LegacyUserInputDefaultsToBlockingAndDoesNotAutoResolve",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.NonblockingUserInputDoesNotRequireWaitingAndRejectsUnknownQuestionIds": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.NonblockingUserInputDoesNotRequireWaitingAndRejectsUnknownQuestionIds",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.SameConnectionIdCannotAliasDifferentThreadTurnItemOrKind": {
+      "method": "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.SameConnectionIdCannotAliasDifferentThreadTurnItemOrKind",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.ThreadArchiveStoreTests.ArchiveRejectsOpenRealtimeEphemeralAndForeignAccount": {
+      "method": "tryAGI.Codex.Tests.ThreadArchiveStoreTests.ArchiveRejectsOpenRealtimeEphemeralAndForeignAccount",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.ThreadArchiveStoreTests.ArchiveSurvivesReloadAndFencesExecutionWithoutDeletingHistory": {
+      "method": "tryAGI.Codex.Tests.ThreadArchiveStoreTests.ArchiveSurvivesReloadAndFencesExecutionWithoutDeletingHistory",
+      "outcome": "Passed"
+    }
+  },
+  "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+  "exitCode": 0,
+  "lane": "offline",
+  "schemaVersion": 1,
+  "scope": "global",
+  "sourceCleanAtEnd": true,
+  "sourceCleanAtStart": true,
+  "sourceTree": "87651eff506eff968a4b2a513010e6aa625355dd83686e415464f4bf69c5b5ec",
+  "sourceTreeAtEnd": "87651eff506eff968a4b2a513010e6aa625355dd83686e415464f4bf69c5b5ec",
+  "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6"
+}

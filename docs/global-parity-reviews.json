@@ -32,14 +32,35 @@
         }
       },
       "native-sdk": {
-        "status": "missing",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
         "ownerIssue": 68,
-        "scope": "native-dispatch",
-        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
-        "basis": [
-          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
-        ]
+        "scope": "native-behavior",
+        "rationale": "Native single-thread archive/unarchive and durable history, owner fencing, exact event and no replay are verified in the mapped C# tests. Rust descendant archive/restore and stale subscriptions in multi-client scenarios remain independent acceptance gaps (#108). The complete RPC is not marked passed.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Archive.cs::ArchiveAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Archive.cs::ArchiveAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ArchiveInterruptsOwnedTurnAndRejectsForeignWriter"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_without_turns",
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_and_unarchive_spawned_descendants",
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_clears_stale_subscriptions_before_resume"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/realtime-parity-evidence/ci-3a0a7d1-45958143597.json",
+          "receiptSha256": "88dba101c2a4d3e4aa743debc2729139d4ad9d813c8cd5200dbc3e2e16f2a01b",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.ArchiveInterruptsOwnedTurnAndRejectsForeignWriter",
+            "tryAGI.Codex.Tests.ThreadRpcTests.ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/unarchive": {
@@ -71,14 +92,33 @@
         }
       },
       "native-sdk": {
-        "status": "missing",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
         "ownerIssue": 68,
-        "scope": "native-dispatch",
-        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
-        "basis": [
-          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
-        ]
+        "scope": "native-behavior",
+        "rationale": "Native single-thread archive/unarchive and durable history, owner fencing, exact event and no replay are verified in the mapped C# tests. Rust descendant archive/restore and stale subscriptions in multi-client scenarios remain independent acceptance gaps (#108). The complete RPC is not marked passed.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Archive.cs::ArchiveAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Archive.cs::UnarchiveAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_without_turns",
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_and_unarchive_spawned_descendants",
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_clears_stale_subscriptions_before_resume"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/realtime-parity-evidence/ci-3a0a7d1-45958143597.json",
+          "receiptSha256": "88dba101c2a4d3e4aa743debc2729139d4ad9d813c8cd5200dbc3e2e16f2a01b",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/name/set": {
@@ -111,10 +151,10 @@
       },
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
         "ownerIssue": 68,
         "scope": "native-behavior",
-        "rationale": "The C# test passed in Realtime CI at b3f9229 and verifies persisted name across a cold host and fork, but does not exercise a paginated named-empty thread through a subsequent completed turn after restart. Gap #128; do not accept full native RPC yet.",
+        "rationale": "The C# test passed in Realtime CI at 3a0a7d1 and verifies persisted name across a cold host and fork, but does not exercise a paginated named-empty thread through a subsequent completed turn after restart. Gap #128; do not accept full native RPC yet.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Metadata.cs::SetNameAsync",
           "src/libs/tryAGI.Codex/CodexThreadStore.Metadata.cs::SetNameAsync"
@@ -124,7 +164,17 @@
         ],
         "upstreamTests": [
           "codex-rs/app-server/tests/suite/v2/thread_name_persistence.rs::named_empty_paginated_thread_resumes_after_restart"
-        ]
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/realtime-parity-evidence/ci-3a0a7d1-45958143597.json",
+          "receiptSha256": "88dba101c2a4d3e4aa743debc2729139d4ad9d813c8cd5200dbc3e2e16f2a01b",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/archived": {
@@ -154,14 +204,33 @@
         }
       },
       "native-sdk": {
-        "status": "missing",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
         "ownerIssue": 68,
-        "scope": "native-dispatch",
-        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
-        "basis": [
-          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
-        ]
+        "scope": "native-behavior",
+        "rationale": "Native single-thread archive/unarchive and durable history, owner fencing, exact event and no replay are verified in the mapped C# tests. Rust descendant archive/restore and stale subscriptions in multi-client scenarios remain independent acceptance gaps (#108). The complete RPC is not marked passed.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Archive.cs::ArchiveAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Archive.cs::ArchiveAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_without_turns",
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_and_unarchive_spawned_descendants",
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_clears_stale_subscriptions_before_resume"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/realtime-parity-evidence/ci-3a0a7d1-45958143597.json",
+          "receiptSha256": "88dba101c2a4d3e4aa743debc2729139d4ad9d813c8cd5200dbc3e2e16f2a01b",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/unarchived": {
@@ -191,14 +260,33 @@
         }
       },
       "native-sdk": {
-        "status": "missing",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
         "ownerIssue": 68,
-        "scope": "native-dispatch",
-        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
-        "basis": [
-          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
-        ]
+        "scope": "native-behavior",
+        "rationale": "Native single-thread archive/unarchive and durable history, owner fencing, exact event and no replay are verified in the mapped C# tests. Rust descendant archive/restore and stale subscriptions in multi-client scenarios remain independent acceptance gaps (#108). The complete RPC is not marked passed.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Archive.cs::ArchiveAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Archive.cs::UnarchiveAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_without_turns",
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_and_unarchive_spawned_descendants",
+          "codex-rs/app-server/tests/suite/v2/thread_archive.rs::thread_archive_clears_stale_subscriptions_before_resume"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/realtime-parity-evidence/ci-3a0a7d1-45958143597.json",
+          "receiptSha256": "88dba101c2a4d3e4aa743debc2729139d4ad9d813c8cd5200dbc3e2e16f2a01b",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.ArchiveRestoresDurableHistoryAndAttachmentOwnerVisibilityWithoutReplay"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/closed": {
@@ -266,7 +354,7 @@
       },
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
         "ownerIssue": 68,
         "scope": "native-behavior",
         "rationale": "Native SetNameAsync emits one exact event observed by the C# fixture, but Rust tests require notification fan-out to both connected clients for loaded and unloaded threads. Host-adapter acceptance remains pending (#128).",
@@ -280,7 +368,509 @@
         "upstreamTests": [
           "codex-rs/app-server/tests/suite/v2/thread_name_websocket.rs::thread_name_updated_broadcasts_for_loaded_threads",
           "codex-rs/app-server/tests/suite/v2/thread_name_websocket.rs::thread_name_updated_broadcasts_for_not_loaded_threads"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/realtime-parity-evidence/ci-3a0a7d1-45958143597.json",
+          "receiptSha256": "88dba101c2a4d3e4aa743debc2729139d4ad9d813c8cd5200dbc3e2e16f2a01b",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/readFile": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Native byte-exact reads, oversized/nonregular path rejection and local effects; actual Rust differential and host authorization are separate.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.ReadRejectsDirectoryAndOversizedSparseFileWithoutPartialSuccess",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.PosixFifoReadDoesNotWaitForWriter"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_write_file_accepts_base64_bytes",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_methods_cover_current_fs_utils_surface",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_methods_reject_relative_paths"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSystemTests.PosixFifoReadDoesNotWaitForWriter",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion(length: 0)",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion(length: 257)",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.ReadRejectsDirectoryAndOversizedSparseFileWithoutPartialSuccess"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/writeFile": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Native binary writes and canonical base64 rejection before mutation; authorization callback is tested, not an actual consumer permission adapter.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.WriteDoesNotCreateParentsAndFollowsFinalSymlink",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.DeniedOrCancelledCallCannotTouchFiles"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_write_file_accepts_base64_bytes",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_write_file_rejects_invalid_base64",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_methods_reject_relative_paths"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSystemTests.DeniedOrCancelledCallCannotTouchFiles",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation(encoded: \"Zg\")",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation(encoded: \"Zg==\\n\")",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation(encoded: \"Zh==\")",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.InvalidBase64FailsBeforeAuthorizationOrTruncation(encoded: \"____\")",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion(length: 0)",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.RawBytesRoundTripWithoutTextConversion(length: 257)",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.WriteDoesNotCreateParentsAndFollowsFinalSymlink"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/createDirectory": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Recursive/default and single-directory behavior in temporary paths; actual Rust/runtime comparison is separate.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.RecursiveDefaultsAndExclusiveSingleDirectoryMatchRust"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_methods_cover_current_fs_utils_surface"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSystemTests.RecursiveDefaultsAndExclusiveSingleDirectoryMatchRust"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/getMetadata": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Native projection of symlink identity and used metadata fields; timestamp and platform semantics still need full differential review.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.MetadataAndListingFollowTargetsButRetainLinkIdentity"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_get_metadata_returns_only_used_fields",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_get_metadata_reports_symlink"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSystemTests.MetadataAndListingFollowTargetsButRetainLinkIdentity"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/readDirectory": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Native local directory listing including link behavior. Cross-platform and real host authorization remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.MetadataAndListingFollowTargetsButRetainLinkIdentity"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_methods_cover_current_fs_utils_surface"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSystemTests.MetadataAndListingFollowTargetsButRetainLinkIdentity"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/copy": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Native recursive merge, link preservation and descendant fences. Special-file/OS matrix and real Rust runtime still need independent acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.DirectoryCopyMergesPreservesLinksAndRejectsResolvedDescendants",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.CopyLinkNeverCopiesItsTargetAndCannotOverwriteExistingLink"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_copy_rejects_directory_without_recursive",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_copy_rejects_copying_directory_into_descendant",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_copy_preserves_symlinks_in_recursive_copy"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSystemTests.CopyLinkNeverCopiesItsTargetAndCannotOverwriteExistingLink",
+            "tryAGI.Codex.Tests.CodexFileSystemTests.DirectoryCopyMergesPreservesLinksAndRejectsResolvedDescendants"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/remove": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Native remove defaults and final symlink behavior tested on temporary paths. No full host permission credit.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemTests.cs::CodexFileSystemTests.RemoveDefaultsIgnoreOnlyMissingAndNeverTraverseFinalDirectoryLink"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_methods_cover_current_fs_utils_surface"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexFileSystemTests.RemoveDefaultsIgnoreOnlyMissingAndNeverTraverseFinalDirectoryLink"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/watch": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Source-reviewed filesystem watch behavior and ownership tests; no exact independent receipt for this class yet. Multi-platform and host delivery remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystemWatches.cs::CodexFileSystemWatches"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemWatchTests.cs::CodexFileSystemWatchTests.RealOsEventsAreOwnerOnlySortedAndDeduplicated",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemWatchTests.cs::CodexFileSystemWatchTests.MissingTargetMovesFromAncestorWithoutBroadRecursiveWatch"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_watch_directory_reports_changed_child_paths_and_unwatch_stops_notifications",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_watch_allows_missing_file_targets"
         ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/unwatch": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Source-reviewed filesystem watch behavior and ownership tests; no exact independent receipt for this class yet. Multi-platform and host delivery remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystemWatches.cs::CodexFileSystemWatches"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemWatchTests.cs::CodexFileSystemWatchTests.IDsAreConnectionOwnedAndForeignUnwatchIsNoOp",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemWatchTests.cs::CodexFileSystemWatchTests.UnwatchAwaitsInFlightCallbackAndSuppressesQueuedNotifications"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_watch_directory_reports_changed_child_paths_and_unwatch_stops_notifications"
+        ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:fs/changed": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 79,
+        "scope": "native-behavior",
+        "rationale": "Source-reviewed filesystem watch behavior and ownership tests; no exact independent receipt for this class yet. Multi-platform and host delivery remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystemWatches.cs::CodexFileSystemWatches"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemWatchTests.cs::CodexFileSystemWatchTests.RealOsEventsAreOwnerOnlySortedAndDeduplicated",
+          "src/tests/tryAGI.Codex.Tests/CodexFileSystemWatchTests.cs::CodexFileSystemWatchTests.FileWatchFiltersUnrelatedSiblings"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_watch_file_reports_atomic_replace_events",
+          "codex-rs/app-server/tests/suite/v2/fs.rs::fs_watch_directory_reports_changed_child_paths_and_unwatch_stops_notifications"
+        ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:model/list": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 84,
+        "scope": "native-behavior",
+        "rationale": "Native catalog projection, ordering, hidden filtering, cursor behavior and explicit provider selection have credential-free evidence. Actual account-scoped provider discovery and all upstream fields remain separately unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexModelCatalogRpc.cs::InvokeAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.StaticCatalogProjectsRustWireShapeAndPriorityDefaultBeforePagination",
+          "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.ExplicitProviderSelectionFiltersApiModelsAndDoesNotChangeDefault",
+          "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.DynamicPaidProviderIsNeverSelectedImplicitlyAndFailureDoesNotFallback",
+          "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.RejectsInvalidParameters",
+          "src/tests/tryAGI.Codex.Tests/CodexModelCatalogRpcTests.cs::CodexModelCatalogRpcTests.ProviderMismatchIsRejected"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/model_list.rs::list_models_includes_hidden_models",
+          "codex-rs/app-server/tests/suite/v2/model_list.rs::list_models_uses_display_order_and_marks_the_selection_default",
+          "codex-rs/app-server/tests/suite/v2/model_list.rs::list_models_pagination_works",
+          "codex-rs/app-server/tests/suite/v2/model_list.rs::list_models_rejects_invalid_cursor"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.DynamicPaidProviderIsNeverSelectedImplicitlyAndFailureDoesNotFallback",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ExplicitProviderSelectionFiltersApiModelsAndDoesNotChangeDefault",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.ProviderMismatchIsRejected",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"cursor\\\":\\\"-1\\\"}\")",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"cursor\\\":\\\"999\\\"}\")",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"includeHidden\\\":\\\"false\\\"}\")",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"limit\\\":-1}\")",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.RejectsInvalidParameters(json: \"{\\\"limit\\\":1,\\\"limit\\\":2}\")",
+            "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.StaticCatalogProjectsRustWireShapeAndPriorityDefaultBeforePagination"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:permissionProfile/list": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 80,
+        "scope": "native-behavior",
+        "rationale": "Native authorized discovery, profile inheritance, pagination, malformed/untrusted layer rejection and revalidation verified using host callbacks. Actual policy enforcement and platform adapter acceptance remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexPermissionProfileCatalog.cs::HandleAsync",
+          "src/libs/tryAGI.Codex/CodexPermissionProfileCatalog.cs::ListAsync",
+          "src/libs/tryAGI.Codex/CodexPermissionProfileCatalog.cs::ResolveAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexPermissionProfileCatalogTests.cs::CodexPermissionProfileCatalogTests.BuiltInsAndConfiguredProfilesHavePinnedOrderingPaginationAndDescriptions",
+          "src/tests/tryAGI.Codex.Tests/CodexPermissionProfileCatalogTests.cs::CodexPermissionProfileCatalogTests.UnauthorizedOrRelativeDirectoryCannotTriggerConfigurationRead",
+          "src/tests/tryAGI.Codex.Tests/CodexPermissionProfileCatalogTests.cs::CodexPermissionProfileCatalogTests.SelectionRevalidatesWorkingDirectoryAndCurrentRevision",
+          "src/tests/tryAGI.Codex.Tests/CodexPermissionProfileCatalogTests.cs::CodexPermissionProfileCatalogTests.MalformedAndCyclicProfilesNeverReachAuthorityEvaluator",
+          "src/tests/tryAGI.Codex.Tests/CodexPermissionProfileCatalogTests.cs::CodexPermissionProfileCatalogTests.UntrustedProjectLayerCannotInjectOrBroadenProfiles",
+          "src/tests/tryAGI.Codex.Tests/CodexPermissionProfileCatalogTests.cs::CodexPermissionProfileCatalogTests.RawProfileConstraintsReachHostButAreNotExposedInWireSummary",
+          "src/tests/tryAGI.Codex.Tests/CodexPermissionProfileCatalogTests.cs::CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/permission_profile_list.rs::permission_profile_list_returns_builtin_and_configured_profiles",
+          "codex-rs/app-server/tests/suite/v2/permission_profile_list.rs::permission_profile_list_resolves_project_profiles_and_paginates",
+          "codex-rs/app-server/tests/suite/v2/permission_profile_list.rs::permission_profile_list_resolves_roots_against_requested_cwd"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.BuiltInsAndConfiguredProfilesHavePinnedOrderingPaginationAndDescriptions",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"cursor\\\":\\\"-1\\\"}\")",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"cursor\\\":\\\"01\\\"}\")",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"grant\\\":true}\")",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"limit\\\":0}\")",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"limit\\\":1,\\\"limit\\\":2}\")",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.InvalidWireRequestsDoNotReadConfiguration(input: \"{\\\"limit\\\":513}\")",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.MalformedAndCyclicProfilesNeverReachAuthorityEvaluator",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.RawProfileConstraintsReachHostButAreNotExposedInWireSummary",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.SelectionRevalidatesWorkingDirectoryAndCurrentRevision",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.UnauthorizedOrRelativeDirectoryCannotTriggerConfigurationRead",
+            "tryAGI.Codex.Tests.CodexPermissionProfileCatalogTests.UntrustedProjectLayerCannotInjectOrBroadenProfiles"
+          ]
+        }
+      }
+    },
+    "crate:codex-rs/rmcp-client/Cargo.toml:codex-rmcp-client": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 74,
+        "scope": "native-behavior",
+        "rationale": "Component evidence only: native handshake, correlation, tools, resource/prompt handling and refresh. Entire Rust crate, OAuth/enterprise credential lifecycle, actual host routing and new protocol features remain unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexMcpClient.cs::CodexMcpClient"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.NegotiatesOnceAndCorrelatesConcurrentResponsesOutOfOrder",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.AuthorizationIsIndependentOfToolDiscoveryAndPreservesExactArguments",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.CancellationCorrelatesWireIdAndLateResultCannotCompleteAnotherRequest",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.RefreshUsesPaginationAndInvalidationInTransportOrder",
+          "src/tests/tryAGI.Codex.Tests/CodexMcpClientTests.cs::CodexMcpClientTests.ResourcesAndPromptsRetainRawResultsAndRpcErrors"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexMcpClientTests.AuthorizationIsIndependentOfToolDiscoveryAndPreservesExactArguments",
+            "tryAGI.Codex.Tests.CodexMcpClientTests.CancellationCorrelatesWireIdAndLateResultCannotCompleteAnotherRequest",
+            "tryAGI.Codex.Tests.CodexMcpClientTests.NegotiatesOnceAndCorrelatesConcurrentResponsesOutOfOrder",
+            "tryAGI.Codex.Tests.CodexMcpClientTests.RefreshUsesPaginationAndInvalidationInTransportOrder",
+            "tryAGI.Codex.Tests.CodexMcpClientTests.ResourcesAndPromptsRetainRawResultsAndRpcErrors"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverRequests:item/tool/requestUserInput": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 76,
+        "scope": "native-behavior",
+        "rationale": "Durable correlated user-input ledger handles blocking and nonblocking responses, but actual server-request publication, frontend selection and turn integration are not proven.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexToolRequestLedger.cs::CodexToolRequestLedger"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexToolRequestLedgerTests.cs::CodexToolRequestLedgerTests.ExactAdmissionAndTerminalResponseSurviveNewLedgerAndCannotBeReapplied",
+          "src/tests/tryAGI.Codex.Tests/CodexToolRequestLedgerTests.cs::CodexToolRequestLedgerTests.NonblockingUserInputDoesNotRequireWaitingAndRejectsUnknownQuestionIds",
+          "src/tests/tryAGI.Codex.Tests/CodexToolRequestLedgerTests.cs::CodexToolRequestLedgerTests.LegacyUserInputDefaultsToBlockingAndDoesNotAutoResolve"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ExactAdmissionAndTerminalResponseSurviveNewLedgerAndCannotBeReapplied",
+            "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.LegacyUserInputDefaultsToBlockingAndDoesNotAutoResolve",
+            "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.NonblockingUserInputDoesNotRequireWaitingAndRejectsUnknownQuestionIds"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverRequests:mcpServer/elicitation/request": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 76,
+        "scope": "native-behavior",
+        "rationale": "Correlated elicitation response ledger and form validation component are tested. Actual MCP server/UI round trip and host authority pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexToolRequestLedger.cs::CodexToolRequestLedger"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexToolRequestLedgerTests.cs::CodexToolRequestLedgerTests.SameConnectionIdCannotAliasDifferentThreadTurnItemOrKind",
+          "src/tests/tryAGI.Codex.Tests/CodexToolRequestLedgerTests.cs::CodexToolRequestLedgerTests.FormElicitationRetainsExtensionsAndDeclineCannotSmuggleContent",
+          "src/tests/tryAGI.Codex.Tests/CodexToolRequestLedgerTests.cs::CodexToolRequestLedgerTests.ConcurrentResponsesCommitAtMostOneAndDeadlineIsRecheckedAfterAuthorization"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ConcurrentResponsesCommitAtMostOneAndDeadlineIsRecheckedAfterAuthorization",
+            "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.FormElicitationRetainsExtensionsAndDeclineCannotSmuggleContent",
+            "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.SameConnectionIdCannotAliasDifferentThreadTurnItemOrKind"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverRequests:item/tool/call": {
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+        "ownerIssue": 76,
+        "scope": "native-behavior",
+        "rationale": "Durable dynamic request identity, cancellation and expiry component only. Actual tool execution admission, model continuation and native host RPC integration pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexToolRequestLedger.cs::CodexToolRequestLedger"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/CodexToolRequestLedgerTests.cs::CodexToolRequestLedgerTests.ExactAdmissionAndTerminalResponseSurviveNewLedgerAndCannotBeReapplied",
+          "src/tests/tryAGI.Codex.Tests/CodexToolRequestLedgerTests.cs::CodexToolRequestLedgerTests.CancelAndExpiryExcludeLateDynamicResponses"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "3a0a7d1ef9c1adf9d247bf2b8074208d31b0b872",
+          "receipt": "docs/global-parity-evidence/ci-3a0a7d1-45958143646.json",
+          "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
+          "cases": [
+            "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.CancelAndExpiryExcludeLateDynamicResponses",
+            "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ExactAdmissionAndTerminalResponseSurviveNewLedgerAndCannotBeReapplied"
+          ]
+        }
       }
     }
   }
