@@ -139,7 +139,8 @@ public sealed class ThreadAgentTests
                 promotionId ??= promotion["id"]!.GetValue<string>();
                 Assert.Equal(promotionId, promotion["id"]!.GetValue<string>());
                 Assert.Equal("streamed", promotion["item_id"]!.GetValue<string>());
-                Assert.Equal("::codex-realtime-inline{}\nPreview", (await Read(ct)).GetProperty("text").GetString());
+                var expectedPreview = "::codex-realtime-inline{}\nPreview" + (checks == 0 ? "" : " and final");
+                Assert.Equal(expectedPreview, (await Read(ct)).GetProperty("text").GetString());
                 checks++;
             });
         Assert.Equal(2, checks);

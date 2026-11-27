@@ -33,6 +33,17 @@ public sealed class RealtimePresentationTests
         Assert.Equal(thread.Revision, replay.Revision);
         Assert.Empty(replay.Turns.Single().Output);
         var original = Assert.Single(Items(thread), x => Type(x) == "bemItemPromoted");
+        var extension = candidate with { Preview = candidate.Preview with { Text = candidate.Preview.Text + " more public text" } };
+        thread = await store.RecordRealtimeArtifactPreviewAsync(thread.Id, thread.Revision, turn, "runner", extension, Ct);
+        Assert.Equal(original.ToJsonString(), Assert.Single(Items(thread), x => Type(x) == "bemItemPromoted").ToJsonString());
+        Assert.Equal(extension.Preview.Text, Assert.Single(CodexThreadStore.ProjectRealtimeArtifactPreviews(thread, turn))["text"]!.GetValue<string>());
+        var update = Assert.Single(RealtimeHistoryTests.Session(thread).ArtifactPreviewUpdates!);
+        Assert.Equal(extension.Preview, update.Preview);
+        var stale = await store.RecordRealtimeArtifactPreviewAsync(thread.Id, thread.Revision, turn, "runner", candidate, Ct);
+        Assert.Equal(thread.Revision, stale.Revision);
+        var rewritten = candidate with { Preview = candidate.Preview with { Text = "::codex-realtime-inline{}\nUnobserved rewrite" } };
+        var refused = await store.RecordRealtimeArtifactPreviewAsync(thread.Id, thread.Revision, turn, "runner", rewritten, Ct);
+        Assert.Equal(thread.Revision, refused.Revision);
         thread = await store.RecoverInterruptedAsync(thread.Id, thread.Revision, turn, "runner", Ct);
         var recovered = await store.ReadAsync(thread.Id, Ct);
         Assert.Empty(recovered.Turns.Single().Output);
@@ -40,7 +51,7 @@ public sealed class RealtimePresentationTests
         Assert.Equal(original.ToJsonString(), Assert.Single(Items(recovered), x => Type(x) == "bemItemPromoted").ToJsonString());
         var preview = Assert.Single(CodexThreadStore.ProjectRealtimeArtifactPreviews(recovered, turn));
         Assert.Equal("preview", preview["id"]!.GetValue<string>());
-        Assert.Equal(candidate.Preview.Text, preview["text"]!.GetValue<string>());
+        Assert.Equal(extension.Preview.Text, preview["text"]!.GetValue<string>());
     }
 
     [Fact]
@@ -61,7 +72,9 @@ public sealed class RealtimePresentationTests
         Assert.NotNull(first);
         Assert.Equal("public", first.ItemId);
         Assert.Equal("r1", first.Preview.RequestId);
-        Assert.Null(stream.Observe(Event("r1", """{"type":"response.output_text.delta","item_id":"public","delta":" more"}""")));
+        var continuation = stream.Observe(Event("r1", """{"type":"response.output_text.delta","item_id":"public","delta":" more"}"""));
+        Assert.NotNull(continuation);
+        Assert.Equal(first.Preview.Text + " more", continuation.Preview.Text);
         Assert.Null(stream.Observe(Event("r2", """{"type":"response.output_text.delta","item_id":"public","delta":"::codex-inline-vis{second}"}""")));
     }
 

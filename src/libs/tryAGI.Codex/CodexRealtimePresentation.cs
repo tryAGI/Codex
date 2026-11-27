@@ -139,6 +139,8 @@ public sealed partial class CodexThreadStore
         var bySession = sessions.ToDictionary(s => s.SessionId, StringComparer.Ordinal);
         var known = new HashSet<(Guid, string, string, int?)>();
         var eligible = new Dictionary<(Guid, string), HashSet<CodexStoredRealtimePromotion>>();
+        var previewProofs = new Dictionary<(Guid, string), CodexStoredRealtimeArtifactPreview>();
+        var previewBytes = new Dictionary<Guid, long>();
         foreach (var session in sessions)
         {
             if (session.StartedRevision > document.Revision || session.ClosedRevision > document.Revision ||
@@ -162,6 +164,9 @@ public sealed partial class CodexThreadStore
                     !turn.Dispatches.Any(d => d.Kind == "inference" && d.CallId == preview.RequestId) ||
                     !CodexRealtimePresentation.AssistantPresentations(preview.Text).Contains((promotion.Presentation, promotion.Index)))
                     throw new InvalidDataException("Realtime streaming presentation lacks its admitted public preview.");
+                previewProofs[(promotion.TurnId, promotion.ItemId)] = preview;
+                previewBytes[promotion.TurnId] = previewBytes.GetValueOrDefault(promotion.TurnId) +
+                    System.Text.Encoding.UTF8.GetByteCount(preview.Text);
                 continue;
             }
             var key = (promotion.TurnId, promotion.SessionId);
@@ -169,6 +174,26 @@ public sealed partial class CodexThreadStore
                 eligible.Add(key, candidates = CodexRealtimePresentation.Eligible(turn, promotion.SessionId).ToHashSet());
             if (!candidates.Contains(promotion))
                 throw new InvalidDataException("Realtime promotion does not reference an eligible backing artifact.");
+        }
+
+        var updated = new HashSet<(Guid, string)>();
+
+        foreach (var session in sessions)
+        foreach (var update in session.ArtifactPreviewUpdates ?? [])
+        {
+            if (update is null || !CodexRealtimeArtifactStream.ValidId(update.ItemId) || update.Preview is not { } current ||
+                current.Text is null || !previewProofs.TryGetValue((update.TurnId, update.ItemId), out var proof) ||
+                !updated.Add((update.TurnId, update.ItemId)) ||
+                current.RequestId != proof.RequestId || current.Phase != proof.Phase ||
+                !current.Text.StartsWith(proof.Text, StringComparison.Ordinal) ||
+                session.History?.Events.Any(e => e.Promotion is { Preview: not null } p &&
+                    p.TurnId == update.TurnId && p.ItemId == update.ItemId) != true)
+                throw new InvalidDataException("Realtime preview update does not extend its original presentation proof.");
+            var bytes = System.Text.Encoding.UTF8.GetByteCount(current.Text);
+            var total = previewBytes.GetValueOrDefault(update.TurnId) + bytes;
+            if (bytes > CodexRealtimeArtifactStream.MaximumPreviewBytes || total > MaximumArtifactPreviewBytesPerTurn)
+                throw new InvalidDataException("Realtime preview update capacity exceeded.");
+            previewBytes[update.TurnId] = total;
         }
     }
 }

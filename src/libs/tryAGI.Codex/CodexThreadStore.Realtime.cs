@@ -55,6 +55,9 @@ public sealed record CodexStoredRealtimeSession(
 
     /// <summary>Backing reasoning turns associated with this voice session at a durable boundary.</summary>
     public Guid[]? PresentationTurnIds { get; init; }
+
+    /// <summary>Latest public previews for promoted items, separate from the immutable timeline.</summary>
+    public CodexStoredRealtimeArtifactUpdate[]? ArtifactPreviewUpdates { get; init; }
 }
 
 public sealed partial class CodexThreadStore

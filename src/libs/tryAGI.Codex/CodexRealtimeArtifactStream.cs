@@ -11,6 +11,13 @@ public sealed record CodexStoredRealtimeArtifactPreview(
     [property: JsonRequired] string Text,
     string? Phase = null);
 
+/// <summary>Latest append-only public preview for an already promoted backing item.
+/// Its original promotion evidence and timeline position remain immutable.</summary>
+public sealed record CodexStoredRealtimeArtifactUpdate(
+    [property: JsonRequired] Guid TurnId,
+    [property: JsonRequired] string ItemId,
+    [property: JsonRequired] CodexStoredRealtimeArtifactPreview Preview);
+
 internal sealed record CodexRealtimeArtifactCandidate(string ItemId, CodexStoredRealtimeArtifactPreview Preview);
 
 // Only retain bounded, explicitly public assistant text. A new presentation is emitted once,
@@ -32,6 +39,7 @@ internal sealed class CodexRealtimeArtifactStream
         internal HashSet<(string, int?)> Presented { get; } = [];
         internal int Bytes;
         internal bool Retired;
+        internal string? PublishedText;
     }
 
     internal CodexRealtimeArtifactCandidate? Observe(CodexResponseEvent source)
@@ -92,9 +100,20 @@ internal sealed class CodexRealtimeArtifactStream
         var textSnapshot = string.Concat(item.Parts.Values);
         var candidates = CodexRealtimePresentation.AssistantPresentations(textSnapshot).ToArray();
         var fresh = candidates.Count(p => !item.Presented.Contains(p));
-        if (fresh == 0 || fresh > MaximumPresentations - presentations) return null;
+        if (fresh > MaximumPresentations - presentations || fresh == 0 && item.Presented.Count == 0) return null;
+        if (item.PublishedText is { } prior)
+        {
+            // A late delta for an earlier multipart segment must not rewrite a visible preview.
+            if (!textSnapshot.StartsWith(prior, StringComparison.Ordinal))
+            {
+                item.Retired = true;
+                return null;
+            }
+            if (textSnapshot.Length == prior.Length) return null;
+        }
         foreach (var candidate in candidates) item.Presented.Add(candidate);
         presentations += fresh;
+        item.PublishedText = textSnapshot;
         return new(id, new(request!, textSnapshot, item.Phase));
     }
 
