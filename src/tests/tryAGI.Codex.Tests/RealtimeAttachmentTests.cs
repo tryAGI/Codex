@@ -106,6 +106,52 @@ public sealed class RealtimeAttachmentTests
         Assert.Equal(0, auth.Requests);
     }
 
+    [Theory]
+    [InlineData("v1", "wss://api.openai.com/v1/realtime?intent=quicksilver&call_id=rtc_test")]
+    [InlineData("v2", "wss://api.openai.com/v1/realtime?call_id=rtc_test")]
+    [InlineData("v3", "wss://api.openai.com/v1/live/rtc_test")]
+    public async Task AttachmentUsesCanonicalRouteAndExplicitSessionIdentity(string protocol, string expectedUri)
+    {
+        var auth = new OAuth();
+        using var client = new CodexClient(auth);
+        var (uri, headers) = await client.PrepareRealtimeAttachmentAsync("rtc_test",
+            new CodexRealtimeAttachmentOptions
+            {
+                Protocol = protocol, SidebandBaseUri = new Uri("wss://api.openai.com"),
+                SessionId = "client-session", VoiceSessionId = "voice-session", ExpectedAccountId = "account-a",
+            }, TestContext.Current.CancellationToken);
+        Assert.Equal(expectedUri, uri.AbsoluteUri);
+        Assert.Equal("Bearer test-token", headers["Authorization"]);
+        Assert.Equal("account-a", headers["ChatGPT-Account-Id"]);
+        Assert.Equal("client-session", headers["x-session-id"]);
+        Assert.Equal("voice-session", headers["voice-session-id"]);
+        Assert.Equal(1, auth.Requests);
+    }
+
+    [Fact]
+    public async Task ExternalAttachmentNeverUsesSdkCredentialsAndRejectsConflictingIdentity()
+    {
+        var auth = new OAuth();
+        using var client = new CodexClient(auth);
+        var ct = TestContext.Current.CancellationToken;
+        CodexRealtimeAttachmentOptions Options(string? identity) => new()
+        {
+            Authentication = CodexRealtimeAttachmentAuthentication.ExternalHeaders,
+            SidebandBaseUri = new Uri("wss://external.invalid/v1"),
+            SessionId = identity,
+            ExternalHeaderProvider = _ => ValueTask.FromResult<IReadOnlyDictionary<string, string>>(
+                new Dictionary<string, string> { ["Authorization"] = "Bearer external-test", ["X-Session-Id"] = "external-session" }),
+        };
+        var (uri, headers) = await client.PrepareRealtimeAttachmentAsync("rtc_test", Options("external-session"), ct);
+        Assert.Equal("wss://external.invalid/v1/live/rtc_test", uri.AbsoluteUri);
+        Assert.Equal("Bearer external-test", headers["Authorization"]);
+        Assert.Equal("external-session", headers["x-session-id"]);
+        Assert.False(headers.ContainsKey("ChatGPT-Account-Id"));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.PrepareRealtimeAttachmentAsync("rtc_test", Options("different"), ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.PrepareRealtimeAttachmentAsync("rtc_test", Options("bad\r\nheader"), ct));
+        Assert.Equal(0, auth.Requests);
+    }
+
     [Fact]
     public async Task ElapsedDeadlineAndCancellationHaveNoAuthorizationOrTransportEffects()
     {

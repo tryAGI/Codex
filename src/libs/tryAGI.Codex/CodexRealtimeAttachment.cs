@@ -33,6 +33,12 @@ public sealed class CodexRealtimeAttachmentOptions
     [JsonIgnore]
     public Func<CancellationToken, ValueTask<IReadOnlyDictionary<string, string>>>? ExternalHeaderProvider { get; init; }
 
+    /// <summary>Optional client session identity for the x-session-id header.</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>Optional voice session identity for the voice-session-id header.</summary>
+    public string? VoiceSessionId { get; init; }
+
     /// <summary>Optional account fence for SDK OAuth credentials.</summary>
     public string? ExpectedAccountId { get; init; }
 
@@ -89,19 +95,32 @@ public sealed partial class CodexClient
         CodexRealtimeAttachmentOptions? attachmentOptions = null, CancellationToken cancellationToken = default)
     {
         var attachment = attachmentOptions ?? new();
+        using var deadline = AttachmentDeadline(attachment.StartBefore, cancellationToken);
+        var ct = deadline.Token;
+        var (uri, headers) = await PrepareRealtimeAttachmentAsync(callId, attachment, ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        var connection = await CodexSidebandActivation.ConnectAsync(
+            token => ConnectAttachmentSocketAsync(uri, headers, attachment.Protocol, token),
+            options.RequestTimeout, ct).ConfigureAwait(false);
+        if (ct.IsCancellationRequested)
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+        }
+        return new(callId, connection);
+    }
+
+    // Keep authorization and URI shaping in one testable preparation path. Never log its headers.
+    internal async Task<(Uri Uri, IReadOnlyDictionary<string, string> Headers)> PrepareRealtimeAttachmentAsync(
+        string callId, CodexRealtimeAttachmentOptions attachment, CancellationToken ct)
+    {
         ValidateAttachmentIdentity(callId, attachment.Protocol);
         var configured = attachment.SidebandBaseUri ?? options.SidebandBaseUri;
         ValidateAttachmentDestination(configured, attachment);
-        var uri = attachment.Protocol == "v2"
-            ? new UriBuilder(configured)
-            {
-                Path = configured.AbsolutePath.TrimEnd('/').EndsWith("/live", StringComparison.Ordinal)
-                    ? configured.AbsolutePath.TrimEnd('/')[..^5] + "/realtime" : configured.AbsolutePath.TrimEnd('/'),
-                Query = "call_id=" + Uri.EscapeDataString(callId),
-            }.Uri
-            : CodexRealtimeProtocol.SidebandUri(configured, callId, attachment.Protocol);
-        using var deadline = AttachmentDeadline(attachment.StartBefore, cancellationToken);
-        var ct = deadline.Token;
+        var uri = CodexRealtimeProtocol.SidebandUri(configured, callId, attachment.Protocol);
+        foreach (var id in new[] { attachment.SessionId, attachment.VoiceSessionId })
+            if (id is not null && (id.Length is < 1 or > 128 || id.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('_' or '-' or '.'))))
+                throw new ArgumentException("Invalid realtime attachment header identity.", nameof(attachment));
         ct.ThrowIfCancellationRequested();
 
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -135,16 +154,17 @@ public sealed partial class CodexClient
             headers.Add("originator", options.Originator);
         }
 
-        ct.ThrowIfCancellationRequested();
-        var connection = await CodexSidebandActivation.ConnectAsync(
-            token => ConnectAttachmentSocketAsync(uri, headers, attachment.Protocol, token),
-            options.RequestTimeout, ct).ConfigureAwait(false);
-        if (ct.IsCancellationRequested)
+        void AddIdentity(string name, string? identity)
         {
-            await connection.DisposeAsync().ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
+            if (identity is null) return;
+            if (headers.TryGetValue(name, out var suppliedIdentity) && suppliedIdentity != identity)
+                throw new ArgumentException("Conflicting realtime attachment header identity.", nameof(attachment));
+            headers[name] = identity;
         }
-        return new(callId, connection);
+        AddIdentity("x-session-id", attachment.SessionId);
+        AddIdentity("voice-session-id", attachment.VoiceSessionId);
+        ct.ThrowIfCancellationRequested();
+        return (uri, headers);
     }
 
     /// <summary>Attach to caller-owned channels without fetching SDK credentials or opening a socket.

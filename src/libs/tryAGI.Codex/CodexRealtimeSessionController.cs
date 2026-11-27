@@ -647,6 +647,7 @@ public sealed partial class CodexClient
             {
                 Protocol = request.Protocol, SidebandBaseUri = selected.SidebandBaseUri,
                 Authentication = selected.Authentication, ExternalHeaderProvider = selected.ExternalHeaderProvider,
+                SessionId = selected.SessionId, VoiceSessionId = selected.VoiceSessionId,
                 ExpectedAccountId = account, StartBefore = deadline,
             }, ct);
         }, reconnect);
