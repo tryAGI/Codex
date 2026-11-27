@@ -272,6 +272,12 @@ public sealed partial class CodexClient : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         if (model.Length > 128 || model.Any(char.IsControl)) throw new ArgumentException("Invalid realtime model.");
+        // The SDK's ChatGPT OAuth endpoint is a complete, canonical direct socket route,
+        // not a generic provider API base. Preserve its existing slash-free wire path.
+        if (protocol == "v3" && backend.IsAbsoluteUri &&
+            backend.IdnHost.Equals("chatgpt.com", StringComparison.OrdinalIgnoreCase) &&
+            backend.AbsolutePath.TrimEnd('/') == "/backend-api/codex")
+            backend = new UriBuilder(backend) { Path = "/backend-api/codex" }.Uri;
         return CodexRealtimeProtocol.RealtimeSocketUri(backend, protocol, model, queryParameters: queryParameters);
     }
 

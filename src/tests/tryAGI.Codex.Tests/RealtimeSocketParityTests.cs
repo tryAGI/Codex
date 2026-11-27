@@ -66,6 +66,16 @@ public sealed class RealtimeSocketParityTests
     }
 
     [Theory]
+    [InlineData("https://chatgpt.com/backend-api/codex")]
+    [InlineData("https://chatgpt.com/backend-api/codex/")]
+    public void ChatGptDirectRouteRemainsCanonicalWithExplicitQuery(string backend)
+    {
+        Assert.Equal("wss://chatgpt.com/backend-api/codex?model=snapshot&trace=1",
+            CodexClient.DirectRealtimeUri(new Uri(backend), "snapshot", "v3",
+                new Dictionary<string, string> { ["trace"] = "1" }).AbsoluteUri);
+    }
+
+    [Theory]
     [InlineData("v1", "wss://example.com/v1/realtime?foo=bar&intent=quicksilver&model=snapshot&trace=1")]
     [InlineData("v2", "wss://example.com/v1/realtime?foo=bar&model=snapshot&trace=1")]
     [InlineData("v3", "wss://example.com/v1/live?foo=bar&model=snapshot&trace=1")]
