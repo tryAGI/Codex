@@ -214,12 +214,18 @@ public sealed partial class CodexClient : IDisposable
     /// <summary>Creates a new direct realtime WebSocket session. API-key clients support V1/V2/V3.
     /// The existing ChatGPT OAuth V3 and GA V2 routes retain their distinct authorization behavior.
     /// The host owns usage reservations, PCM input/output and reconnection.</summary>
-    public async Task<CodexRealtimeConnection> ConnectRealtimeWebSocketAsync(CodexRealtimeSessionOptions session, CancellationToken cancellationToken = default)
+    public Task<CodexRealtimeConnection> ConnectRealtimeWebSocketAsync(CodexRealtimeSessionOptions session, CancellationToken cancellationToken = default)
+        => ConnectDirectRealtimeCoreAsync(session, null, cancellationToken);
+
+    private async Task<CodexRealtimeConnection> ConnectDirectRealtimeCoreAsync(CodexRealtimeSessionOptions session,
+        string? expectedAccountId, CancellationToken cancellationToken)
     {
         var api = realtimeApiKeyProvider is not null;
         var uri = DirectRealtimeDestination(session, api);
         _ = session.Protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(session) : CodexRealtimeProtocol.SessionUpdate(session, chatGptCall: false);
         var auth = await GetRealtimeAuthorizationAsync(cancellationToken).ConfigureAwait(false);
+        if (!api && expectedAccountId is not null && auth.AccountId != expectedAccountId)
+            throw new CodexRealtimeAccountMismatchException();
         var connection = await CodexRealtimeConnection.ConnectAsync(uri, auth.Token, auth.AccountId, options, cancellationToken,
             session.Protocol, chatGptCall: false, session).ConfigureAwait(false);
         try

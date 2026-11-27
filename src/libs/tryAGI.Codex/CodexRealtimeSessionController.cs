@@ -65,6 +65,11 @@ public sealed record CodexRealtimeReconnectOptions
 public sealed record CodexRealtimeAttachRequest(
     string CallId, string Protocol, string AccountId, Guid AttachmentId, DateTimeOffset StartBefore);
 
+/// <summary>Durably admitted new direct socket creation. SessionId is a logical host identity,
+/// not a provider call ID. The factory must use the authorized account and create only once.</summary>
+public sealed record CodexRealtimeDirectConnectRequest(Guid ThreadId, string SessionId, string Protocol,
+    string AccountId, Guid AttachmentId, DateTimeOffset StartBefore);
+
 /// <summary>Exact undelivered observation retained while the host reconciles an interrupted journal write.</summary>
 public sealed record CodexRealtimePendingObservation(Guid AttachmentId, string Id, CodexRealtimeEvent Event);
 
@@ -82,7 +87,8 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
     private readonly Guid threadId;
     private readonly string sessionId;
     private readonly string ownerId;
-    private readonly Func<CodexRealtimeAttachRequest, CancellationToken, Task<CodexRealtimeAttachedCall>> connect;
+    private readonly Func<CodexRealtimeAttachRequest, CancellationToken, Task<CodexRealtimeAttachedCall>>? connect;
+    private readonly Func<CodexRealtimeDirectConnectRequest, CancellationToken, Task<CodexRealtimeConnection>>? directConnect;
     private readonly CodexRealtimeReconnectOptions policy;
     private readonly SemaphoreSlim transitions = new(1, 1);
     private readonly object sync = new();
@@ -91,10 +97,12 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
     private CodexRealtimePendingObservation? pending;
     private bool disposed;
 
-    private sealed class Live(Guid id, CodexRealtimeAttachedCall call)
+    private sealed class Live(Guid id, CodexRealtimeConnection connection, CodexRealtimeAttachedCall? sideband)
     {
         public Guid Id { get; } = id;
-        public CodexRealtimeAttachedCall Call { get; } = call;
+        public CodexRealtimeConnection Connection { get; } = connection;
+        public CodexRealtimeAttachedCall? Sideband { get; } = sideband;
+        public ValueTask DisposeAsync() => Sideband is null ? Connection.DisposeAsync() : Sideband.DisposeAsync();
         public CancellationTokenSource Stop { get; } = new();
         public Task<CodexRealtimeLifecycleStatus>? Pump { get; set; }
         public bool StopRequested { get; set; }
@@ -105,12 +113,29 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
     public CodexRealtimeSessionController(CodexThreadStore store, Guid threadId, string sessionId, string ownerId,
         Func<CodexRealtimeAttachRequest, CancellationToken, Task<CodexRealtimeAttachedCall>> connect,
         CodexRealtimeReconnectOptions? options = null)
+        : this(store, threadId, sessionId, ownerId, options)
+        => this.connect = connect ?? throw new ArgumentNullException(nameof(connect));
+
+    /// <summary>Create a controller for a registered direct session using a host-owned connection factory.
+    /// The same durable controller and observer pump are used; the factory is never retried after admission.</summary>
+    public static CodexRealtimeSessionController CreateDirect(CodexThreadStore store, Guid threadId, string sessionId,
+        string ownerId, Func<CodexRealtimeDirectConnectRequest, CancellationToken, Task<CodexRealtimeConnection>> connect,
+        CodexRealtimeReconnectOptions? options = null)
+        => new(store, threadId, sessionId, ownerId, options, connect);
+
+    private CodexRealtimeSessionController(CodexThreadStore store, Guid threadId, string sessionId, string ownerId,
+        CodexRealtimeReconnectOptions? options,
+        Func<CodexRealtimeDirectConnectRequest, CancellationToken, Task<CodexRealtimeConnection>> connect)
+        : this(store, threadId, sessionId, ownerId, options)
+        => directConnect = connect ?? throw new ArgumentNullException(nameof(connect));
+
+    private CodexRealtimeSessionController(CodexThreadStore store, Guid threadId, string sessionId, string ownerId,
+        CodexRealtimeReconnectOptions? options)
     {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
         this.threadId = threadId != Guid.Empty ? threadId : throw new ArgumentException("Thread ID is required.", nameof(threadId));
         this.sessionId = !string.IsNullOrWhiteSpace(sessionId) ? sessionId : throw new ArgumentException("Session ID is required.", nameof(sessionId));
         this.ownerId = !string.IsNullOrWhiteSpace(ownerId) ? ownerId : throw new ArgumentException("Owner ID is required.", nameof(ownerId));
-        this.connect = connect ?? throw new ArgumentNullException(nameof(connect));
         policy = options ?? new();
         if (policy.MaximumAttempts is < 1 or > 8 || policy.Timeout <= TimeSpan.Zero ||
             policy.Timeout > TimeSpan.FromMinutes(2) || policy.RetryDelay < TimeSpan.Zero ||
@@ -118,6 +143,10 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
             policy.DrainTimeout > TimeSpan.FromMinutes(1))
             throw new ArgumentOutOfRangeException(nameof(options));
     }
+
+    /// <summary>The transport ownership contract selected by the host.</summary>
+    public CodexRealtimeTransportKind TransportKind => directConnect is null
+        ? CodexRealtimeTransportKind.ExistingCall : CodexRealtimeTransportKind.DirectWebSocket;
 
     internal bool IsBoundTo(CodexThreadStore journal, Guid thread, string session, string owner) =>
         ReferenceEquals(store, journal) && threadId == thread && sessionId == session && ownerId == owner;
@@ -128,7 +157,7 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
     /// sole inbound reader so that observations are persisted before delivery.</summary>
     public CodexRealtimeConnection? Connection
     {
-        get { lock (sync) return current?.Call.Connection; }
+        get { lock (sync) return current?.Connection; }
     }
 
     /// <summary>Attach or reattach to a cleanly detached session. RecoveryRequired is fenced
@@ -230,6 +259,8 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                     }
                     if (decision is not (CodexRealtimeRecoveryDecision.Open or CodexRealtimeRecoveryDecision.Ended))
                         return RecoveryStatus(decision);
+                    if (directConnect is not null && decision == CodexRealtimeRecoveryDecision.Open)
+                        return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
                     try
                     {
                         thread = await store.ConfirmRealtimeHistoryRecoveryAsync(threadId, thread.Revision,
@@ -265,13 +296,20 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         if (operationId == Guid.Empty) throw new ArgumentException("End operation ID is required.", nameof(operationId));
+        if (directConnect is not null && endProvider is not null)
+            throw new ArgumentException("Direct realtime owns its socket; no separate provider hangup callback is allowed.", nameof(endProvider));
         CancelAttempt();
         await transitions.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
             var live = GetLive();
-            if (live is not null && !await DrainAsync(live, cancellationToken).ConfigureAwait(false))
+            if (directConnect is not null && live is not null)
+            {
+                if (!await CloseDirectAsync(live, operationId, cancellationToken).ConfigureAwait(false))
+                    return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+            }
+            else if (live is not null && !await DrainAsync(live, cancellationToken).ConfigureAwait(false))
             {
                 await LoseAsync(live).ConfigureAwait(false);
                 return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
@@ -328,7 +366,7 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
             try
             {
                 if (endProvider is not null)
-                    await endProvider(live?.Call.Connection, cancellationToken).ConfigureAwait(false);
+                    await endProvider(live?.Connection, cancellationToken).ConfigureAwait(false);
                 if (live is not null) await DisposeLiveAsync(live).ConfigureAwait(false);
                 for (var attempt = 0; attempt < policy.MaximumAttempts; attempt++)
                 {
@@ -351,6 +389,50 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         finally { transitions.Release(); }
     }
 
+    private async Task<bool> CloseDirectAsync(Live live, Guid operationId, CancellationToken ct)
+    {
+        try
+        {
+            CodexThreadAdmission? admission = null;
+            for (var attempt = 0; attempt < policy.MaximumAttempts; attempt++)
+            {
+                var thread = await store.ReadAsync(threadId, ct).ConfigureAwait(false);
+                var session = Session(thread);
+                if (session.AttachmentId != live.Id || session.EndOperationId is { } prior && prior != operationId)
+                    return false;
+                try
+                {
+                    admission = await store.BeginDirectRealtimeCloseAsync(threadId, thread.Revision,
+                        sessionId, ownerId, live.Id, operationId, ct).ConfigureAwait(false);
+                    break;
+                }
+                catch (CodexThreadConflictException) when (attempt + 1 < policy.MaximumAttempts) { }
+            }
+            if (admission?.Admitted == true)
+            {
+                Task<CodexRealtimeLifecycleStatus> pump;
+                lock (sync)
+                {
+                    // Do not cancel an in-flight receive before sending close. ClientWebSocket
+                    // cancellation can abort the socket and discard the provider's final events.
+                    live.StopRequested = true;
+                    pump = live.Pump ??= PumpCoreAsync(live, null, CancellationToken.None);
+                }
+                using var close = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                close.CancelAfter(policy.DrainTimeout);
+                await live.Connection.CloseSessionAsync(close.Token).ConfigureAwait(false);
+                await pump.WaitAsync(close.Token).ConfigureAwait(false);
+                if (live.Connection.Closure is { End: "remote_close", CloseCode: (int)WebSocketCloseStatus.NormalClosure } &&
+                    Volatile.Read(ref pending) is null)
+                    return true;
+            }
+        }
+        catch (Exception error) when (error is not OutOfMemoryException) { }
+        await DisposeLiveAsync(live).ConfigureAwait(false);
+        await ConfirmOrFenceOwnEndAsync(operationId, live.Id).ConfigureAwait(false);
+        return false;
+    }
+
     // A lost completion receipt can be reconciled by reading the exact durable end.
     // An uncertain admission may only fence its own operation or original attachment.
     private async Task<CodexRealtimeLifecycleStatus> ConfirmOrFenceOwnEndAsync(Guid operationId, Guid? originalAttachment)
@@ -367,7 +449,8 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                     return CodexRealtimeLifecycleStatus.Ended;
                 var ownEnd = session.State == "ending" && session.EndOperationId == operationId;
                 var ownAttachment = originalAttachment is not null && session.State == "attached" &&
-                    session.AttachmentId == originalAttachment;
+                    session.AttachmentId == originalAttachment &&
+                    (session.EndOperationId is null || session.EndOperationId == operationId);
                 if (!ownEnd && !ownAttachment) break;
                 try
                 {
@@ -405,35 +488,48 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         session = Session(thread);
         var status = CodexRealtimeLifecycleStatus.Retryable;
         var deadline = DateTimeOffset.UtcNow + policy.Timeout;
-        for (var number = 0; number < policy.MaximumAttempts; number++)
+        var attempts = directConnect is null ? policy.MaximumAttempts : 1;
+        for (var number = 0; number < attempts; number++)
         {
             CodexRealtimeAttachedCall? call = null;
+            CodexRealtimeConnection? connection = null;
             try
             {
                 ct.ThrowIfCancellationRequested();
                 thread = await store.ReadAsync(threadId, ct).ConfigureAwait(false);
                 if (Session(thread).AttachmentId != attachmentId)
                     return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
-                call = await connect(new(session.CallId, session.Protocol, thread.AccountId, attachmentId, deadline), ct).ConfigureAwait(false);
+                if (directConnect is not null)
+                    connection = await directConnect(new(threadId, sessionId, session.Protocol, thread.AccountId, attachmentId, deadline), ct).ConfigureAwait(false);
+                else
+                {
+                    call = await connect!(new(session.CallId!, session.Protocol, thread.AccountId, attachmentId, deadline), ct).ConfigureAwait(false);
+                    connection = call.Connection;
+                    if (call.CallId != session.CallId) throw new InvalidOperationException("Existing-call factory returned another call.");
+                }
                 ct.ThrowIfCancellationRequested();
-                if (call.CallId != session.CallId || call.Connection.Protocol != session.Protocol)
-                    throw new InvalidOperationException("Existing-call factory returned a different call or protocol.");
+                if (connection.Protocol != session.Protocol)
+                    throw new InvalidOperationException("Realtime factory returned a different wire protocol.");
                 thread = await store.ReadAsync(threadId, ct).ConfigureAwait(false);
                 if (Session(thread).AttachmentId != attachmentId)
                     throw new InvalidOperationException("Realtime attachment was replaced.");
-                lock (sync) current = new(attachmentId, call);
+                lock (sync) current = new(attachmentId, connection, call);
                 return CodexRealtimeLifecycleStatus.Attached;
             }
             catch (Exception error) when (error is not OutOfMemoryException)
             {
                 if (call is not null) await call.DisposeAsync().ConfigureAwait(false);
+                else if (connection is not null) await connection.DisposeAsync().ConfigureAwait(false);
                 status = Classify(error);
-                if (status != CodexRealtimeLifecycleStatus.Retryable || number + 1 >= policy.MaximumAttempts) break;
+                if (status != CodexRealtimeLifecycleStatus.Retryable || number + 1 >= attempts) break;
                 try { await RetryDelayAsync(number, ct).ConfigureAwait(false); }
                 catch (OperationCanceledException) { status = CodexRealtimeLifecycleStatus.Cancelled; break; }
             }
         }
         if (!await FenceBestEffortAsync(attachmentId).ConfigureAwait(false)) return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+        // Direct creation may already have reached the provider. Never interpret a
+        // failed handshake/initialization as authorization to create another session.
+        if (directConnect is not null) return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
         if (status == CodexRealtimeLifecycleStatus.Ended)
         {
             // 404/410 after the activation budget is authoritative for this exact existing call.
@@ -457,7 +553,7 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         var result = CodexRealtimeLifecycleStatus.Retryable;
         try
         {
-            await foreach (var item in live.Call.Connection.ReadEventsAsync(read.Token).ConfigureAwait(false))
+            await foreach (var item in live.Connection.ReadEventsAsync(read.Token).ConfigureAwait(false))
             {
                 var deliver = true;
                 if (CodexThreadStore.IsRealtimeHistoryEvent(item))
@@ -535,7 +631,12 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         }
         try
         {
-            await live.Call.DetachAsync(ct).ConfigureAwait(false);
+            if (directConnect is not null)
+            {
+                await LoseAsync(live).ConfigureAwait(false);
+                return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+            }
+            await live.Sideband!.DetachAsync(ct).ConfigureAwait(false);
             lock (sync) { if (ReferenceEquals(current, live)) current = null; }
             for (var number = 0; number < policy.MaximumAttempts; number++)
             {
@@ -580,7 +681,7 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
     {
         lock (sync) { if (ReferenceEquals(current, live)) current = null; }
         live.Stop.Cancel();
-        await live.Call.DisposeAsync().ConfigureAwait(false);
+        await live.DisposeAsync().ConfigureAwait(false);
     }
 
     private async Task<bool> FenceBestEffortAsync(Guid? expected)
@@ -613,8 +714,8 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
     }
 
     private CodexStoredRealtimeSession Session(CodexThreadDocument thread)
-        => thread.RealtimeSessions?.SingleOrDefault(s => s.SessionId == sessionId && s.OwnerId == ownerId)
-            ?? throw new InvalidOperationException("Realtime logical session or owner no longer matches.");
+        => thread.RealtimeSessions?.SingleOrDefault(s => s.SessionId == sessionId && s.OwnerId == ownerId && s.TransportKind == TransportKind)
+            ?? throw new InvalidOperationException("Realtime logical session, owner or transport kind no longer matches.");
 
     private Live? GetLive() { lock (sync) return current; }
     private void ThrowIfDisposed() { lock (sync) ObjectDisposedException.ThrowIf(disposed, this); }

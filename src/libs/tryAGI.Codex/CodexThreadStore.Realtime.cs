@@ -2,11 +2,20 @@ using System.Text.Json.Serialization;
 
 namespace tryAGI.Codex;
 
+/// <summary>Logical realtime transport ownership, persisted independently of a socket attachment.</summary>
+public enum CodexRealtimeTransportKind
+{
+    /// <summary>The media call already exists and has independent ownership.</summary>
+    ExistingCall,
+    /// <summary>The direct WebSocket owns the realtime provider session.</summary>
+    DirectWebSocket,
+}
+
 /// <summary>Versioned lifecycle of a logical realtime session. Attachment identity fences one
 /// transport; the logical owner and call survive transport loss. No state authorizes remote replay.</summary>
 /// <param name="Version">Journal schema version.</param>
 /// <param name="SessionId">Stable provider or host logical session identity.</param>
-/// <param name="CallId">Existing call identity, not a new call creation request.</param>
+/// <param name="CallId">Existing media call identity; null for a direct WebSocket session.</param>
 /// <param name="Protocol">Realtime wire version.</param>
 /// <param name="OwnerId">Logical owner, independent of the attachment.</param>
 /// <param name="State">Detached, attached, recoveryRequired, ending or ended (camel case).</param>
@@ -15,7 +24,7 @@ namespace tryAGI.Codex;
 public sealed record CodexStoredRealtimeSession(
     [property: JsonRequired] int Version,
     [property: JsonRequired] string SessionId,
-    [property: JsonRequired] string CallId,
+    [property: JsonRequired, JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? CallId,
     [property: JsonRequired] string Protocol,
     [property: JsonRequired] string OwnerId,
     [property: JsonRequired] string State,
@@ -24,6 +33,10 @@ public sealed record CodexStoredRealtimeSession(
 {
     /// <summary>All previously admitted attachment IDs; prevents reusing a retired transport token.</summary>
     public Guid[]? UsedAttachmentIds { get; init; }
+
+    /// <summary>Existing-call sideband or transport-owned direct realtime session.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public CodexRealtimeTransportKind TransportKind { get; init; }
 
     /// <summary>Durable speech frames, observation identities and backing reasoning carryover.</summary>
     public CodexStoredRealtimeHistory? History { get; init; }
@@ -41,18 +54,32 @@ public sealed partial class CodexThreadStore
     /// have at most one open logical realtime session. No network operation is performed.</summary>
     public Task<CodexThreadDocument> CreateRealtimeSessionAsync(Guid threadId, long expectedRevision,
         string sessionId, string callId, string protocol, string ownerId, CancellationToken cancellationToken = default)
+        => CreateRealtimeSessionCoreAsync(threadId, expectedRevision, sessionId, callId,
+            protocol, ownerId, CodexRealtimeTransportKind.ExistingCall, cancellationToken);
+
+    /// <summary>Register a new logical direct session without creating a provider call or socket.
+    /// A subsequent attachment admission permits at most one connection creation attempt.</summary>
+    public Task<CodexThreadDocument> CreateDirectRealtimeSessionAsync(Guid threadId, long expectedRevision,
+        string sessionId, string protocol, string ownerId, CancellationToken cancellationToken = default)
+        => CreateRealtimeSessionCoreAsync(threadId, expectedRevision, sessionId, null,
+            protocol, ownerId, CodexRealtimeTransportKind.DirectWebSocket, cancellationToken);
+
+    private Task<CodexThreadDocument> CreateRealtimeSessionCoreAsync(Guid threadId, long expectedRevision,
+        string sessionId, string? callId, string protocol, string ownerId, CodexRealtimeTransportKind kind, CancellationToken ct)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
-            Token(sessionId); Token(callId); Token(ownerId);
+            Token(sessionId); Token(ownerId);
+            if (kind == CodexRealtimeTransportKind.ExistingCall) Token(callId ?? throw new ArgumentNullException(nameof(callId)));
             if (protocol is not ("v1" or "v2" or "v3")) throw new ArgumentException("Unsupported realtime protocol.", nameof(protocol));
             if (document.Settings.TryGetProperty("ephemeral", out var ephemeral) &&
                 ephemeral.ValueKind == System.Text.Json.JsonValueKind.True)
                 throw new InvalidOperationException("Realtime lifecycle requires durable thread storage.");
             var sessions = document.RealtimeSessions ?? [];
-            if (sessions.Any(s => s.SessionId == sessionId || s.CallId == callId || s.State != "ended"))
+            if (sessions.Any(s => s.SessionId == sessionId || callId is not null && s.CallId == callId || s.State != "ended"))
                 throw new InvalidOperationException("Realtime session identity is already registered or another session is open.");
-            return document with { RealtimeSessions = [.. sessions, new(1, sessionId, callId, protocol, ownerId, "detached")] };
-        }, cancellationToken);
+            return document with { RealtimeSessions = [.. sessions,
+                new CodexStoredRealtimeSession(1, sessionId, callId, protocol, ownerId, "detached") { TransportKind = kind }] };
+        }, ct);
 
     /// <summary>Atomically claims a detached call for one transport. A new attachment ID must
     /// be allocated before attempting the write; an ambiguous write never authorizes replay.</summary>
@@ -63,7 +90,8 @@ public sealed partial class CodexThreadStore
             var session = FindRealtimeSession(document, sessionId, ownerId);
             Id(attachmentId);
             var used = session.UsedAttachmentIds ?? [];
-            if (session.State != "detached" || used.Contains(attachmentId) || used.Length >= MaximumItems)
+            if (session.State != "detached" || used.Contains(attachmentId) || used.Length >= MaximumItems ||
+                session.TransportKind == CodexRealtimeTransportKind.DirectWebSocket && used.Length != 0)
                 throw new InvalidOperationException("Realtime session is not available for this attachment.");
             // Older detached snapshots may contain unadmitted captures from the previous transport.
             document = RetireLostRealtimeHandoffs(document, session);
@@ -83,6 +111,8 @@ public sealed partial class CodexThreadStore
         {
             var session = FindRealtimeSession(document, sessionId, ownerId);
             RequireRealtimeAttachment(session, attachmentId);
+            if (session.TransportKind == CodexRealtimeTransportKind.DirectWebSocket)
+                throw new InvalidOperationException("A lost direct socket requires authoritative end reconciliation.");
             document = RetireLostRealtimeHandoffs(document, session);
             session = FindRealtimeSession(document, sessionId, ownerId);
             return ReplaceRealtimeSession(document, session with { State = "detached", AttachmentId = null });
@@ -108,7 +138,8 @@ public sealed partial class CodexThreadStore
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             var session = FindRealtimeSession(document, sessionId, ownerId);
-            if (session.State != "recoveryRequired" || (!verifiedEnded && session.EndOperationId is not null))
+            if (session.State != "recoveryRequired" || (!verifiedEnded &&
+                (session.EndOperationId is not null || session.TransportKind == CodexRealtimeTransportKind.DirectWebSocket)))
                 throw new InvalidOperationException("Realtime history remains uncertain.");
             _ = RecoverRealtimeHistory(session);
             document = RetireLostRealtimeHandoffs(document, session);
@@ -126,6 +157,29 @@ public sealed partial class CodexThreadStore
         => BeginRealtimeEndCoreAsync(threadId, expectedRevision, sessionId, ownerId, expectedAttachmentId,
             endOperationId, false, cancellationToken);
 
+    // Direct sockets must send close while the sole reader is still alive. Persist the intent
+    // without sealing the tail yet, so final transcript events can still be durably accepted.
+    internal async Task<CodexThreadAdmission> BeginDirectRealtimeCloseAsync(Guid threadId, long expectedRevision,
+        string sessionId, string ownerId, Guid attachmentId, Guid operationId, CancellationToken ct)
+    {
+        Id(operationId);
+        var before = await CurrentAsync(threadId, expectedRevision, ct).ConfigureAwait(false);
+        var session = FindRealtimeSession(before, sessionId, ownerId);
+        RequireRealtimeAttachment(session, attachmentId);
+        if (session.TransportKind != CodexRealtimeTransportKind.DirectWebSocket)
+            throw new InvalidOperationException("Only a direct session owns its close command.");
+        if (session.EndOperationId is { } prior)
+        {
+            if (prior != operationId) throw new InvalidOperationException("Direct close is owned by another operation.");
+            return new(false, before);
+        }
+        var next = ReplaceRealtimeSession(before, session with { EndOperationId = operationId });
+        return new(true, await PublishAsync(before.Revision, next with
+        {
+            Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
+        }, ct).ConfigureAwait(false));
+    }
+
     // Only the lifecycle controller may retire an attached generation after its sole reader
     // has drained. The general storage API continues to require handoff settlement.
     internal Task<CodexThreadAdmission> BeginDrainedRealtimeEndAsync(Guid threadId, long expectedRevision,
@@ -142,7 +196,10 @@ public sealed partial class CodexThreadStore
         var session = FindRealtimeSession(before, sessionId, ownerId);
         if (session.State == "ended") return new(false, before);
         if (session.State == "ending" && session.EndOperationId == endOperationId) return new(false, before);
-        if (session.State is not ("attached" or "detached") || session.AttachmentId != expectedAttachmentId)
+        if (session.State is not ("attached" or "detached") || session.AttachmentId != expectedAttachmentId ||
+            session.EndOperationId is { } prior && prior != endOperationId ||
+            session.TransportKind == CodexRealtimeTransportKind.DirectWebSocket && session.State == "attached" &&
+                (!attachmentDrained || session.EndOperationId != endOperationId))
             throw new InvalidOperationException("Realtime end is fenced by another attachment, end intent or history recovery.");
         if (session.State == "detached" || attachmentDrained)
         {
@@ -207,14 +264,20 @@ public sealed partial class CodexThreadStore
         foreach (var session in sessions)
         {
             if (session is null || open || session.Version != 1 ||
-                !ValidToken(session.SessionId) || !ValidToken(session.CallId) || !ValidToken(session.OwnerId) ||
-                !ids.Add(session.SessionId) || !calls.Add(session.CallId) || session.Protocol is not ("v1" or "v2" or "v3") ||
+                !ValidToken(session.SessionId) || !ValidToken(session.OwnerId) || !ids.Add(session.SessionId) ||
+                !Enum.IsDefined(session.TransportKind) ||
+                (session.TransportKind == CodexRealtimeTransportKind.ExistingCall
+                    ? session.CallId is not { } callId || !ValidToken(callId) || !calls.Add(callId)
+                    : session.CallId is not null || session.UsedAttachmentIds is { Length: > 1 } ||
+                        session.State == "detached" && session.UsedAttachmentIds is { Length: > 0 }) ||
+                session.Protocol is not ("v1" or "v2" or "v3") ||
                 session.State is not ("attached" or "detached" or "recoveryRequired" or "ending" or "ended") ||
                 (session.State == "attached") != (session.AttachmentId is not null) || session.AttachmentId == Guid.Empty ||
                 (session.UsedAttachmentIds is { } used && (used.Length > MaximumItems || used.Contains(Guid.Empty) || used.Distinct().Count() != used.Length)) ||
                 (session.AttachmentId is { } attachment && !(session.UsedAttachmentIds?.Contains(attachment) ?? false)) ||
                 session.EndOperationId == Guid.Empty || (session.State == "ending" && session.EndOperationId is null) ||
-                (session.State is "attached" or "detached") && session.EndOperationId is not null)
+                (session.State == "detached" || session.State == "attached" &&
+                    session.TransportKind == CodexRealtimeTransportKind.ExistingCall) && session.EndOperationId is not null)
                 throw new InvalidDataException("Invalid realtime session journal.");
             CodexRealtimeModeContext.Validate(session.ModeInstructions);
             ValidateRealtimeHandoffAdmissions(session);

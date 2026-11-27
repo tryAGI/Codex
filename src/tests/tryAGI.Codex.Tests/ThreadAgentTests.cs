@@ -284,9 +284,13 @@ public sealed class ThreadAgentTests
     {
         var (_, store, thread, auth, budget, server) = await Setup();
         var agent = Agent(store, auth, budget, server);
-        using var client = new CodexClient(auth);
-        var incoming = Channel.CreateUnbounded<string>();
-        var outgoing = Channel.CreateUnbounded<string>();
+        using var socket = new DirectRealtimeTestSocket
+        {
+            FinalObservation = """{"type":"input_transcript.added","item":{"text":"last speech before close"}}""",
+        };
+        var incoming = socket.Incoming;
+        var outgoing = socket.Outgoing;
+        incoming.Writer.TryWrite("""{"type":"session.started","session":{"id":"provider-direct-session"}}""");
         var notices = Channel.CreateUnbounded<(string Method, JsonElement Body)>();
         var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
             Json("{}"), (_, _, _) => throw new InvalidOperationException("Use the native owned executor."),
@@ -300,11 +304,17 @@ public sealed class ThreadAgentTests
             Assert.Equal(includeStartupContext, request.SessionOptions.Instructions.Contains("explicit workspace", StringComparison.Ordinal));
             Assert.Equal("v3", request.SessionOptions.Protocol);
             Assert.True(request.CoordinatorOptions.DirectAudio);
-            var session = await store.CreateRealtimeSessionAsync(thread.Id, request.Thread.Revision,
-                "voice", "rtc_call", "v3", "voice-owner", ct);
-            var controller = new CodexRealtimeSessionController(store, session.Id, "voice", "voice-owner",
-                (attach, cancel) => client.AttachExistingRealtimeCallAsync(attach.CallId,
-                    new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), attach.Protocol, attach.StartBefore, cancel));
+            var session = await store.CreateDirectRealtimeSessionAsync(thread.Id, request.Thread.Revision,
+                "voice", "v3", "voice-owner", ct);
+            var controller = CodexRealtimeSessionController.CreateDirect(store, session.Id, "voice", "voice-owner",
+                (attach, cancel) =>
+                {
+                    Assert.Equal(thread.Id, attach.ThreadId);
+                    Assert.Equal("voice", attach.SessionId);
+                    Assert.Equal("account", attach.AccountId);
+                    Assert.Equal("v3", attach.Protocol);
+                    return CodexClient.InitializeDirectRealtimeWebSocketAsync(socket, request.SessionOptions, cancellationToken: cancel);
+                });
             return new(new CodexRealtimeCoordinator(store, agent, rpc, controller, session.Id,
                 "voice", "voice-owner", "account", _ => Options(session.Id, Guid.NewGuid()), NoTools, request.CoordinatorOptions));
         }, (ownerThread, _) =>
@@ -359,13 +369,39 @@ public sealed class ThreadAgentTests
             Assert.Equal("AAAAAA==", notice.Body.GetProperty("audio").GetProperty("data").GetString());
             break;
         }
+        server.Replies.Enqueue(Text("native direct answer"));
+        await incoming.Writer.WriteAsync("""
+            {"type":"delegation.created","item":{"type":"delegation","target":"client","id":"direct-handoff","content":[{"type":"input_text","text":"answer using backing model"}]}}
+            """, token);
+        while (true)
+        {
+            var wire = Json(await outgoing.Reader.ReadAsync(token));
+            if (!wire.GetRawText().Contains("native direct answer", StringComparison.Ordinal)) continue;
+            Assert.Equal("delegation.context.append", wire.GetProperty("type").GetString());
+            Assert.Equal("direct-handoff", wire.GetProperty("delegation_item_id").GetString());
+            break;
+        }
+        while (true)
+        {
+            var actual = await store.ReadAsync(thread.Id, token);
+            if (actual.Turns.LastOrDefault()?.Status == "completed") break;
+            await Task.Delay(10, token);
+        }
+        Assert.Single(server.Requests);
         await Invoke("stop");
         var end = await Invoke("list", new() { ["order"] = "position" });
-        Assert.Equal(2, end.GetProperty("data").GetArrayLength());
-        Assert.Equal("realtimeSessionClosed", end.GetProperty("data")[1].GetProperty("item").GetProperty("type").GetString());
+        var data = end.GetProperty("data").EnumerateArray().ToArray();
+        Assert.Equal("realtimeSessionClosed", data[^1].GetProperty("item").GetProperty("type").GetString());
+        Assert.Contains("last speech before close", end.GetRawText());
+        Assert.Equal(1, Volatile.Read(ref socket.CloseCommands));
         var old = await Invoke("list", new() { ["order"] = "position", ["snapshotEnd"] = snapshot });
         Assert.Single(old.GetProperty("data").EnumerateArray());
-        Assert.Equal("ended", (await store.ReadAsync(thread.Id, token)).RealtimeSessions!.Single().State);
+        var ended = (await store.ReadAsync(thread.Id, token)).RealtimeSessions!.Single();
+        Assert.Equal("ended", ended.State);
+        Assert.Equal(CodexRealtimeTransportKind.DirectWebSocket, ended.TransportKind);
+        Assert.Null(ended.CallId);
+        Assert.Single(ended.UsedAttachmentIds!);
+        Assert.Equal("start", Assert.Single(ended.HandoffAdmissions!).State);
     }
 
     [Fact]

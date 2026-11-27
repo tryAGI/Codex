@@ -118,6 +118,8 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     public Guid ThreadId => threadId;
     /// <summary>The persisted logical voice session.</summary>
     public string SessionId => sessionId;
+    /// <summary>Ownership of the enrolled voice transport.</summary>
+    public CodexRealtimeTransportKind TransportKind => controller.TransportKind;
     internal bool IsBoundTo(CodexThreadRpc host) => ReferenceEquals(rpc, host);
     internal string? Protocol => controller.Connection?.Protocol;
     /// <summary>Last owned reasoning failure, if any. No remote action is automatically replayed.</summary>
@@ -270,7 +272,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         var id = handoff.Event.Delegation?.Id ?? throw new InvalidOperationException("Missing delegation identity.");
         var thread = await ReadBoundAsync(ct).ConfigureAwait(false);
         var session = thread.RealtimeSessions!.Single(s => s.SessionId == sessionId);
-        if (session.HandoffAdmissions?.Any(r => r.HandoffId == id) == true) return;
+        if (session.EndOperationId is not null || session.HandoffAdmissions?.Any(r => r.HandoffId == id) == true) return;
         if (session.AttachmentId != handoff.Attachment) throw new InvalidOperationException("Realtime attachment changed before handoff admission.");
         var input = CodexThreadStore.PrepareRealtimeHandoffInput(session, id);
         var submission = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(threadId + "\n" + sessionId + "\n" + id)).AsSpan(0, 16));

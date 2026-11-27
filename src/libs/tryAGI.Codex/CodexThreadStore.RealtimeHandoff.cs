@@ -74,6 +74,7 @@ public sealed partial class CodexThreadStore
         var before = await CurrentAsync(threadId, expectedRevision, ct).ConfigureAwait(false);
         var session = FindRealtimeSession(before, sessionId, ownerId);
         RequireRealtimeAttachment(session, attachmentId);
+        if (session.EndOperationId is not null) throw new CodexThreadConflictException();
         var receipts = session.HandoffAdmissions ?? [];
         if (receipts.FirstOrDefault(r => r.HandoffId == handoffId) is { } prior)
         {

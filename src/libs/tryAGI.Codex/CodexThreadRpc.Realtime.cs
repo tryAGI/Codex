@@ -176,6 +176,11 @@ public sealed partial class CodexThreadRpc
             var request = RealtimeStart(await store.ReadAsync(id, ct).ConfigureAwait(false), p);
             var binding = await factory(request, ct).ConfigureAwait(false);
             var coordinator = binding.Coordinator;
+            var expectedKind = request.CoordinatorOptions.DirectAudio
+                ? CodexRealtimeTransportKind.DirectWebSocket : CodexRealtimeTransportKind.ExistingCall;
+            if (coordinator.TransportKind != expectedKind ||
+                expectedKind == CodexRealtimeTransportKind.DirectWebSocket && (binding.EndProvider is not null || binding.AnswerSdp is not null))
+                throw Invalid("Host returned a different realtime transport ownership contract.");
             if (coordinator.ThreadId != id || !coordinator.IsBoundTo(this) ||
                 request.SessionOptions.SessionId is { } expected && coordinator.SessionId != expected)
                 throw Invalid("Host returned a different realtime thread or session binding.");
