@@ -28,6 +28,7 @@ public sealed class CodexAgentControl : IDisposable
     private bool inputInitialized;
     internal string? TurnTrigger { get; private set; }
     internal Guid? GoalContinuationId { get; private set; }
+    internal CodexGoalToolPolicy? GoalTools { get; set; }
     internal string?[] ClientIds { get { lock (gate) return clientIds.ToArray(); } }
 
     internal void InitializeInput(IReadOnlyList<JsonElement> items, string? clientId = null, string? turnTrigger = null,

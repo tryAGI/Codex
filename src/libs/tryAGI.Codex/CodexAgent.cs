@@ -244,7 +244,8 @@ public sealed class CodexAgent(CodexClient client)
             cancellationToken.ThrowIfCancellationRequested();
             if (validated.Count == 1 && outputs[0].Images.Count == 0 && !items.Any(x => CodexRealtimeProtocol.Text(x, "type") == "message") &&
                 completeAfterSingleTool?.Invoke(validated[0], outputs[0].Text) is { Length: <= 4096 } direct &&
-                (direct.Length == 0 ? allowSilentCompletion : !string.IsNullOrWhiteSpace(direct)))
+                (direct.Length == 0 ? allowSilentCompletion : !string.IsNullOrWhiteSpace(direct)) &&
+                (control is null || await control.TryFinishAsync(cancellationToken).ConfigureAwait(false)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (direct.Length > 0)

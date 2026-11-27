@@ -29,7 +29,7 @@ public sealed partial class CodexThreadRpc
             throw new InvalidOperationException("Native goal authority is already installed.");
     }
 
-    private static JsonObject? Goal(Guid id, CodexStoredThreadGoal? goal) => goal is null ? null : new JsonObject
+    internal static JsonObject? Goal(Guid id, CodexStoredThreadGoal? goal) => goal is null ? null : new JsonObject
     {
         ["threadId"] = id.ToString(), ["objective"] = goal.Objective, ["status"] = goal.Status,
         ["tokenBudget"] = goal.TokenBudget, ["tokensUsed"] = goal.TokensUsed, ["timeUsedSeconds"] = goal.TimeUsedSeconds,

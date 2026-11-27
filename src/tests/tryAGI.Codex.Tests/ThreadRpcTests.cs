@@ -35,6 +35,7 @@ public sealed class ThreadRpcTests
         internal Action? AfterToolAdmission;
         internal Action? AfterQueueAdmission;
         internal Action? AfterGoalAdmission;
+        internal Action? AfterGoalToolSettlement;
         public Task<JsonElement?> ReadAsync(Guid id, CancellationToken ct)
         { ct.ThrowIfCancellationRequested(); lock (gate) return Task.FromResult(Rows.TryGetValue(id, out var row) ? (JsonElement?)row.Clone() : null); }
         public Task<bool> CompareExchangeAsync(Guid id, long? revision, JsonElement next, CancellationToken ct)
@@ -51,6 +52,10 @@ public sealed class ThreadRpcTests
                 if (AfterGoalAdmission is { } goalHook && next.GetProperty("turns").EnumerateArray().Any(turn =>
                     turn.TryGetProperty("turnTrigger", out var trigger) && trigger.GetString() == "native:goal"))
                 { AfterGoalAdmission = null; goalHook(); }
+                if (AfterGoalToolSettlement is { } settlement && next.GetProperty("turns").EnumerateArray()
+                    .SelectMany(turn => turn.GetProperty("dispatches").EnumerateArray())
+                    .Any(dispatch => dispatch.TryGetProperty("goalToolResult", out _)))
+                { AfterGoalToolSettlement = null; settlement(); }
                 if (AfterToolAdmission is { } hook && next.GetProperty("turns").EnumerateArray()
                     .SelectMany(t => t.GetProperty("dispatches").EnumerateArray())
                     .Any(d => d.GetProperty("kind").GetString() == "tool" && d.GetProperty("state").GetString() == "dispatching"))
@@ -905,6 +910,211 @@ public sealed class ThreadRpcTests
                 && current.QueuedSubmissions is not { Length: > 0 }) return current;
             await Task.Delay(10, deadline.Token);
         }
+    }
+
+    private static string GoalFunction(string name, string callId, string arguments) => new JsonObject
+    {
+        ["type"] = "function_call", ["id"] = "item_" + callId, ["call_id"] = callId,
+        ["name"] = name, ["arguments"] = arguments
+    }.ToJsonString();
+
+    private static JsonElement GoalToolOutput(CodexStoredDispatch dispatch)
+        => Json(dispatch.Result!.Value.GetProperty("output").GetString()!);
+
+    [Fact]
+    public async Task GoalToolsUseNativeDispatcherAndAtomicallyCreateReadAndComplete()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true), maximumTokenBudget: 20);
+        var authorizations = new ConcurrentQueue<CodexGoalToolAuthorization>();
+        host.EnableThreadGoalTools((request, _) =>
+        {
+            authorizations.Enqueue(request);
+            return Task.FromResult(true);
+        });
+        var ordinary = f.Provider.Reply;
+        f.Provider.Reply = (n, token) => n switch
+        {
+            1 => Task.FromResult(GoalFunction("get_goal", "get", "{}")),
+            2 => Task.FromResult(GoalFunction("create_goal", "create", """{"objective":"  finish the requested work  ","token_budget":10}""")),
+            3 => Task.FromResult(GoalFunction("update_goal", "complete", """{"status":"complete"}""")),
+            _ => ordinary(n, token)
+        };
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        var turn = Assert.Single(final.Turns);
+        Assert.Equal("completed", turn.Status);
+        Assert.Equal("complete", final.Goal!.Status);
+        Assert.Equal("finish the requested work", final.Goal.Objective);
+        Assert.Equal(10L, final.Goal.TokenBudget);
+        Assert.Equal(3L, final.Goal.TokensUsed);
+        var receipts = turn.Dispatches.Where(item => item.Kind == "tool").ToArray();
+        Assert.Equal(new[] { "get", "create", "complete" }, receipts.Select(item => item.CallId));
+        Assert.All(receipts, item => Assert.Equal("succeeded", item.State));
+        Assert.Equal(JsonValueKind.Null, GoalToolOutput(receipts[0]).GetProperty("goal").ValueKind);
+        Assert.Null(receipts[0].GoalToolResult!.GoalId);
+        Assert.Equal(final.Goal.Id, receipts[1].GoalToolResult!.GoalId);
+        Assert.Equal("active", GoalToolOutput(receipts[1]).GetProperty("goal").GetProperty("status").GetString());
+        var completed = GoalToolOutput(receipts[2]);
+        Assert.Equal("complete", completed.GetProperty("goal").GetProperty("status").GetString());
+        Assert.Equal(7L, completed.GetProperty("remainingTokens").GetInt64());
+        Assert.NotNull(completed.GetProperty("completionBudgetReport").GetString());
+        Assert.Equal(new[] { "create_goal", "update_goal" }, authorizations.Select(request => request.ToolName));
+        Assert.All(authorizations, request =>
+        {
+            Assert.Equal("account", request.AccountId);
+            Assert.Equal(id, request.ThreadId);
+            Assert.Equal(turn.Id, request.TurnId);
+        });
+        Assert.Null(authorizations.First().GoalId);
+        Assert.Equal(final.Goal.Id, authorizations.Last().GoalId);
+        Assert.Equal(4, f.Provider.Requests.Count);
+        var catalog = f.Provider.Requests.First().GetProperty("tools").EnumerateArray().Select(item => item.GetProperty("name").GetString());
+        Assert.Contains("get_goal", catalog);
+        Assert.Contains("create_goal", catalog);
+        Assert.Contains("update_goal", catalog);
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalToolsRejectUnfinishedReplacementInvalidStatusAndUnapprovedPause()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "original goal"
+        }), ct);
+        var original = (await f.Store.ReadAsync(id, ct)).Goal!;
+        var approvals = new ConcurrentQueue<CodexGoalToolAuthorization>();
+        host.EnableThreadGoalTools((request, _) =>
+        {
+            approvals.Enqueue(request);
+            return Task.FromResult(false);
+        });
+        var ordinary = f.Provider.Reply;
+        f.Provider.Reply = (n, token) => n switch
+        {
+            1 => Task.FromResult(GoalFunction("create_goal", "replace", """{"objective":"replacement"}""")),
+            2 => Task.FromResult(GoalFunction("update_goal", "resume", """{"status":"active"}""")),
+            3 => Task.FromResult(GoalFunction("update_goal", "pause", """{"status":"paused"}""")),
+            _ => ordinary(n, token)
+        };
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        Assert.Equal("completed", final.Turns[0].Status);
+        Assert.Equal(original.Id, final.Goal!.Id);
+        Assert.Equal(original.Objective, final.Goal.Objective);
+        Assert.Equal("active", final.Goal.Status);
+        Assert.Equal("pause", Assert.Single(approvals).CallId);
+        var receipts = final.Turns[0].Dispatches.Where(item => item.Kind == "tool").ToArray();
+        Assert.Equal(3, receipts.Length);
+        Assert.All(receipts, item =>
+        {
+            Assert.Null(item.GoalToolResult);
+            Assert.NotNull(GoalToolOutput(item).GetProperty("error").GetString());
+        });
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalToolAuthorizationCannotMutateAChangedGoalSnapshot()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "original goal"
+        }), ct);
+        host.EnableThreadGoalTools(async (_, token) =>
+        {
+            await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+            {
+                ["threadId"] = id.ToString(), ["status"] = "paused"
+            }), token);
+            return true;
+        });
+        var ordinary = f.Provider.Reply;
+        f.Provider.Reply = (n, token) => n == 1
+            ? Task.FromResult(GoalFunction("update_goal", "stale", """{"status":"complete"}""")) : ordinary(n, token);
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        Assert.Equal("completed", final.Turns[0].Status);
+        Assert.Equal("paused", final.Goal!.Status);
+        var receipt = Assert.Single(final.Turns[0].Dispatches, item => item.Kind == "tool");
+        Assert.Null(receipt.GoalToolResult);
+        Assert.Contains("snapshot changed", GoalToolOutput(receipt).GetProperty("error").GetString());
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalToolCanCompleteAutomaticTurnAtBudgetBoundaryWithoutExtraInference()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        host.EnableAutomaticThreadGoals((_, _) => Task.FromResult(true));
+        var authorizations = new ConcurrentQueue<CodexGoalToolAuthorization>();
+        host.EnableThreadGoalTools((request, _) =>
+        {
+            authorizations.Enqueue(request);
+            return Task.FromResult(true);
+        });
+        f.Provider.Reply = (_, _) => Task.FromResult(GoalFunction("update_goal", "complete", """{"status":"complete"}"""));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = 3
+        }), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        var turn = Assert.Single(final.Turns);
+        Assert.Equal("completed", turn.Status);
+        Assert.Equal("complete", final.Goal!.Status);
+        Assert.Equal(3L, final.Goal.TokensUsed);
+        Assert.Equal("budgetLimited", Assert.Single(authorizations).GoalStatus);
+        var receipt = Assert.Single(turn.Dispatches, item => item.Kind == "tool");
+        Assert.Equal("complete", receipt.GoalToolResult!.Status);
+        Assert.Equal("Goal status: complete. Tokens used: 3 / 3.", turn.Output[^1].GetProperty("content").GetString());
+        Assert.Single(f.Provider.Requests);
+        Assert.Single(f.Provider.TurnMetadataHeaders);
+        await host.StopAsync(ct);
+        Assert.Single(f.Provider.Requests);
+    }
+
+    [Fact]
+    public async Task GoalToolLostCommitAcknowledgmentRecoversExactResultWithoutReapplyingMutation()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        var authorizations = new ConcurrentQueue<CodexGoalToolAuthorization>();
+        host.EnableThreadGoalTools((request, _) =>
+        {
+            authorizations.Enqueue(request);
+            return Task.FromResult(true);
+        });
+        f.Storage.AfterGoalToolSettlement = () => throw new IOException("Lost native goal tool commit acknowledgment.");
+        f.Provider.Reply = (_, _) => Task.FromResult(GoalFunction("create_goal", "create", """{"objective":"durable goal"}"""));
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        var turn = Assert.Single(final.Turns);
+        Assert.Equal("failed", turn.Status);
+        var receipt = Assert.Single(turn.Dispatches, item => item.Kind == "tool");
+        Assert.Equal("succeeded", receipt.State);
+        Assert.Equal(final.Goal!.Id, receipt.GoalToolResult!.GoalId);
+        Assert.Equal("durable goal", final.Goal.Objective);
+        Assert.True(JsonElement.DeepEquals(receipt.Result!.Value, turn.Output[^1]));
+        Assert.Single(authorizations);
+        Assert.Single(f.Provider.Requests);
+        await host.StopAsync(ct);
+        var cold = f.Host();
+        cold.EnableThreadGoals((_, _) => Task.FromResult(true));
+        await cold.InvokeAsync("thread/resume", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        Assert.Equal(final.Goal.Id, (await f.Store.ReadAsync(id, ct)).Goal!.Id);
+        Assert.Single(f.Provider.Requests);
+        await cold.StopAsync(ct);
     }
 
     [Fact]

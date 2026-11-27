@@ -141,8 +141,19 @@ public sealed partial class CodexThreadStore
 
     /// <summary>Only a true durable admission permits dispatch. A repeated call ID never grants
     /// another dispatch, even if its prior outcome is unknown. Changed bytes/kind are a conflict.</summary>
-    public async Task<CodexThreadAdmission> AdmitAsync(Guid threadId, long expectedRevision, Guid turnId,
+    public Task<CodexThreadAdmission> AdmitAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string callId, string kind, JsonElement request, CancellationToken cancellationToken = default)
+        => AdmitCoreAsync(threadId, expectedRevision, turnId, ownerId, callId, kind, request, null, cancellationToken);
+
+    internal Task<CodexThreadAdmission> AdmitGoalToolAsync(Guid threadId, long revision, Guid turnId, string owner,
+        CodexToolCall call, CancellationToken ct)
+    {
+        if (!CodexNativeGoalTools.IsGoalCall(call)) throw new ArgumentException("Invalid native goal tool.");
+        return AdmitCoreAsync(threadId, revision, turnId, owner, call.Id, "tool", CodexNativeGoalTools.Request(call), call.Name, ct);
+    }
+
+    private async Task<CodexThreadAdmission> AdmitCoreAsync(Guid threadId, long expectedRevision, Guid turnId,
+        string ownerId, string callId, string kind, JsonElement request, string? nativeGoalTool, CancellationToken cancellationToken)
     {
         Token(callId);
         if (kind is not ("inference" or "tool")) throw new ArgumentException("Invalid dispatch kind.", nameof(kind));
@@ -155,7 +166,7 @@ public sealed partial class CodexThreadStore
             if (prior.Kind != kind || prior.RequestSha256 != hash) throw new InvalidOperationException("Dispatch identity is already bound to different request bytes.");
             return new(false, before);
         }
-        RequireGoalContinuationDispatch(before, active);
+        RequireGoalContinuationDispatch(before, active, nativeGoalTool);
         var dispatch = new CodexStoredDispatch(callId, kind, hash, "dispatching")
         { GoalInference = CaptureGoalInference(before, kind) };
         var turn = active with { Dispatches = [.. active.Dispatches, dispatch] };
@@ -216,7 +227,7 @@ public sealed partial class CodexThreadStore
         => ChangeTurnAsync(threadId, expectedRevision, turnId, lostOwnerId, turn => turn with
         {
             Status = "interrupted", CompletedAt = time.GetUtcNow(),
-            Output = CodexInferenceRecovery.RecoverOutput(turn),
+            Output = RecoverGoalToolOutputs(turn, CodexInferenceRecovery.RecoverOutput(turn)),
             Dispatches = turn.Dispatches.Select(d => d.State == "dispatching" ? d with { State = "unknown" } : d).ToArray()
         }, cancellationToken);
 
@@ -370,6 +381,7 @@ public sealed partial class CodexThreadStore
                     !active && receipt.State == "dispatching" || turn.Status == "completed" && receipt.State == "unknown")
                     throw new InvalidDataException("Native dispatch history is invalid.");
                 ValidateGoalInference(receipt, goalInferenceIds);
+                ValidateGoalToolResult(receipt);
             }
             ValidateNativeBackingArtifacts(turn);
         }

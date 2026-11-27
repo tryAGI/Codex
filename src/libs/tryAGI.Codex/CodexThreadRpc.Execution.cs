@@ -136,6 +136,7 @@ public sealed partial class CodexThreadRpc
         try
         {
             events = new CodexTurnEvents(thread.Id.ToString(), running.Id.ToString(), PublishAsync);
+            if (CodexThreadStore.ReadStateEligible(thread)) running.Control.GoalTools = Volatile.Read(ref goalTools);
             running.Control.BindRealtimeObserver(() => realtimeObservers.TryGetValue(thread.Id, out var coordinator)
                 ? coordinator.CaptureReasoningObserver(running.Id) : null);
             var run = new CodexThreadRun(thread, running.Id, "native-rpc:" + Guid.CreateVersion7(), running.Options, input, running.Control,

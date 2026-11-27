@@ -108,6 +108,12 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         identity.Validate();
         var before = await store.ReadAsync(threadId, cancellationToken).ConfigureAwait(false);
         if (before.Revision != expectedRevision) throw new CodexThreadConflictException();
+        if (control?.GoalTools is not null)
+        {
+            if (journalProjection is not null || !CodexThreadStore.ReadStateEligible(before))
+                throw new InvalidOperationException("Native goal tools require an unredacted persistent user thread.");
+            options = options with { Tools = CodexNativeGoalTools.Attach(options.Tools) };
+        }
         var guard = new AccountCredentials(credentials, before.AccountId);
         var authOwner = CodexThreadCompactionScheduler.AuthOwner.From(
             await guard.GetCredentialsAsync(cancellationToken).ConfigureAwait(false));
@@ -221,7 +227,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                     control?.ObserveRealtimeProvider(item);
                     observe?.Invoke(item);
                 }, cancellationToken, observeDiagnostics,
-                canExecuteConcurrently: canExecuteConcurrently,
+                completeAfterSingleTool: control?.GoalTools is null ? null : execution.CompleteAfterGoalTool,
+                canExecuteConcurrently: call => !(control?.GoalTools is not null && CodexNativeGoalTools.IsGoalCall(call))
+                    && canExecuteConcurrently?.Invoke(call) == true,
                 previouslyExecutedCallIds: CodexThreadStore.DispatchedToolCallIds(started), control: control,
                 observeAsync: async (item, ct) =>
                 {
@@ -842,16 +850,20 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         {
             var request = Json(new JsonObject { ["kind"] = call.Kind.ToString(), ["name"] = call.Name,
                 ["namespace"] = call.Namespace, ["input"] = call.Input });
+            var goalPolicy = control?.GoalTools;
+            var nativeGoal = goalPolicy is not null && CodexNativeGoalTools.IsGoalCall(call);
             CodexNativeToolArtifactContext? artifacts = null;
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                var admitted = await JournalAsync(doc => store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, call.Id,
-                    "tool", request, ct), result => result.Thread, ct).ConfigureAwait(false);
+                var admitted = await JournalAsync(doc => nativeGoal
+                    ? store.AdmitGoalToolAsync(doc.Id, doc.Revision, turnId, owner, call, ct)
+                    : store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, call.Id, "tool", request, ct),
+                    result => result.Thread, ct).ConfigureAwait(false);
                 if (!admitted.Admitted) throw new CodexProtocolException("Tool identity already dispatched; replay refused.");
                 // Do not retain raw public artifact content behind an explicit host redaction
                 // projection. The existing model-output callback remains available unchanged.
-                if (projection is null)
+                if (projection is null && !nativeGoal)
                 {
                     var itemId = CodexThreadStore.RealtimeTimeline(Turn, true).Select((item, index) =>
                         (Item: item, Id: CodexRealtimeProtocol.Text(item, "id") ?? Turn.Id + ":" + index))
@@ -877,8 +889,17 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             {
                 entered = true;
                 CodexToolOutput output;
-                try { output = await execute(artifacts is null ? call : call with { NativeArtifacts = artifacts }, token).ConfigureAwait(false); }
-                finally { if (artifacts is not null) await artifacts.CloseAsync().ConfigureAwait(false); }
+                if (nativeGoal)
+                {
+                    var local = await InvokeGoalToolAsync(call, goalPolicy!, token).ConfigureAwait(false);
+                    output = local.Output;
+                    if (local.Committed) return output;
+                }
+                else
+                {
+                    try { output = await execute(artifacts is null ? call : call with { NativeArtifacts = artifacts }, token).ConfigureAwait(false); }
+                    finally { if (artifacts is not null) await artifacts.CloseAsync().ConfigureAwait(false); }
+                }
                 var receipt = Json(new JsonObject { ["type"] = call.Kind == CodexToolCallKind.Custom ? "custom_tool_call_output" : "function_call_output",
                     ["call_id"] = call.Id, ["output"] = output.Content() });
                 Remember(call.Id, receipt);
@@ -894,6 +915,81 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 await SettleAsync(call.Id, true, CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
+        }
+
+        private async Task<(CodexToolOutput Output, bool Committed)> InvokeGoalToolAsync(
+            CodexToolCall call, CodexGoalToolPolicy policy, CancellationToken ct)
+        {
+            CodexNativeGoalTools.Command command;
+            try { command = CodexNativeGoalTools.Prepare(call, policy.MaximumTokenBudget); }
+            catch (Exception error) when (error is ArgumentException or JsonException)
+            {
+                return (CodexNativeGoalTools.Error("Invalid goal tool arguments."), false);
+            }
+
+            CodexThreadDocument snapshot;
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try { snapshot = Current; }
+            finally { gate.Release(); }
+            if (CodexNativeGoalTools.Rejection(command, snapshot.Goal) is { } rejection)
+                return (CodexNativeGoalTools.Error(rejection), false);
+
+            var authorized = command.Name == CodexNativeGoalTools.Get;
+            if (!authorized)
+            {
+                // Authorization must not hold the journal gate, and cannot be replayed
+                // against a different goal or a later document revision.
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                deadline.CancelAfter(TimeSpan.FromSeconds(30));
+                try
+                {
+                    authorized = await policy.Authorize(new(snapshot.AccountId, snapshot.Id, turnId,
+                        call.Id, snapshot.Revision, snapshot.Goal?.Id, snapshot.Goal?.Status,
+                        command.Name, command.Arguments.Clone()), deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
+                }
+                catch (Exception error) when (error is not OutOfMemoryException && !ct.IsCancellationRequested)
+                {
+                    return (CodexNativeGoalTools.Error("Goal mutation authorization could not be confirmed."), false);
+                }
+                if (!authorized) return (CodexNativeGoalTools.Error("Goal mutation was not authorized."), false);
+            }
+
+            CodexThreadStore.GoalToolCommit committed;
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (Current.Revision != snapshot.Revision)
+                    return (CodexNativeGoalTools.Error("Goal snapshot changed; inspect it before another request."), false);
+                try
+                {
+                    committed = await store.SettleGoalToolAsync(snapshot.Id, snapshot.Revision, turnId, owner,
+                        call, command, authorized, ct).ConfigureAwait(false);
+                    Current = committed.Thread;
+                }
+                catch (CodexThreadConflictException)
+                {
+                    return (CodexNativeGoalTools.Error("Goal snapshot changed; inspect it before another request."), false);
+                }
+            }
+            finally { gate.Release(); }
+            if (committed.Mutated) await policy.Notify(committed.Thread, turnId).ConfigureAwait(false);
+            return (committed.Output, true);
+        }
+
+        internal string? CompleteAfterGoalTool(CodexToolCall call, string output)
+        {
+            // A terminal goal-tool mutation can finish an automatic goal turn locally.
+            // Do not grant another provider or tool dispatch after the goal stopped.
+            if (!CodexNativeGoalTools.IsGoalCall(call) || call.Name != CodexNativeGoalTools.Update ||
+                Turn.GoalContinuation is not { } continuation || Current.Goal is not { } goal ||
+                goal.Id != continuation.GoalId || goal.Status == "active" ||
+                Turn.Dispatches.SingleOrDefault(item => item.CallId == call.Id)?.GoalToolResult is not { } receipt ||
+                receipt.OriginThreadId != Current.Id || receipt.GoalId != goal.Id || receipt.Status != goal.Status)
+                return null;
+            var tokens = goal.TokensUsed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var budget = goal.TokenBudget is { } limit
+                ? " / " + limit.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+            return "Goal status: " + goal.Status + ". Tokens used: " + tokens + budget + ".";
         }
 
         internal async Task ValidatedAsync(JsonElement item, CancellationToken ct)
@@ -941,7 +1037,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             foreach (var id in Turn.Dispatches.Where(d => d.State is "dispatching" or "unknown").Select(d => d.CallId).ToArray())
                 await SettleAsync(id, false, timeout.Token).ConfigureAwait(false);
             await JournalAsync(doc => store.CompleteAsync(doc.Id, doc.Revision, turnId, owner,
-                interrupted ? "interrupted" : "failed", CodexInferenceRecovery.RecoverOutput(Turn), timeout.Token), timeout.Token).ConfigureAwait(false);
+                interrupted ? "interrupted" : "failed", CodexThreadStore.RecoverGoalToolOutputs(Turn, CodexInferenceRecovery.RecoverOutput(Turn)), timeout.Token), timeout.Token).ConfigureAwait(false);
         }
         public void Dispose() => gate.Dispose();
     }

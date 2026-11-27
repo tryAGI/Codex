@@ -142,6 +142,9 @@ public sealed record CodexStoredDispatch(
 
     /// <summary>Original active goal generation captured when inference was admitted.</summary>
     public CodexGoalInferenceBinding? GoalInference { get; init; }
+
+    /// <summary>Exact settled native goal tool result, atomically committed with goal state.</summary>
+    public CodexStoredGoalToolResult? GoalToolResult { get; init; }
 }
 
 /// <summary>Result of <see cref="CodexThreadStore.AdmitAsync"/>.</summary>

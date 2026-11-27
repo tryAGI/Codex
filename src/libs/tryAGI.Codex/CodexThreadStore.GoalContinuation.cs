@@ -47,10 +47,11 @@ public sealed partial class CodexThreadStore
             throw new InvalidDataException("Native goal continuation has no durable binding.");
     }
 
-    private static void RequireGoalContinuationDispatch(CodexThreadDocument thread, CodexStoredTurn turn)
+    private static void RequireGoalContinuationDispatch(CodexThreadDocument thread, CodexStoredTurn turn, string? nativeGoalTool = null)
     {
-        if (turn.GoalContinuation is { } binding &&
-            (binding.OriginThreadId != thread.Id || thread.Goal is not { Status: "active" } goal || goal.Id != binding.GoalId))
+        if (turn.GoalContinuation is not { } binding) return;
+        if (binding.OriginThreadId != thread.Id || thread.Goal is not { } goal || goal.Id != binding.GoalId ||
+            goal.Status != "active" && !(goal.Status == "budgetLimited" && nativeGoalTool is CodexNativeGoalTools.Get or CodexNativeGoalTools.Update))
             throw new InvalidOperationException("The automatic goal turn no longer has an active goal generation.");
     }
 
