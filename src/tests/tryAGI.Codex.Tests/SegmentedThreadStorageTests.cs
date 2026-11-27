@@ -161,10 +161,13 @@ public sealed class SegmentedThreadStorageTests
         var first = await store.CreateAsync(Guid.NewGuid(), Settings("a", payload), Ct);
         var original = Hashes(roots.Snapshot(first.Id));
         var created = pages.Created;
+        var puts = pages.PutCalls;
         var second = await store.UpdateSettingsAsync(first.Id, first.Revision, Settings(new string('z', 137), payload), Ct);
         var updated = Hashes(roots.Snapshot(first.Id));
         Assert.True(original.Intersect(updated, StringComparer.Ordinal).Count() >= 2);
         Assert.True(pages.Created - created < updated.Length);
+        Assert.Equal(updated.Except(original, StringComparer.Ordinal).Count(), pages.PutCalls - puts);
+        Assert.True(pages.PutCalls - puts < updated.Distinct(StringComparer.Ordinal).Count());
         var reloaded = await store.ReadAsync(first.Id, Ct);
         Assert.Equal(second.Revision, reloaded.Revision);
         Assert.Equal(payload, reloaded.Settings.GetProperty("payload").GetString());
@@ -513,6 +516,133 @@ public sealed class SegmentedThreadStorageTests
             CodexThreadHistoryCollection.Turns, cancellationToken: Ct));
         Assert.Equal(reads, pages.Reads);
         Assert.Equal(candidate.GetRawText(), (await storage.ReadAsync(thread.Id, Ct))!.Value.GetRawText());
+    }
+
+    [Fact]
+    public async Task ObservationCheckpointCrossesRevisionsWithoutReadingTheConsumedPrefix()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        CodexSegmentedThreadStorage Restart() => new(roots, pages, "account", indexHistory: true);
+        var storage = Restart();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("large", Payload()), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_delta", "v3", "owner", Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        await Append(0, 70);
+        var first = await storage.ReadRealtimeObservationDeltaAsync(thread.Id, "session", pageSize: 256, cancellationToken: Ct);
+        Assert.Equal(64, first.Items.Length);
+        Assert.True(first.HasMore);
+        var tail = await storage.ReadRealtimeObservationDeltaAsync(thread.Id, "session", first.Checkpoint, cancellationToken: Ct);
+        Assert.Equal(64, tail.StartOrdinal);
+        Assert.Equal(6, tail.Items.Length);
+        Assert.False(tail.HasMore);
+        Assert.Equal(70, tail.Checkpoint.NextOrdinal);
+
+        // The next commit grows the formerly partial last block. Its first six items
+        // must still match the consumed prefix exactly, even after a process restart.
+        await Append(70, 9);
+        storage = Restart();
+        var reads = pages.Reads;
+        var delta = await storage.ReadRealtimeObservationDeltaAsync(thread.Id, "session", tail.Checkpoint, cancellationToken: Ct);
+        Assert.Equal(70, delta.StartOrdinal);
+        Assert.Equal(9, delta.Items.Length);
+        Assert.Equal(79, delta.TotalCount);
+        Assert.False(delta.HasMore);
+        Assert.InRange(pages.Reads - reads, 1, Hashes(roots.Snapshot(thread.Id)).Length - 1);
+        var expected = CodexThreadStore.Encode(thread).GetProperty("realtimeSessions")[0]
+            .GetProperty("history").GetProperty("events").EnumerateArray().Select(e => e.GetRawText());
+        Assert.Equal(expected, first.Items.Concat(tail.Items).Concat(delta.Items).Select(e => e.GetRawText()));
+
+        reads = pages.Reads;
+        var unchanged = await storage.ReadRealtimeObservationDeltaAsync(thread.Id, "session", delta.Checkpoint, cancellationToken: Ct);
+        Assert.Empty(unchanged.Items);
+        Assert.Equal(delta.Checkpoint, unchanged.Checkpoint);
+        Assert.Equal(reads, pages.Reads);
+        var end = Guid.NewGuid();
+        thread = (await store.BeginRealtimeEndAsync(thread.Id, thread.Revision, "session", "owner", attachment, end, Ct)).Thread;
+        thread = await store.CompleteRealtimeEndAsync(thread.Id, thread.Revision, "session", "owner", end, Ct);
+        var closed = await storage.ReadRealtimeObservationDeltaAsync(thread.Id, "session", unchanged.Checkpoint, cancellationToken: Ct);
+        Assert.Equal("seal", Assert.Single(closed.Items).GetProperty("kind").GetString());
+        Assert.False(closed.HasMore);
+        Assert.Equal(thread.Revision, closed.Revision);
+
+        async Task Append(int from, int count)
+        {
+            foreach (var indices in Enumerable.Range(from, count).Chunk(16))
+            {
+                var observations = indices.Select(i => new CodexRealtimePendingObservation(attachment, "delta-" + i,
+                    RealtimeHistoryTests.Event(new JsonObject
+                    {
+                        ["type"] = "input_transcript.added",
+                        ["item"] = new JsonObject { ["text"] = "x" },
+                        ["padding"] = new string('p', 2048),
+                    }.ToJsonString()))).ToArray();
+                var receipt = await store.RecordRealtimeObservationsAsync(thread.Id, thread.Revision,
+                    "session", "owner", attachment, observations, Ct);
+                Assert.All(receipt.Admitted, admitted => Assert.True(admitted));
+                thread = receipt.Thread;
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ObservationCheckpointRejectsRewrittenOrTruncatedPrefix(bool truncate)
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_changed", "v3", "owner", Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "a",
+            """{"type":"input_transcript.added","item":{"text":"first"}}""");
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "b",
+            """{"type":"input_transcript.added","item":{"text":"second"}}""");
+        var prior = await storage.ReadRealtimeObservationDeltaAsync(thread.Id, "session", cancellationToken: Ct);
+        Assert.Equal(2, prior.Checkpoint.NextOrdinal);
+        var candidate = JsonNode.Parse(CodexThreadStore.Encode(thread).GetRawText())!.AsObject();
+        // Deliberately inject a replacement through the low-level storage adapter.
+        // This must never be interpreted as an append-only reducer continuation.
+        var events = candidate["realtimeSessions"]![0]!["history"]!["events"]!.AsArray();
+        if (truncate) events.RemoveAt(1);
+        else events[0]!["id"] = "replacement";
+        candidate["revision"] = thread.Revision + 1;
+        Assert.True(await storage.CompareExchangeAsync(thread.Id, thread.Revision, Json(candidate.ToJsonString()), Ct));
+        var reads = pages.Reads;
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => storage.ReadRealtimeObservationDeltaAsync(thread.Id,
+            "session", prior.Checkpoint, cancellationToken: Ct));
+        Assert.Equal(reads, pages.Reads);
+    }
+
+    [Fact]
+    public async Task ObservationCheckpointRejectsWrongScopeOrRollbackAndRequiresAnIndex()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var legacy = new CodexSegmentedThreadStorage(roots, pages, "account");
+        var store = new CodexThreadStore(legacy, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => legacy.ReadRealtimeObservationDeltaAsync(thread.Id,
+            "session", cancellationToken: Ct));
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var upgraded = new CodexThreadStore(storage, "account");
+        thread = await upgraded.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_scope", "v3", "owner", Ct);
+        var empty = await storage.ReadRealtimeObservationDeltaAsync(thread.Id, "session", cancellationToken: Ct);
+        Assert.Empty(empty.Items);
+        var reads = pages.Reads;
+        await Assert.ThrowsAsync<ArgumentException>(() => storage.ReadRealtimeObservationDeltaAsync(thread.Id,
+            "other", empty.Checkpoint, cancellationToken: Ct));
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => storage.ReadRealtimeObservationDeltaAsync(thread.Id,
+            "session", empty.Checkpoint with { Revision = thread.Revision + 1 }, cancellationToken: Ct));
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => storage.ReadRealtimeObservationDeltaAsync(thread.Id,
+            "session", empty.Checkpoint with { DocumentSha256 = new string('0', 64) }, cancellationToken: Ct));
+        Assert.Equal(reads, pages.Reads);
     }
 
     [Fact]

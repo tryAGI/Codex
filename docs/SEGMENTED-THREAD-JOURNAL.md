@@ -16,7 +16,7 @@ The root store must accept ordinary inline documents and versioned manifest obje
 
 1. Read and validate the current root's identity and revision. A known stale revision is rejected before staging pages.
 2. Split the candidate document's exact UTF-8 JSON into content-defined pages. The deterministic rolling hash only selects boundaries; SHA-256 verifies content. Each page is at most 512 KiB; all non-final pages are at least 32 KiB. Identical pages can be physically deduplicated by the host. Repeated patterns do not guarantee ideal chunk reuse.
-3. Durably stage each distinct candidate page. A successful put is not publication.
+3. Durably stage each distinct candidate page not already referenced by the currently captured committed manifest. Retained digest/length references prove durable page availability under the host retention contract. Do not reuse a failed writer's uncommitted staging receipts. A successful put is not publication.
 4. Publish the single version-1 manifest with the expected root revision. Competing writers cannot both publish the same next revision.
 5. A reader captures one root, verifies every page's length and SHA-256, verifies the ordered reconstructed document hash, and checks its thread/account/revision identity before returning a document. Missing or corrupt pages fail closed; no partial document is returned.
 
@@ -54,6 +54,12 @@ Version 2 can add `historyIndex` and its canonical SHA-256 digest in the same ro
 - V1 and inline roots remain readable through the full-document path. If the index exceeds its bounded directory budget (8,192 entries/ranges or a 1 MiB v2 manifest), omit it rather than preventing closure of an otherwise valid journal. The page result exposes `UsedIndex = false` for those fallback reads; missing collections are empty.
 - No inference, handoff dispatch or persistence mutation occurs during history reads.
 
+## Stage 2b: append-only observation prefix checkpoints
+
+`ReadRealtimeObservationDeltaAsync` returns a bounded batch and a versioned `CodexRealtimeObservationPrefix`. Unlike a normal pagination cursor, this checkpoint can cross committed revisions if the exact previously consumed observation prefix remains unchanged. The SHA-256 proof covers the account, thread, session, ordered block digests and item counts. A partial final block is verified against its original bytes, even if a later append grew that block. Fully consumed unchanged blocks are compared through the trusted manifest index without re-reading them.
+
+The host must persist the prefix together with its applied reducer state atomically, and only after processing the returned items. A changed/truncated prefix, rollback, wrong scope, same-revision hash mismatch or unavailable index requires explicit verified full replay. The proof is not itself a serialized reducer state, an authority token, or proof of unread page integrity. This API provides the read-side foundation for persistent reducer checkpoints; it does not yet replace the existing reducer or full-document writer.
+
 ## Next stages
 
-Move the existing host history/item query surface to the bounded index API. Add persistent incremental reducer checkpoints validated against the immutable source event prefix, coordinate with the native realtime reduction and Rust rollout work, and support page-aware compaction, forks and deletion. Only then retire the full-document ceiling for a page-aware store, keeping bounded pages, context windows, manifests and explicit recovery. The Advantage consumer migration remains outside this SDK change.
+Move the existing host history/item query surface to the bounded index API. Persist the actual reducer state atomically with the verified observation prefix, coordinate with the native realtime reduction and Rust rollout work, and support page-aware compaction, forks and deletion. Only then retire the full-document ceiling for a page-aware store, keeping bounded pages, context windows, manifests and explicit recovery. The Advantage consumer migration remains outside this SDK change.

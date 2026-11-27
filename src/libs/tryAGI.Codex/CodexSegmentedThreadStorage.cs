@@ -152,9 +152,13 @@ public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
             candidate = JsonSerializer.SerializeToElement(manifest, CodexThreadSegmentJson.Default.CodexThreadSegmentManifest);
         }
         ValidateManifest(threadId, candidate, manifest);
+        // Only the currently observed committed manifest proves durable retention.
+        // Never infer durability from a failed writer, orphan page or process-local cache.
+        var retained = header?.Manifest?.Pages.ToHashSet() ?? [];
         foreach (var (sha, range) in staged)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (retained.Contains(new(sha, range.Length))) continue;
             await pages.PutSegmentAsync(threadId, sha, bytes.AsMemory(range.Offset, range.Length), cancellationToken).ConfigureAwait(false);
         }
         cancellationToken.ThrowIfCancellationRequested();
