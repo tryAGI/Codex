@@ -206,6 +206,25 @@ public sealed partial class CodexThreadStore
         return ReplaceRealtimeSession(document, session with { History = AppendRealtimeHistory(session, history, item) });
     }
 
+    // The transport has been drained or authoritatively fenced. Never dispatch an unadmitted
+    // handoff from that generation. Its source frames remain pending for ordinary carryover.
+    private CodexThreadDocument RetireLostRealtimeHandoffs(CodexThreadDocument document, CodexStoredRealtimeSession session)
+    {
+        if (session.History is not { } history) return document;
+        var pending = history.Handoffs.Where(h => h.State == "pending").ToArray();
+        if (pending.Length == 0) return document;
+        if (pending.Length > MaximumItems - history.Events.Length)
+            throw new InvalidOperationException("Realtime journal capacity exhausted before handoff retirement.");
+        var observedAt = NextRealtimeObservationTime(history);
+        var rejected = pending.Select(h => new CodexStoredRealtimeHistoryEvent(
+            "handoff:" + Guid.NewGuid().ToString("N"), "rejected", observedAt, document.Turns.Length,
+            Reason: "attachmentRetired", HandoffId: h.HandoffId));
+        return ReplaceRealtimeSession(document, session with
+        {
+            History = ReplayRealtimeHistory(session, history.Mode, [.. history.Events, .. rejected]),
+        });
+    }
+
     internal CodexThreadDocument SealRealtimeBeforeTurn(CodexThreadDocument document, Guid turnId)
     {
         foreach (var session in document.RealtimeSessions ?? [])

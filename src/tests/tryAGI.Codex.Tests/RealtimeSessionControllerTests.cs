@@ -205,6 +205,66 @@ public sealed class RealtimeSessionControllerTests
         Assert.Single(factory.Requests);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LostTransportRetiresUnadmittedHandoffOnlyAfterVerifiedRecovery(bool ended)
+    {
+        var (_, store, thread, lost) = await RealtimeHistoryTests.Setup();
+        thread = await RealtimeHistoryTests.Observe(store, thread, lost, "speech",
+            """{"type":"input_transcript.added","item":{"text":"please"}}""");
+        thread = await RealtimeHistoryTests.Observe(store, thread, lost, "handoff",
+            """{"type":"delegation.created","item":{"id":"orphan","type":"delegation","target":"client","content":[{"type":"input_text","text":"please"}]}}""");
+        using var factory = new Factory();
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+
+        Assert.Equal(CodexRealtimeLifecycleStatus.HistoryRecoveryRequired,
+            await controller.RecoverAsync((_, _) => Task.FromResult(CodexRealtimeRecoveryDecision.Unknown),
+                provenLostAttachmentId: lost, cancellationToken: Ct));
+        var fenced = await store.ReadAsync(thread.Id, Ct);
+        Assert.Equal("pending", Assert.Single(RealtimeHistoryTests.Session(fenced).History!.Handoffs).State);
+        Assert.Empty(fenced.Turns);
+
+        var result = await controller.RecoverAsync((_, _) => Task.FromResult(
+            ended ? CodexRealtimeRecoveryDecision.Ended : CodexRealtimeRecoveryDecision.Open), cancellationToken: Ct);
+        Assert.Equal(ended ? CodexRealtimeLifecycleStatus.Ended : CodexRealtimeLifecycleStatus.Attached, result);
+        var recovered = await store.ReadAsync(thread.Id, Ct);
+        var history = RealtimeHistoryTests.Session(recovered).History!;
+        Assert.Equal("rejected", Assert.Single(history.Handoffs).State);
+        Assert.Single(history.Events, e => e.Reason == "attachmentRetired");
+        Assert.Equal("please", Assert.Single(history.Frames).Text);
+        Assert.Empty(recovered.Turns);
+
+        if (!ended)
+        {
+            Assert.Equal(CodexRealtimeLifecycleStatus.Detached, await controller.DetachAsync(Ct));
+            Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await controller.EndAsync(Guid.NewGuid(), cancellationToken: Ct));
+        }
+
+        var closed = await store.ReadAsync(thread.Id, Ct);
+        Assert.Single(RealtimeHistoryTests.Session(closed).History!.Carryover);
+        Assert.Contains("please", CodexThreadStore.RealtimeCarryoverBeforeTurn(closed, 0).Single().GetRawText());
+        Assert.Empty(closed.Turns);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await controller.EndAsync(Guid.NewGuid(), cancellationToken: Ct));
+        Assert.Equal(closed.Revision, (await store.ReadAsync(thread.Id, Ct)).Revision);
+    }
+
+    [Fact]
+    public async Task CleanDetachRetiresPendingHandoffWithoutDiscardingSpeech()
+    {
+        var (_, store, thread, attachment) = await RealtimeHistoryTests.Setup();
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "handoff",
+            """{"type":"delegation.created","item":{"id":"pending","type":"delegation","target":"client","content":[{"type":"input_text","text":"keep this"}]}}""");
+        var detached = await store.DetachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        var session = RealtimeHistoryTests.Session(detached);
+        Assert.Equal("detached", session.State);
+        Assert.Equal("rejected", Assert.Single(session.History!.Handoffs).State);
+        Assert.Equal("pending", Assert.Single(session.History.Frames).Disposition);
+        var end = await store.BeginRealtimeEndAsync(thread.Id, detached.Revision, "session", "owner", null, Guid.NewGuid(), Ct);
+        Assert.Single(RealtimeHistoryTests.Session(end.Thread).History!.Carryover);
+        Assert.Empty(end.Thread.Turns);
+    }
+
     [Fact]
     public async Task ReplacementDuringConnectionFencesOldTransportWithoutTouchingNewOwner()
     {

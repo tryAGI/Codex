@@ -55,23 +55,34 @@ public sealed partial class CodexThreadStore
     /// be allocated before attempting the write; an ambiguous write never authorizes replay.</summary>
     public Task<CodexThreadDocument> AttachRealtimeSessionAsync(Guid threadId, long expectedRevision,
         string sessionId, string ownerId, Guid attachmentId, CancellationToken cancellationToken = default)
-        => ChangeRealtimeAsync(threadId, expectedRevision, sessionId, ownerId, session =>
+        => ChangeAsync(threadId, expectedRevision, document =>
         {
+            var session = FindRealtimeSession(document, sessionId, ownerId);
             Id(attachmentId);
             var used = session.UsedAttachmentIds ?? [];
             if (session.State != "detached" || used.Contains(attachmentId) || used.Length >= MaximumItems)
                 throw new InvalidOperationException("Realtime session is not available for this attachment.");
-            return session with { State = "attached", AttachmentId = attachmentId, UsedAttachmentIds = [.. used, attachmentId] };
+            // Older detached snapshots may contain unadmitted captures from the previous transport.
+            document = RetireLostRealtimeHandoffs(document, session);
+            session = FindRealtimeSession(document, sessionId, ownerId);
+            return ReplaceRealtimeSession(document, session with
+            {
+                State = "attached", AttachmentId = attachmentId, UsedAttachmentIds = [.. used, attachmentId],
+            });
         }, cancellationToken);
 
     /// <summary>Detaches the exact transport after all accepted events have been drained and
-    /// persisted. Does not end the logical session or the caller-owned media call.</summary>
+    /// persisted. Unadmitted captures from that transport are retired without discarding their
+    /// transcript; admitted handoffs remain bound to their reasoning turns. Does not end the media call.</summary>
     public Task<CodexThreadDocument> DetachRealtimeSessionAsync(Guid threadId, long expectedRevision,
         string sessionId, string ownerId, Guid attachmentId, CancellationToken cancellationToken = default)
-        => ChangeRealtimeAsync(threadId, expectedRevision, sessionId, ownerId, session =>
+        => ChangeAsync(threadId, expectedRevision, document =>
         {
+            var session = FindRealtimeSession(document, sessionId, ownerId);
             RequireRealtimeAttachment(session, attachmentId);
-            return session with { State = "detached", AttachmentId = null };
+            document = RetireLostRealtimeHandoffs(document, session);
+            session = FindRealtimeSession(document, sessionId, ownerId);
+            return ReplaceRealtimeSession(document, session with { State = "detached", AttachmentId = null });
         }, cancellationToken);
 
     /// <summary>Fences an attachment after the host proves transport ownership was lost, or
@@ -97,6 +108,8 @@ public sealed partial class CodexThreadStore
             if (session.State != "recoveryRequired" || (!verifiedEnded && session.EndOperationId is not null))
                 throw new InvalidOperationException("Realtime history remains uncertain.");
             _ = RecoverRealtimeHistory(session);
+            document = RetireLostRealtimeHandoffs(document, session);
+            session = FindRealtimeSession(document, sessionId, ownerId);
             if (verifiedEnded)
                 document = SealRealtimeHistory(document, session, "recovery-end:" + expectedRevision, "sessionEnd");
             var recovered = FindRealtimeSession(document, sessionId, ownerId);
@@ -115,6 +128,11 @@ public sealed partial class CodexThreadStore
         if (session.State == "ending" && session.EndOperationId == endOperationId) return new(false, before);
         if (session.State is not ("attached" or "detached") || session.AttachmentId != expectedAttachmentId)
             throw new InvalidOperationException("Realtime end is fenced by another attachment, end intent or history recovery.");
+        if (session.State == "detached")
+        {
+            before = RetireLostRealtimeHandoffs(before, session);
+            session = FindRealtimeSession(before, sessionId, ownerId);
+        }
         var sealedThread = SealRealtimeHistory(before, session, "end:" + endOperationId.ToString("N"), "sessionEnd");
         var sealedSession = FindRealtimeSession(sealedThread, sessionId, ownerId);
         var next = ReplaceRealtimeSession(sealedThread, sealedSession with { State = "ending", AttachmentId = null, EndOperationId = endOperationId });
