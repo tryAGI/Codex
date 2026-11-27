@@ -61,7 +61,7 @@ public sealed class RealtimeSessionControllerTests
         storage.ThrowAfterCommit = true;
         Assert.True(factory.Incoming.Writer.TryWrite(old));
         for (var i = 0; i < 32; i++)
-            Assert.True(factory.Incoming.Writer.TryWrite($$"""{"type":"input_transcript.added","event_id":"new-{{i}}","item":{"text":"x"}}"""));
+            Assert.True(factory.Incoming.Writer.TryWrite($$$"""{"type":"input_transcript.added","event_id":"new-{{{i}}}","item":{"text":"x"}}"""));
         Assert.True(factory.Incoming.Writer.TryWrite("""{"type":"turn.done","event_id":"final","turn":{"role":"user","transcript":"start xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!"}}"""));
         var seen = new List<string>();
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
