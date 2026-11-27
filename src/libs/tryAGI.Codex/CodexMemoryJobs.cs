@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace tryAGI.Codex;
 
@@ -43,8 +44,10 @@ public sealed record CodexMemoryJobState(long Revision, CodexMemoryJobStatus Sta
 /// <param name="SourceEnabled">Stage-1 source is currently permitted and not polluted.</param>
 /// <param name="SourceWatermark">Stage-1 source revision; null for phase 2.</param>
 /// <param name="OutputWatermark">Existing stage-1 output revision, if any.</param>
+/// <param name="ResetEpoch">Namespace reset generation; zero for legacy observations.</param>
+/// <param name="SourceModeRevision">Independent thread memory-mode generation.</param>
 public sealed record CodexMemoryJobObservation(CodexMemoryJobKey Key, CodexMemoryJobState? State,
-    bool SourceEnabled, long? SourceWatermark, long? OutputWatermark);
+    bool SourceEnabled, long? SourceWatermark, long? OutputWatermark, long ResetEpoch = 0, long SourceModeRevision = 0);
 
 /// <summary>Generated stage-1 output for one exact source revision.</summary>
 /// <param name="SourceWatermark">Claimed source revision.</param>
@@ -96,11 +99,15 @@ public enum CodexMemoryJobChangeKind
 /// <param name="Consolidation">Phase-2 exact artifact and selection.</param>
 /// <param name="ExpectedWorkerId">Expected current worker for an owned transition.</param>
 /// <param name="ExpectedOwnershipToken">Expected current lease fence for an owned transition.</param>
+/// <param name="ResetEpoch">Exact observed namespace reset generation.</param>
+/// <param name="SourceModeRevision">Exact observed thread memory-mode generation.</param>
 public sealed record CodexMemoryJobChange(CodexMemoryJobKey Key, Guid OperationId, CodexMemoryJobChangeKind Kind,
     long? ExpectedRevision, CodexMemoryJobState Next, long? ExpectedSourceWatermark = null,
     int? MaximumRunningClaims = null, CodexMemoryExtractionOutput? Extraction = null,
     CodexMemoryConsolidationOutput? Consolidation = null, Guid? ExpectedWorkerId = null,
-    Guid? ExpectedOwnershipToken = null);
+    Guid? ExpectedOwnershipToken = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] long ResetEpoch = 0,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] long SourceModeRevision = 0);
 
 /// <summary>Claim planning outcome before the storage CAS.</summary>
 public enum CodexMemoryJobClaimOutcome
@@ -252,7 +259,8 @@ public sealed class CodexMemoryJobs
             state?.LastSuccessWatermark, newer ? DefaultRetries : state!.RetryRemaining,
             null, null, workerId, operationId, now + lease, null);
         return new(CodexMemoryJobClaimOutcome.Prepared, new(observation.Key, operationId, CodexMemoryJobChangeKind.Claim,
-            state?.Revision, next, stage1 ? input : null, stage1 ? maximumRunningClaims : null));
+            state?.Revision, next, stage1 ? input : null, stage1 ? maximumRunningClaims : null,
+            ResetEpoch: observation.ResetEpoch, SourceModeRevision: observation.SourceModeRevision));
     }
 
     /// <summary>Plans a lease extension for the owned global phase-2 job.</summary>
@@ -305,7 +313,8 @@ public sealed class CodexMemoryJobs
         }
         var next = Terminal(state, CodexMemoryJobStatus.Succeeded, now) with { LastSuccessWatermark = watermark };
         return new(observation.Key, operationId, CodexMemoryJobChangeKind.CompleteStage1, state.Revision, next,
-            watermark, Extraction: output, ExpectedWorkerId: workerId, ExpectedOwnershipToken: ownershipToken);
+            watermark, Extraction: output, ExpectedWorkerId: workerId, ExpectedOwnershipToken: ownershipToken,
+            ResetEpoch: observation.ResetEpoch, SourceModeRevision: observation.SourceModeRevision);
     }
 
     /// <summary>Plans successful phase-2 publication against its claimed input watermark.</summary>
@@ -327,7 +336,8 @@ public sealed class CodexMemoryJobs
         };
         return new(observation.Key, operationId, CodexMemoryJobChangeKind.CompletePhase2, state.Revision, next,
             Consolidation: output with { Selected = output.Selected.ToArray() },
-            ExpectedWorkerId: workerId, ExpectedOwnershipToken: ownershipToken);
+            ExpectedWorkerId: workerId, ExpectedOwnershipToken: ownershipToken,
+            ResetEpoch: observation.ResetEpoch, SourceModeRevision: observation.SourceModeRevision);
     }
 
     /// <summary>Plans a monotonic global enqueue without stealing a running lease.</summary>
@@ -348,7 +358,8 @@ public sealed class CodexMemoryJobs
                 RetryAt = state.Status == CodexMemoryJobStatus.Running ? state.RetryAt : null,
                 RetryRemaining = Math.Max(state.RetryRemaining, DefaultRetries),
             };
-        return new(observation.Key, operationId, CodexMemoryJobChangeKind.EnqueuePhase2, state?.Revision, next);
+        return new(observation.Key, operationId, CodexMemoryJobChangeKind.EnqueuePhase2, state?.Revision, next,
+            ResetEpoch: observation.ResetEpoch, SourceModeRevision: observation.SourceModeRevision);
     }
 
     /// <summary>
@@ -363,6 +374,7 @@ public sealed class CodexMemoryJobs
         var owned = change.Kind is CodexMemoryJobChangeKind.Heartbeat or CodexMemoryJobChangeKind.Fail or
             CodexMemoryJobChangeKind.CompleteStage1 or CodexMemoryJobChangeKind.CompletePhase2;
         if (change.OperationId == Guid.Empty || change.ExpectedRevision is <= 0 ||
+            change.ResetEpoch < 0 || change.SourceModeRevision < 0 ||
             change.Next.Revision != checked((change.ExpectedRevision ?? 0) + 1) ||
             (owned && (change.ExpectedWorkerId is null || change.ExpectedWorkerId == Guid.Empty ||
                 change.ExpectedOwnershipToken is null || change.ExpectedOwnershipToken == Guid.Empty ||
@@ -400,7 +412,8 @@ public sealed class CodexMemoryJobs
     {
         ArgumentNullException.ThrowIfNull(observation);
         CheckKey(observation.Key);
-        if (observation.SourceWatermark is < 0 || observation.OutputWatermark is < 0)
+        if (observation.SourceWatermark is < 0 || observation.OutputWatermark is < 0 ||
+            observation.ResetEpoch < 0 || observation.SourceModeRevision < 0)
             throw new InvalidDataException("Invalid memory source watermark.");
         if (observation.State is { } state &&
             (state.Revision < 1 || state.InputWatermark < 0 || state.RetryRemaining < 0 ||
@@ -450,7 +463,8 @@ public sealed class CodexMemoryJobs
     private static CodexMemoryJobChange Change(CodexMemoryJobObservation observation, Guid operationId,
         CodexMemoryJobChangeKind kind, CodexMemoryJobState next) =>
         new(observation.Key, operationId, kind, observation.State?.Revision, next,
-            ExpectedWorkerId: observation.State?.WorkerId, ExpectedOwnershipToken: observation.State?.OwnershipToken);
+            ExpectedWorkerId: observation.State?.WorkerId, ExpectedOwnershipToken: observation.State?.OwnershipToken,
+            ResetEpoch: observation.ResetEpoch, SourceModeRevision: observation.SourceModeRevision);
 
     private static void VerifyReceipt(CodexMemoryJobReceipt receipt, CodexMemoryJobKey key, Guid operationId)
     {

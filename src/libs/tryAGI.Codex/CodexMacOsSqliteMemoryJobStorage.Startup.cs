@@ -85,7 +85,9 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage
             var limitParameter = "?" + (4 + frozen.AllowedSources.Count).ToString(System.Globalization.CultureInfo.InvariantCulture);
             using var query = Prepare(database, """
                 SELECT thread,watermark,updated_at,kind FROM discovery
-                WHERE eligible=1 AND updated_at>=?1 AND updated_at<=?2 AND thread<>?3 AND kind IN (
+                WHERE eligible=1 AND updated_at>=?1 AND updated_at<=?2 AND thread<>?3
+                  AND NOT EXISTS(SELECT 1 FROM memory_mode m WHERE m.thread=discovery.thread AND m.enabled=0)
+                  AND kind IN (
                 """ + parameters + ") ORDER BY updated_at DESC,thread LIMIT " + limitParameter + ";");
             query.Bind(1, frozen.EarliestUpdate.UtcTicks);
             query.Bind(2, frozen.LatestUpdate.UtcTicks);

@@ -905,6 +905,30 @@ public sealed class CodexSqliteMemoryJobStorageTests
         Assert.Null(await LocalBackend(upgraded, thread).ReadRpcSummaryAsync(Ct));
     }
 
+    [Fact]
+    public async Task Schema4UpgradeBackfillsRetentionWithoutInventingSourceTimestamps()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var known = Guid.NewGuid();
+        var unknown = Guid.NewGuid();
+        CodexMemoryJobChange completed;
+        await using (var storage = await fixture.Open(clock, true))
+        {
+            completed = await Extract(storage, clock, known, 7, "known");
+            Assert.True(await storage.PublishSourceAsync(Discover(clock, known, 7, 24 * 40), Ct));
+            await Extract(storage, clock, unknown, 8, "unknown time");
+        }
+        await fixture.MakeLegacySchemaAsync(4);
+        await Assert.ThrowsAsync<InvalidDataException>(() => fixture.Open(clock));
+        await using var upgraded = await fixture.Upgrade(clock);
+        Assert.Equal(0L, (await upgraded.ReadAsync(Key(), Ct)).ResetEpoch);
+        Assert.Equal(unknown, Assert.Single(await upgraded.SelectPhase2InputsAsync(clock.GetUtcNow().AddDays(-30), cancellationToken: Ct)).ThreadId);
+        Assert.Equal(CodexMemoryJobSettlement.Applied, (await upgraded.ApplyAsync(completed, Ct)).Settlement);
+        Assert.Equal("known", (await upgraded.ReadExtractionAsync(new(known, 7), Ct))!.RawMemory);
+    }
+
     private sealed class AfterScan(ICodexMemoryStartupSource inner, Func<CancellationToken, Task> change) : ICodexMemoryStartupSource
     {
         public async ValueTask<IReadOnlyList<CodexMemoryStartupCandidate>> ScanStartupAsync(
@@ -947,7 +971,9 @@ public sealed class CodexSqliteMemoryJobStorageTests
 
         internal async Task MakeLegacySchemaAsync(int version = 1)
         {
-            const string removeArtifacts = "BEGIN IMMEDIATE; DROP TRIGGER memory_pointer_changed; " +
+            const string removeMaintenance = "BEGIN IMMEDIATE; DROP TABLE memory_usage_receipt; " +
+                "DROP TABLE memory_lifecycle_receipt; DROP TABLE memory_retention; DROP TABLE memory_mode; DROP TABLE memory_epoch; ";
+            const string removeArtifacts = removeMaintenance + "DROP TRIGGER memory_pointer_changed; " +
                 "DROP TABLE memory_artifact_source; DROP TABLE memory_entry; DROP TABLE memory_manifest; " +
                 "DROP TABLE memory_io_policy; DROP TABLE memory_view; ";
             var sql = version switch
@@ -955,6 +981,7 @@ public sealed class CodexSqliteMemoryJobStorageTests
                 1 => removeArtifacts + "DROP TABLE discovery; DROP TABLE sampling; PRAGMA user_version=1; COMMIT;",
                 2 => removeArtifacts + "DROP TABLE discovery; PRAGMA user_version=2; COMMIT;",
                 3 => removeArtifacts + "PRAGMA user_version=3; COMMIT;",
+                4 => removeMaintenance + "PRAGMA user_version=4; COMMIT;",
                 _ => throw new ArgumentOutOfRangeException(nameof(version)),
             };
             using var process = Process.Start(new ProcessStartInfo("/usr/bin/sqlite3")
