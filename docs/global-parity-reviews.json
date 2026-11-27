@@ -1254,6 +1254,141 @@
           ]
         }
       }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:turn/start": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Two explicit text-only turn admissions, exactly two Responses requests on each runtime, with retained ordered history after a host restart. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::StartAsync",
+          "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustTurnLifecycleDifferentialTests.cs::RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
+          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "cases": [
+            "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:turn/started": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Correlated start notification precedes assistant item lifecycle and terminal for both turns. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::RunAsync",
+          "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustTurnLifecycleDifferentialTests.cs::RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
+          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "cases": [
+            "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:item/started": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Exactly one correlated assistant-message start per tested turn, ordered after turn start and before assistant completion. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::PublishItemsAsync",
+          "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustTurnLifecycleDifferentialTests.cs::RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
+          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "cases": [
+            "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:item/completed": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Exactly one correlated completed assistant message with the same synthetic text and item identity as its start. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::PublishItemsAsync",
+          "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustTurnLifecycleDifferentialTests.cs::RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
+          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "cases": [
+            "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:turn/completed": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Correlated completed status and ordered terminal event after assistant completion; both turns and public history survive the restart. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::CompletedAsync",
+          "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustTurnLifecycleDifferentialTests.cs::RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
+          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "cases": [
+            "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
+          ]
+        }
+      }
     }
   }
 }

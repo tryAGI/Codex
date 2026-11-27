@@ -1,0 +1,28 @@
+{
+  "acceptanceEligible": true,
+  "artifactSha256": "1d98e9abd52503b32d1f15bea5586776fa155f52780e44561ff6e96e028a1b50",
+  "cases": {
+    "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart": {
+      "method": "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart",
+      "outcome": "Passed"
+    }
+  },
+  "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+  "diagnostic": null,
+  "exitCode": 0,
+  "lane": "rust-runtime-differential",
+  "networkNamespaceIsolated": true,
+  "platform": "linux-x64",
+  "releaseAsset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
+  "releaseAssetSha256": "63e3b00065ed7f62166d0522e17f663cb866a31d80d03e63365482ed34a1d991",
+  "rustExecutableSha256": "ad83b94c093f0cdd8176a6bc8005a461bdf23a759863e157d40f562b8a9d664d",
+  "rustVersion": "codex-cli 0.172.0",
+  "schemaVersion": 1,
+  "scope": "turn-lifecycle",
+  "sourceCleanAtEnd": true,
+  "sourceCleanAtStart": true,
+  "sourceTree": "96eedca94ae11192f84e4a4e7517f7b5034a33edcd220e11035250bb86b0fc70",
+  "sourceTreeAtEnd": "96eedca94ae11192f84e4a4e7517f7b5034a33edcd220e11035250bb86b0fc70",
+  "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+  "upstreamRelease": "rust-v0.172.0"
+}

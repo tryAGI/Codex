@@ -33,10 +33,14 @@ THREAD_MODEL_PATH = "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTes
 NAME = "NamedEmptyThreadResumesBeforeAndAfterRestart"
 ARCHIVE = "ArchiveEmptyThreadReadAndRestoreMatchRust"
 MODEL = "ExplicitCatalogDisplayOrderDefaultsAndPaginationMatchRust"
+TURN_CLASS = "RustTurnLifecycleDifferentialTests"
+TURN_PATH = f"src/tests/tryAGI.Codex.Tests/{TURN_CLASS}.cs"
+TURN = "TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
 SUITES = {
     "filesystem": (CLASS, TEST_PATH, (BINARY, DIRECTORY, INVALID, RELATIVE, COPY)),
     "thread-lifecycle": (THREAD_CLASS, THREAD_MODEL_PATH, (NAME, ARCHIVE)),
     "model-catalog": (MODEL_CLASS, THREAD_MODEL_PATH, (MODEL,)),
+    "turn-lifecycle": (TURN_CLASS, TURN_PATH, (TURN,)),
 }
 SCENARIOS = {("clientRequests", method): ("filesystem", cases)
              for method, cases in METHOD_CASES.items()}
@@ -50,6 +54,11 @@ SCENARIOS.update({
     ("clientRequests", "thread/read"): ("thread-lifecycle", (ARCHIVE,)),
     ("clientRequests", "thread/resume"): ("thread-lifecycle", (NAME, ARCHIVE)),
     ("clientRequests", "model/list"): ("model-catalog", (MODEL,)),
+    ("clientRequests", "turn/start"): ("turn-lifecycle", (TURN,)),
+    ("serverNotifications", "turn/started"): ("turn-lifecycle", (TURN,)),
+    ("serverNotifications", "item/started"): ("turn-lifecycle", (TURN,)),
+    ("serverNotifications", "item/completed"): ("turn-lifecycle", (TURN,)),
+    ("serverNotifications", "turn/completed"): ("turn-lifecycle", (TURN,)),
 })
 
 

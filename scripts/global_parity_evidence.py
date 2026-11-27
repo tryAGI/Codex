@@ -13,6 +13,10 @@ CLASSES = (
     "CodexPermissionProfileCatalogTests", "CodexMcpClientTests",
     "CodexMcpConnectionPoolTests", "CodexMcpHttpTransportTests",
     "CodexToolRequestLedgerTests", "CodexAsyncUserMessageTests",
+    "CodexAccountRpcTests", "CodexConfigurationReadRpcTests",
+    "CodexApprovalRpcBridgeTests", "CodexReviewRpcTests",
+    "CodexHookRuntimeTests", "CodexSkillCatalogTests",
+    "CodexMcpModernTests", "CodexFileSearchTests", "ThreadGoalTests",
 )
 
 
