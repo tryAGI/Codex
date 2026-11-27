@@ -70,7 +70,7 @@ def validate_reviews(data, review):
             owner = entry.get("ownerIssue")
             if status not in STATUSES or not HEX40.fullmatch(revision) or not isinstance(rationale, str) or not rationale.strip() or type(owner) is not int or owner < 25:
                 raise ValueError(f"Incomplete review: {rid}/{lane}")
-            if set(entry) - {"status", "reviewedCommit", "rationale", "ownerIssue", "scope", "implementation", "test", "basis", "evidence", "testEvidence", "upstreamTests", "runtimeEvidence"}:
+            if set(entry) - {"status", "reviewedCommit", "rationale", "ownerIssue", "scope", "implementation", "test", "basis", "evidence", "testEvidence", "upstreamTests", "runtimeEvidence", "runtimeObservation"}:
                 raise ValueError(f"Unknown review field: {rid}/{lane}")
             _, reviewed_tree = source_revision(revision)
             paths = set()
@@ -144,6 +144,22 @@ def validate_reviews(data, review):
                     raise ValueError("Runtime observations must remain narrow interop evidence")
                 if validate_runtime_observation(candidates[rid], entry, runtime) != reviewed_tree:
                     raise ValueError("Runtime evidence source tree differs from review")
+            additional = entry.get("runtimeObservation")
+            if additional is not None:
+                # Keep the original typed contract evidence intact. A later real
+                # runtime observation has its own independently pinned source.
+                if (lane != "rust-app-server-interop" or scope != "typed-contract-only"
+                        or status != "source-reviewed" or runtime is not None
+                        or not isinstance(additional, dict)
+                        or set(additional) != {"reviewedCommit", "scope", "rationale", "implementation", "test", "runtimeEvidence"}
+                        or additional.get("scope") != "rust-runtime"
+                        or not HEX40.fullmatch(additional.get("reviewedCommit", ""))
+                        or not isinstance(additional.get("rationale"), str) or not additional["rationale"].strip()):
+                    raise ValueError("Invalid independent runtime observation on typed review")
+                additional_rev = additional["reviewedCommit"]
+                references(additional["implementation"], additional_rev)
+                references(additional["test"], additional_rev)
+                validate_runtime_observation(candidates[rid], additional, additional["runtimeEvidence"])
             key = (rid, lane)
             reviewed[key] = entry
             # Negative conclusions can be invalidated by a new handler in another file;
@@ -178,9 +194,10 @@ def summarize(data, review):
                 test_observed += 1
                 if source_revision(entry["reviewedCommit"])[1] == current_tree and clean:
                     test_current += 1
-            if entry and entry.get("runtimeEvidence"):
+            runtime_entry = entry.get("runtimeObservation", entry) if entry else None
+            if runtime_entry and runtime_entry.get("runtimeEvidence"):
                 runtime_observed += 1
-                if source_revision(entry["reviewedCommit"])[1] == current_tree and clean:
+                if source_revision(runtime_entry["reviewedCommit"])[1] == current_tree and clean:
                     runtime_current += 1
         unresolved = counts["pending"] + counts["stale"]
         applicable = sum(counts[s] for s in ("source-reviewed", "missing", "divergent", "passed"))
@@ -232,5 +249,13 @@ def self_test(data, review):
         reject(lambda r: runtime_entry(r)["runtimeEvidence"].update(cases=[]))
         reject(lambda r: runtime_entry(r).update(scope="typed-contract-only"))
         reject(lambda r: runtime_entry(r).update(status="passed"))
+    additional_row = next((key for key, value in review["rows"].items()
+                           if value.get("rust-app-server-interop", {}).get("runtimeObservation")), None)
+    if additional_row is not None:
+        def typed_entry(r):
+            return r["rows"][additional_row]["rust-app-server-interop"]
+        reject(lambda r: typed_entry(r)["runtimeObservation"].update(reviewedCommit="HEAD"))
+        reject(lambda r: typed_entry(r)["runtimeObservation"]["runtimeEvidence"].update(cases=[]))
+        reject(lambda r: typed_entry(r).update(scope="rust-runtime"))
     assert not summarize(data, review)[1]
     print("Global review self-test: orphan, mutable revision, unjustified or evidence-free pass and wrong lane rejected.")

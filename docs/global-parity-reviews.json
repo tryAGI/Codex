@@ -29,6 +29,28 @@
             "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadIdParams\", definition: \"ThreadArchiveParams\", sent: True)",
             "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData"
           ]
+        },
+        "runtimeObservation": {
+          "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "scope": "rust-runtime",
+          "rationale": "Actual empty-thread archive/read/unarchive comparison; no descendant, active turn, multi-client, or real native DB acceptance.",
+          "implementation": [
+            "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+            "src/libs/tryAGI.Codex/CodexThreadRpc.Archive.cs::ArchiveAsync"
+          ],
+          "test": [
+            "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+          ],
+          "runtimeEvidence": {
+            "lane": "rust-runtime-differential",
+            "outcome": "passed",
+            "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+            "receipt": "docs/global-parity-evidence/rust-thread-lifecycle-6143759-45960387756.json",
+            "receiptSha256": "bf2746ef0933b6fc68c60c072a9ca6a6bcd2c0b4b3190f1c2bcbc333fba945b9",
+            "cases": [
+              "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+            ]
+          }
         }
       },
       "native-sdk": {
@@ -89,6 +111,28 @@
             "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadUnarchiveResponse\", definition: \"ThreadUnarchiveResponse\", sent: False)",
             "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData"
           ]
+        },
+        "runtimeObservation": {
+          "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "scope": "rust-runtime",
+          "rationale": "Empty-thread restore, identity, empty history, notification and resume observed on both hosts; descendant and durable host storage acceptance remain pending.",
+          "implementation": [
+            "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+            "src/libs/tryAGI.Codex/CodexThreadRpc.Archive.cs::ArchiveAsync"
+          ],
+          "test": [
+            "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+          ],
+          "runtimeEvidence": {
+            "lane": "rust-runtime-differential",
+            "outcome": "passed",
+            "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+            "receipt": "docs/global-parity-evidence/rust-thread-lifecycle-6143759-45960387756.json",
+            "receiptSha256": "bf2746ef0933b6fc68c60c072a9ca6a6bcd2c0b4b3190f1c2bcbc333fba945b9",
+            "cases": [
+              "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+            ]
+          }
         }
       },
       "native-sdk": {
@@ -147,6 +191,28 @@
             "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadSetNameParams\", definition: \"ThreadSetNameParams\", sent: True)",
             "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData"
           ]
+        },
+        "runtimeObservation": {
+          "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "scope": "rust-runtime",
+          "rationale": "Exact rename result and single client notification, then immediate and cold-host resume. Native memory CAS fixture and actual Rust disk restart; multi-client fan-out and following completed turn remain unverified (#128).",
+          "implementation": [
+            "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+            "src/libs/tryAGI.Codex/CodexThreadRpc.Metadata.cs::SetNameAsync"
+          ],
+          "test": [
+            "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.NamedEmptyThreadResumesBeforeAndAfterRestart"
+          ],
+          "runtimeEvidence": {
+            "lane": "rust-runtime-differential",
+            "outcome": "passed",
+            "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+            "receipt": "docs/global-parity-evidence/rust-thread-lifecycle-6143759-45960387756.json",
+            "receiptSha256": "bf2746ef0933b6fc68c60c072a9ca6a6bcd2c0b4b3190f1c2bcbc333fba945b9",
+            "cases": [
+              "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.NamedEmptyThreadResumesBeforeAndAfterRestart"
+            ]
+          }
         }
       },
       "native-sdk": {
@@ -201,6 +267,28 @@
             "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadArchivedNotification\", sent: False)",
             "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods"
           ]
+        },
+        "runtimeObservation": {
+          "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "scope": "rust-runtime",
+          "rationale": "One archived notification with exact thread identity on each host; no multi-client fan-out proof.",
+          "implementation": [
+            "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+            "src/libs/tryAGI.Codex/CodexThreadRpc.Archive.cs::ArchiveAsync"
+          ],
+          "test": [
+            "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+          ],
+          "runtimeEvidence": {
+            "lane": "rust-runtime-differential",
+            "outcome": "passed",
+            "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+            "receipt": "docs/global-parity-evidence/rust-thread-lifecycle-6143759-45960387756.json",
+            "receiptSha256": "bf2746ef0933b6fc68c60c072a9ca6a6bcd2c0b4b3190f1c2bcbc333fba945b9",
+            "cases": [
+              "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+            ]
+          }
         }
       },
       "native-sdk": {
@@ -257,6 +345,28 @@
             "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadUnarchivedNotification\", sent: False)",
             "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods"
           ]
+        },
+        "runtimeObservation": {
+          "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "scope": "rust-runtime",
+          "rationale": "One unarchived notification with exact thread identity on each host; no multi-client fan-out proof.",
+          "implementation": [
+            "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+            "src/libs/tryAGI.Codex/CodexThreadRpc.Archive.cs::ArchiveAsync"
+          ],
+          "test": [
+            "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+          ],
+          "runtimeEvidence": {
+            "lane": "rust-runtime-differential",
+            "outcome": "passed",
+            "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+            "receipt": "docs/global-parity-evidence/rust-thread-lifecycle-6143759-45960387756.json",
+            "receiptSha256": "bf2746ef0933b6fc68c60c072a9ca6a6bcd2c0b4b3190f1c2bcbc333fba945b9",
+            "cases": [
+              "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+            ]
+          }
         }
       },
       "native-sdk": {
@@ -350,6 +460,28 @@
             "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNameNotification\", definition: \"ThreadNameUpdatedNotification\", sent: False)",
             "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods"
           ]
+        },
+        "runtimeObservation": {
+          "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "scope": "rust-runtime",
+          "rationale": "Name and thread identity notification observed on both hosts; only one client. Multi-client loaded/unloaded fan-out still pending #128.",
+          "implementation": [
+            "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+            "src/libs/tryAGI.Codex/CodexThreadRpc.Metadata.cs::SetNameAsync"
+          ],
+          "test": [
+            "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.NamedEmptyThreadResumesBeforeAndAfterRestart"
+          ],
+          "runtimeEvidence": {
+            "lane": "rust-runtime-differential",
+            "outcome": "passed",
+            "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+            "receipt": "docs/global-parity-evidence/rust-thread-lifecycle-6143759-45960387756.json",
+            "receiptSha256": "bf2746ef0933b6fc68c60c072a9ca6a6bcd2c0b4b3190f1c2bcbc333fba945b9",
+            "cases": [
+              "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.NamedEmptyThreadResumesBeforeAndAfterRestart"
+            ]
+          }
         }
       },
       "native-sdk": {
@@ -876,6 +1008,30 @@
             "tryAGI.Codex.Tests.CodexModelCatalogRpcTests.StaticCatalogProjectsRustWireShapeAndPriorityDefaultBeforePagination"
           ]
         }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "ownerIssue": 84,
+        "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+        "scope": "rust-runtime",
+        "rationale": "Same explicit synthetic static catalog on both hosts, order, default, hidden and pagination compared. Provider-backed display order, account-scoped discovery and live behavior remain unverified.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexModelCatalogRpc.cs::InvokeAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustModelCatalogDifferentialTests.ExplicitCatalogDisplayOrderDefaultsAndPaginationMatchRust"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "receipt": "docs/global-parity-evidence/rust-model-catalog-6143759-45960395473.json",
+          "receiptSha256": "60dab95a9e70f31eb6008bfd49eb38d004a88d7e8b4082936fd03ae8c03bff48",
+          "cases": [
+            "tryAGI.Codex.Tests.RustModelCatalogDifferentialTests.ExplicitCatalogDisplayOrderDefaultsAndPaginationMatchRust"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:permissionProfile/list": {
@@ -1041,6 +1197,60 @@
           "cases": [
             "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.CancelAndExpiryExcludeLateDynamicResponses",
             "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ExactAdmissionAndTerminalResponseSurviveNewLedgerAndCannotBeReapplied"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/read": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "ownerIssue": 69,
+        "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+        "scope": "rust-runtime",
+        "rationale": "Read an empty archived thread and compare identity, zero turns and notLoaded status; broader history projections and paging remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Queries.cs::ReadAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "receipt": "docs/global-parity-evidence/rust-thread-lifecycle-6143759-45960387756.json",
+          "receiptSha256": "bf2746ef0933b6fc68c60c072a9ca6a6bcd2c0b4b3190f1c2bcbc333fba945b9",
+          "cases": [
+            "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/resume": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "ownerIssue": 68,
+        "reviewedCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+        "scope": "rust-runtime",
+        "rationale": "Immediate and cold-host resume of a named empty thread and resume after restore. The fixture uses paginated native defaults and explicit Rust historyMode, not identical thread/start parameters. Real native DB and next turn remain pending.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.cs::ResumeAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.NamedEmptyThreadResumesBeforeAndAfterRestart",
+          "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs::RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+          "receipt": "docs/global-parity-evidence/rust-thread-lifecycle-6143759-45960387756.json",
+          "receiptSha256": "bf2746ef0933b6fc68c60c072a9ca6a6bcd2c0b4b3190f1c2bcbc333fba945b9",
+          "cases": [
+            "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust",
+            "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.NamedEmptyThreadResumesBeforeAndAfterRestart"
           ]
         }
       }

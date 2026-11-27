@@ -1,0 +1,28 @@
+{
+  "acceptanceEligible": true,
+  "artifactSha256": "131266fcd6e138b4f8b1e28078c3285177444b3b48bc44c89a39586c021f48de",
+  "cases": {
+    "tryAGI.Codex.Tests.RustModelCatalogDifferentialTests.ExplicitCatalogDisplayOrderDefaultsAndPaginationMatchRust": {
+      "method": "tryAGI.Codex.Tests.RustModelCatalogDifferentialTests.ExplicitCatalogDisplayOrderDefaultsAndPaginationMatchRust",
+      "outcome": "Passed"
+    }
+  },
+  "csharpCommit": "61437593ad1e72df5b5de08b992d9093cbdb5a0b",
+  "diagnostic": null,
+  "exitCode": 0,
+  "lane": "rust-runtime-differential",
+  "networkNamespaceIsolated": true,
+  "platform": "linux-x64",
+  "releaseAsset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
+  "releaseAssetSha256": "63e3b00065ed7f62166d0522e17f663cb866a31d80d03e63365482ed34a1d991",
+  "rustExecutableSha256": "ad83b94c093f0cdd8176a6bc8005a461bdf23a759863e157d40f562b8a9d664d",
+  "rustVersion": "codex-cli 0.172.0",
+  "schemaVersion": 1,
+  "scope": "model-catalog",
+  "sourceCleanAtEnd": true,
+  "sourceCleanAtStart": true,
+  "sourceTree": "ffec17dbd9470694303c7bc65092722fbea324501e3e89734ed234e8aba3c117",
+  "sourceTreeAtEnd": "ffec17dbd9470694303c7bc65092722fbea324501e3e89734ed234e8aba3c117",
+  "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+  "upstreamRelease": "rust-v0.172.0"
+}

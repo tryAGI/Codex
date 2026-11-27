@@ -1,4 +1,4 @@
-"""Verify narrow real Rust filesystem observations without granting broad parity."""
+"""Verify narrow real Rust observations without granting broad parity."""
 import hashlib
 import json
 import re
@@ -27,7 +27,30 @@ METHOD_CASES = {
     "fs/copy": (COPY,),
     "fs/remove": (COPY,),
 }
-ALL_CASES = {NAMESPACE + CLASS + "." + case for case in (BINARY, DIRECTORY, INVALID, RELATIVE, COPY)}
+THREAD_CLASS = "RustThreadLifecycleDifferentialTests"
+MODEL_CLASS = "RustModelCatalogDifferentialTests"
+THREAD_MODEL_PATH = "src/tests/tryAGI.Codex.Tests/RustThreadModelDifferentialTests.cs"
+NAME = "NamedEmptyThreadResumesBeforeAndAfterRestart"
+ARCHIVE = "ArchiveEmptyThreadReadAndRestoreMatchRust"
+MODEL = "ExplicitCatalogDisplayOrderDefaultsAndPaginationMatchRust"
+SUITES = {
+    "filesystem": (CLASS, TEST_PATH, (BINARY, DIRECTORY, INVALID, RELATIVE, COPY)),
+    "thread-lifecycle": (THREAD_CLASS, THREAD_MODEL_PATH, (NAME, ARCHIVE)),
+    "model-catalog": (MODEL_CLASS, THREAD_MODEL_PATH, (MODEL,)),
+}
+SCENARIOS = {("clientRequests", method): ("filesystem", cases)
+             for method, cases in METHOD_CASES.items()}
+SCENARIOS.update({
+    ("clientRequests", "thread/name/set"): ("thread-lifecycle", (NAME,)),
+    ("serverNotifications", "thread/name/updated"): ("thread-lifecycle", (NAME,)),
+    ("clientRequests", "thread/archive"): ("thread-lifecycle", (ARCHIVE,)),
+    ("clientRequests", "thread/unarchive"): ("thread-lifecycle", (ARCHIVE,)),
+    ("serverNotifications", "thread/archived"): ("thread-lifecycle", (ARCHIVE,)),
+    ("serverNotifications", "thread/unarchived"): ("thread-lifecycle", (ARCHIVE,)),
+    ("clientRequests", "thread/read"): ("thread-lifecycle", (ARCHIVE,)),
+    ("clientRequests", "thread/resume"): ("thread-lifecycle", (NAME, ARCHIVE)),
+    ("clientRequests", "model/list"): ("model-catalog", (MODEL,)),
+})
 
 
 def validate_runtime_observation(row, entry, evidence, root=ROOT):
@@ -39,11 +62,14 @@ def validate_runtime_observation(row, entry, evidence, root=ROOT):
     if (evidence["lane"] != "rust-runtime-differential" or evidence["outcome"] != "passed"
             or evidence["csharpCommit"] != revision or not HEX40.fullmatch(revision)):
         raise ValueError("Runtime observation revision or lane differs from reviewed mapping")
-    methods = METHOD_CASES.get(row.get("method")) if row.get("direction") == "clientRequests" else None
-    if methods is None:
+    scenario = SCENARIOS.get((row.get("direction"), row.get("method")))
+    if scenario is None:
         raise ValueError("No independently reviewed Rust differential scenario for this RPC")
-    expected_tests = {f"{TEST_PATH}::{CLASS}.{method}" for method in methods}
-    expected_cases = {NAMESPACE + CLASS + "." + method for method in methods}
+    scope, methods = scenario
+    cls, test_path, suite_cases = SUITES[scope]
+    expected_tests = {f"{test_path}::{cls}.{method}" for method in methods}
+    expected_cases = {NAMESPACE + cls + "." + method for method in methods}
+    all_cases = {NAMESPACE + cls + "." + method for method in suite_cases}
     if set(entry["test"]) != expected_tests:
         raise ValueError("Runtime observation test references do not match the reviewed RPC")
     if not isinstance(evidence["cases"], list) or len(evidence["cases"]) != len(expected_cases) or set(evidence["cases"]) != expected_cases:
@@ -59,7 +85,7 @@ def validate_runtime_observation(row, entry, evidence, root=ROOT):
         raise ValueError("Differential receipt digest mismatch")
     receipt = json.loads(raw)
     if (receipt.get("schemaVersion") != 1 or receipt.get("lane") != "rust-runtime-differential"
-            or receipt.get("scope") != "filesystem" or receipt.get("platform") != "linux-x64"
+            or receipt.get("scope") != scope or receipt.get("platform") != "linux-x64"
             or receipt.get("upstreamCommit") != PIN or receipt.get("upstreamRelease") != TAG
             or receipt.get("releaseAsset") != ASSET or receipt.get("releaseAssetSha256") != ASSET_SHA256
             or receipt.get("rustExecutableSha256") != EXECUTABLE_SHA256
@@ -74,8 +100,8 @@ def validate_runtime_observation(row, entry, evidence, root=ROOT):
             or receipt.get("diagnostic") is not None or receipt.get("exitCode") != 0):
         raise ValueError("Differential run is diagnostic only, unisolated, dirty, incomplete or failed")
     cases = receipt.get("cases")
-    if not isinstance(cases, dict) or set(cases) != ALL_CASES:
-        raise ValueError("Expected the complete independently reviewed filesystem differential suite")
+    if not isinstance(cases, dict) or set(cases) != all_cases:
+        raise ValueError("Expected the complete independently reviewed differential suite")
     if any(case.get("method") != name or case.get("outcome") != "Passed" for name, case in cases.items()):
         raise ValueError("Differential suite contains a failed, skipped or mismatched test case")
     if source_revision(revision)[1] != receipt["sourceTree"]:

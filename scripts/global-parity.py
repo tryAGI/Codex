@@ -2,9 +2,10 @@
 """Pinned, independent global Rust Codex inventory (#62/#67/#88).
 
 The inventory is deliberately not an acceptance receipt. Realtime is delegated
-to its existing matrix and gate. Only refresh accesses the network.
+to its existing matrix and gate. Only refresh and verify-export access the network.
 """
 import argparse
+import base64
 import collections
 import hashlib
 import importlib.util
@@ -34,6 +35,18 @@ STABLE_EXPECTED = {"clientRequests": 110, "clientNotifications": 1,
                    "serverRequests": 10, "serverNotifications": 87}
 SOURCE_EXPECTED = {"clientRequests": 192, "clientNotifications": 1,
                    "serverRequests": 10, "serverNotifications": 89}
+EXPORT_PATH = "codex-rs/app-server-protocol/schema/precomputed/app-server-exports-experimental.json.zst"
+EXPORT_BLOB = "b0f666b8926c6e11cab2c4805981132d469286fc"
+EXPORT_ARCHIVE_SHA256 = "4e2b363bc15d36317fad26641a265633c2f62c51dc022ef61e6bfeadfc968b8c"
+EXPORT_SCHEMA_SHA256 = "73b080166f3014517f0fd47885e716b9d98e306d96749fad5156021ac61bcd3c"
+EXPORT_CATALOG_SHA256 = "f32b7e4b49a1030a0ed121266ed51c5e6d86a254f94876345a66361ddd584123"
+EXPORT_EXPECTED = {"clientRequests": 189, "clientNotifications": 1,
+                   "serverRequests": 10, "serverNotifications": 87}
+# These declarations are not in the pinned public experimental export.
+# Keep them in the inventory; exclusion here is not an acceptance disposition.
+SOURCE_ONLY = {"clientRequests": ["getAuthStatus", "getConversationSummary", "gitDiffToRemote"],
+               "clientNotifications": [], "serverRequests": [],
+               "serverNotifications": ["rawResponse/completed", "rawResponseItem/completed"]}
 MACROS = {"clientRequests": "client_request", "clientNotifications": "client_notification",
           "serverRequests": "server_request", "serverNotifications": "server_notification"}
 TEST = re.compile(r"(?m)^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+(\w+)\s*\(")
@@ -292,6 +305,48 @@ def refresh():
     MATRIX.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def canonical_digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def exported_rpc_catalog(data):
+    if data["sourceInventory"].get(EXPORT_PATH, {}).get("gitBlob") != EXPORT_BLOB:
+        raise ValueError("Experimental export source provenance differs from the pin")
+    wire = data["rpcCatalog"]
+    if set(wire) != set(SOURCE_ONLY):
+        raise ValueError("Unexpected source RPC directions")
+    for key, excluded in SOURCE_ONLY.items():
+        if not set(excluded) <= set(wire[key]):
+            raise ValueError("Source-only method missing from inventory")
+    exported = {key: sorted(set(names) - set(SOURCE_ONLY[key])) for key, names in wire.items()}
+    if ({key: len(names) for key, names in exported.items()} != EXPORT_EXPECTED
+            or canonical_digest(exported) != EXPORT_CATALOG_SHA256):
+        raise ValueError("Derived public RPC catalog differs from the verified experimental export")
+    if any(not set(names) <= set(exported[key]) for key, names in data["stableRpcCatalog"].items()):
+        raise ValueError("Stable RPC catalog is not a subset of the experimental export")
+    return exported
+
+
+def verify_export(data):
+    # Only this explicit command needs network access and zstd. The ordinary
+    # gate verifies the canonical catalog digest offline.
+    response = json.loads(subprocess.check_output(
+        ["gh", "api", f"repos/openai/codex/contents/{EXPORT_PATH}?ref={PIN}"], cwd=ROOT))
+    raw = base64.b64decode(response["content"])
+    blob = hashlib.sha1(f"blob {len(raw)}\0".encode() + raw).hexdigest()
+    if (response["sha"] != EXPORT_BLOB or blob != EXPORT_BLOB
+            or hashlib.sha256(raw).hexdigest() != EXPORT_ARCHIVE_SHA256):
+        raise ValueError("Pinned experimental export archive digest differs")
+    archive = json.loads(subprocess.check_output(["zstd", "-d", "-c"], input=raw))
+    schema = json.loads(archive["json_schema"]["codex_app_server_protocol.schemas.json"])
+    actual = {key: sorted(names) for key, names in methods(schema).items()}
+    if canonical_digest(schema) != EXPORT_SCHEMA_SHA256 or actual != exported_rpc_catalog(data):
+        raise ValueError("Pinned experimental export does not match the derived catalog")
+    print(json.dumps({"upstreamCommit": PIN, "gitBlob": blob,
+                      "exportedRpcCounts": {key: len(names) for key, names in actual.items()},
+                      "catalogSha256": EXPORT_CATALOG_SHA256, "sourceOnlyRpc": SOURCE_ONLY}, indent=2))
+
+
 def validate(data):
     if (data["schemaVersion"], data["upstreamCommit"], data["upstreamRelease"]) != (1, PIN, TAG):
         raise ValueError("Incorrect global inventory pin")
@@ -308,6 +363,7 @@ def validate(data):
         raise ValueError("Stable RPC catalog incomplete")
     if any(not set(v) <= set(data["rpcCatalog"][key]) for key, v in data["stableRpcCatalog"].items()):
         raise ValueError("Stable catalog must be contained in source catalog")
+    exported_rpc_catalog(data)
     all_rows = data["rows"] + data["delegatedRealtime"]
     ids = [r["id"] for r in all_rows]
     if len(ids) != len(set(ids)):
@@ -335,9 +391,10 @@ def report(data):
                         cwd=ROOT, check=True, capture_output=True, text=True)
     realtime = json.loads(rt.stdout)
     catalog = load_json(CATALOG)
+    exported = exported_rpc_catalog(data)
     drift = {key: {"missing": sorted(set(names) - set(catalog[key])),
                    "extra": sorted(set(catalog[key]) - set(names))}
-             for key, names in data["rpcCatalog"].items()}
+             for key, names in exported.items()}
     rt_index = realtime_index()
     review = read_reviews()
     lanes, global_ready, reviewed_count, stale_count = summarize(data, review)
@@ -351,9 +408,13 @@ def report(data):
             "realtimeReleaseReady": realtime["releaseReady"], "catalogVersion": catalog["version"],
             "stableRpcCounts": {k: len(v) for k, v in data["stableRpcCatalog"].items()},
             "sourceRpcCounts": {k: len(v) for k, v in data["rpcCatalog"].items()},
+            "exportedRpcCounts": {k: len(v) for k, v in exported.items()},
+            "sourceOnlyRpc": SOURCE_ONLY, "experimentalExportCatalogSha256": EXPORT_CATALOG_SHA256,
+            "catalogVersionMatchesPin": catalog["version"] == TAG.removeprefix("rust-v"),
             "catalogDrift": drift, "inventoryReviewed": review["inventoryReviewed"],
             "releaseReady": global_ready and realtime["releaseReady"]
                 and all(rt_index.get(r["symbol"]) for r in data["delegatedRealtime"])
+                and catalog["version"] == TAG.removeprefix("rust-v")
                 and not any(d["missing"] or d["extra"] for d in drift.values())}
 
 
@@ -372,6 +433,8 @@ def self_test(data):
     reject(lambda d: d["rows"][0]["lanes"].update({"native-sdk": "passed"}))
     reject(lambda d: d.update(inventoryReviewed=True))
     reject(lambda d: d["rpcCatalog"]["clientRequests"].pop())
+    reject(lambda d: d["rpcCatalog"]["clientRequests"].__setitem__(0, "invented/method"))
+    reject(lambda d: d["sourceInventory"][EXPORT_PATH].update(gitBlob="0" * 40))
     reject(lambda d: d["delegatedRealtime"][0].update(evidence="copied"))
     assert not report(data)["releaseReady"]
     print("Global parity self-test: duplicate, orphan, premature pass, missing RPC and duplicated evidence rejected.")
@@ -379,14 +442,16 @@ def self_test(data):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("refresh", "check", "report", "gate", "self-test"))
+    parser.add_argument("action", choices=("refresh", "check", "report", "gate", "self-test", "verify-export"))
     action = parser.parse_args().action
     if action == "refresh":
         refresh()
         return
     data = load_json(MATRIX)
     validate(data)
-    if action == "self-test":
+    if action == "verify-export":
+        verify_export(data)
+    elif action == "self-test":
         self_test(data)
         review_self_test(data, read_reviews())
     elif action in ("report", "gate"):
