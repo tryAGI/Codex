@@ -15,7 +15,7 @@ public sealed class CodexMcpHttpException(HttpStatusCode statusCode) : IOExcepti
     public HttpStatusCode StatusCode { get; } = statusCode;
 }
 
-/// <summary>Legacy MCP Streamable HTTP framing. All network exchanges are delegated to an
+/// <summary>MCP Streamable HTTP framing. All network exchanges are delegated to an
 /// explicitly authorized host sender, including any authentication, proxy and destination policy.
 /// The sender must use response-headers-only completion, honor cancellation, and MUST NOT
 /// redirect, rewrite the destination or automatically retry POST requests.</summary>
@@ -33,6 +33,8 @@ public sealed class CodexMcpHttpTransport : ICodexMcpTransport
     private readonly SemaphoreSlim responseSlots = new(32, 32);
     private readonly List<Task> pumps = [];
     private string? sessionId;
+    private string protocolVersion = CodexMcpClient.LegacyProtocolVersion;
+    private bool discoverySent;
     private bool initializationSent;
     private bool initialized;
     private bool listening;
@@ -71,6 +73,7 @@ public sealed class CodexMcpHttpTransport : ICodexMcpTransport
         var method = CodexRealtimeProtocol.Text(message, "method");
         var request = method is not null && message.TryGetProperty("id", out _);
         var initialize = method == "initialize";
+        var discover = method == "server/discover";
         var readyNotification = method == "notifications/initialized";
         var bytes = new ArrayBufferWriter<byte>();
         using (var writer = new Utf8JsonWriter(bytes)) { message.WriteTo(writer); writer.Flush(); }
@@ -85,23 +88,31 @@ public sealed class CodexMcpHttpTransport : ICodexMcpTransport
         HttpResponseMessage? response = null;
         try
         {
-            using var http = CreateRequest(HttpMethod.Post, initialize);
+            using var http = CreateRequest(HttpMethod.Post, initialize, method, message);
             http.Content = new ByteArrayContent(bytes.WrittenSpan.ToArray());
             http.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            if (initialize)
+            if (initialize || discover)
             {
                 lock (gate)
                 {
                     EnsureUsable();
-                    if (initializationSent) throw new InvalidOperationException("MCP HTTP initialization cannot be replayed.");
-                    initializationSent = true;
+                    if (initialize)
+                    {
+                        if (initializationSent || initialized) throw new InvalidOperationException("MCP HTTP initialization cannot be replayed.");
+                        initializationSent = true;
+                    }
+                    else
+                    {
+                        if (initializationSent || discoverySent) throw new InvalidOperationException("MCP HTTP discovery cannot be replayed.");
+                        discoverySent = true;
+                    }
                 }
             }
             response = await sender(http, ct).ConfigureAwait(false);
             ValidateDestination(response);
-            if (response.StatusCode == HttpStatusCode.NotFound)
-                throw new CodexMcpHttpException(response.StatusCode);
-            if (!response.IsSuccessStatusCode)
+            var discoveryRejection = discover && request && response.StatusCode == HttpStatusCode.BadRequest &&
+                response.Content.Headers.ContentType?.MediaType == "application/json";
+            if (!response.IsSuccessStatusCode && !discoveryRejection)
                 throw new CodexMcpHttpException(response.StatusCode);
             CaptureSession(response, initialize);
             if (!request)
@@ -114,7 +125,7 @@ public sealed class CodexMcpHttpTransport : ICodexMcpTransport
                 }
                 return;
             }
-            if (response.StatusCode != HttpStatusCode.OK)
+            if (response.StatusCode != HttpStatusCode.OK && !discoveryRejection)
                 throw new CodexProtocolException("MCP HTTP request requires status 200.");
             var media = response.Content.Headers.ContentType?.MediaType;
             if (media is not ("application/json" or "text/event-stream"))
@@ -127,7 +138,7 @@ public sealed class CodexMcpHttpTransport : ICodexMcpTransport
                 var transferred = response;
                 response = null;
                 ownsSlot = false;
-                pumps.Add(PumpAsync(transferred, media == "text/event-stream", expectedId, isListener: false));
+                pumps.Add(PumpAsync(transferred, media == "text/event-stream", expectedId, isListener: false, requireError: discoveryRejection));
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -221,19 +232,48 @@ public sealed class CodexMcpHttpTransport : ICodexMcpTransport
         return null;
     }
 
-    private HttpRequestMessage CreateRequest(HttpMethod method, bool initialize)
+    internal void SetNegotiatedProtocol(string version)
     {
         lock (gate)
         {
             EnsureUsable();
-            if (!initialize && !initializationSent)
+            if (version == CodexMcpClient.ModernProtocolVersion)
+            {
+                if (!discoverySent || initializationSent || sessionId is not null)
+                    throw new CodexProtocolException("Invalid modern MCP HTTP negotiation state.");
+                initialized = true;
+            }
+            else if (!initializationSent || !CodexMcpClient.IsKnownLegacyVersion(version))
+                throw new CodexProtocolException("Invalid legacy MCP HTTP negotiation state.");
+            protocolVersion = version;
+        }
+    }
+
+    private HttpRequestMessage CreateRequest(HttpMethod method, bool initialize, string? rpcMethod = null,
+        JsonElement? message = null)
+    {
+        lock (gate)
+        {
+            EnsureUsable();
+            var discover = rpcMethod == "server/discover";
+            var modern = discover || protocolVersion == CodexMcpClient.ModernProtocolVersion;
+            if (!initialize && !discover && !initializationSent && !initialized)
                 throw new InvalidOperationException("MCP HTTP initialization is required.");
+            if (modern && method != HttpMethod.Post)
+                throw new InvalidOperationException("Legacy session event streams and deletion are not available in modern mode.");
             var request = new HttpRequestMessage(method, endpoint);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
             if (method == HttpMethod.Post)
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             if (!initialize)
-                request.Headers.Add(ProtocolHeader, CodexMcpClient.LegacyProtocolVersion);
+                request.Headers.Add(ProtocolHeader, discover ? CodexMcpClient.ModernProtocolVersion : protocolVersion);
+            if (modern && rpcMethod is not null)
+            {
+                request.Headers.Add("Mcp-Method", rpcMethod);
+                if (message is { } payload && payload.TryGetProperty("params", out var parameters) &&
+                    parameters.ValueKind == JsonValueKind.Object && CodexRealtimeProtocol.Text(parameters, "name") is { } name)
+                    request.Headers.Add("Mcp-Name", name);
+            }
             if (sessionId is not null) request.Headers.Add(SessionHeader, sessionId);
             return request;
         }
@@ -265,7 +305,8 @@ public sealed class CodexMcpHttpTransport : ICodexMcpTransport
         }
     }
 
-    private async Task PumpAsync(HttpResponseMessage response, bool isSse, JsonElement? expectedId, bool isListener)
+    private async Task PumpAsync(HttpResponseMessage response, bool isSse, JsonElement? expectedId, bool isListener,
+        bool requireError = false)
     {
         try
         {
@@ -284,8 +325,9 @@ public sealed class CodexMcpHttpTransport : ICodexMcpTransport
                         bytes.Write(buffer.AsSpan(0, read));
                     }
                     var message = Parse(bytes.WrittenMemory);
-                    if (!MatchesResponse(message, expectedId))
-                        throw new CodexProtocolException("MCP HTTP response has an unexpected request ID.");
+                    if (!MatchesResponse(message, expectedId) ||
+                        requireError && (!message.TryGetProperty("error", out _) || message.TryGetProperty("result", out _)))
+                        throw new CodexProtocolException("MCP HTTP response has an invalid or unexpected request ID/result.");
                     await inbound.Writer.WriteAsync(message, stop).ConfigureAwait(false);
                     return;
                 }

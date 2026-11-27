@@ -49,10 +49,10 @@ public sealed class CodexMcpRpcException(int code, string message, JsonElement? 
     public JsonElement? DataValue { get; } = data;
 }
 
-/// <summary>Native legacy MCP JSON-RPC session over an explicitly supplied transport.
+/// <summary>Native MCP JSON-RPC session over an explicitly supplied transport.
 /// The required host policy authorizes every outgoing operation independently of discovery.
 /// No credentials, endpoint discovery, process launch, retry, or approval are implicit.</summary>
-public sealed class CodexMcpClient : IAsyncDisposable
+public sealed partial class CodexMcpClient : IAsyncDisposable
 {
     /// <summary>Supported legacy MCP wire version.</summary>
     public const string LegacyProtocolVersion = "2025-06-18";
@@ -97,7 +97,7 @@ public sealed class CodexMcpClient : IAsyncDisposable
     public bool IsToolCatalogCurrent => State == CodexMcpState.Ready &&
         ToolCatalog is { } current && current.Revision == ToolListRevision;
 
-    /// <summary>Negotiates the pinned legacy MCP protocol and completes initialized notification.
+    /// <summary>Negotiates the explicitly selected MCP lifecycle.
     /// A failed or cancelled handshake requires a new client/transport.</summary>
     public async Task<CodexMcpServerInfo> InitializeAsync(string clientName, string clientVersion,
         CancellationToken cancellationToken = default)
@@ -113,24 +113,7 @@ public sealed class CodexMcpClient : IAsyncDisposable
         }
         try
         {
-            var result = await RequestAsync("initialize", new JsonObject
-            {
-                ["protocolVersion"] = LegacyProtocolVersion,
-                ["capabilities"] = new JsonObject(),
-                ["clientInfo"] = new JsonObject { ["name"] = clientName, ["version"] = clientVersion },
-            }, cancellationToken).ConfigureAwait(false);
-            if (result.ValueKind != JsonValueKind.Object ||
-                CodexRealtimeProtocol.Text(result, "protocolVersion") != LegacyProtocolVersion ||
-                !result.TryGetProperty("capabilities", out var capabilities) || capabilities.ValueKind != JsonValueKind.Object ||
-                !result.TryGetProperty("serverInfo", out var info) || info.ValueKind != JsonValueKind.Object)
-                throw new CodexProtocolException("Unsupported or invalid MCP initialize result.");
-            using var initialized = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stop);
-            initialized.CancelAfter(timeout);
-            await SendAsync(new JsonObject
-            {
-                ["jsonrpc"] = "2.0", ["method"] = "notifications/initialized",
-            }, initialized.Token).ConfigureAwait(false);
-            var negotiated = new CodexMcpServerInfo(LegacyProtocolVersion, capabilities.Clone(), result.Clone());
+            var negotiated = await NegotiateAsync(clientName, clientVersion, cancellationToken).ConfigureAwait(false);
             Volatile.Write(ref serverInfo, negotiated);
             if (Interlocked.CompareExchange(ref state, (int)CodexMcpState.Ready,
                     (int)CodexMcpState.Initializing) != (int)CodexMcpState.Initializing)
@@ -239,11 +222,14 @@ public sealed class CodexMcpClient : IAsyncDisposable
             throw new InvalidOperationException("MCP client is not ready.");
         if (!info.Capabilities.TryGetProperty(capability, out var value) || value.ValueKind != JsonValueKind.Object)
             throw new InvalidOperationException($"MCP server did not advertise {capability} capability.");
-        return RequestAsync(method, parameters, ct);
+        return info.ProtocolVersion == ModernProtocolVersion
+            ? InvokeModernCompleteAsync(method, parameters, ct)
+            : RequestAsync(method, parameters, ct);
     }
 
     private async Task<JsonElement> RequestAsync(string method, JsonObject parameters, CancellationToken ct)
     {
+        ApplyModernMetadata(parameters);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct, stop);
         deadline.CancelAfter(timeout);
         var token = deadline.Token;
