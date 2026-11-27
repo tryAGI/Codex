@@ -69,6 +69,87 @@ public sealed class CodexProviderRoutingTests
         Assert.Throws<CodexProviderRouteException>(() => CodexProviderNetworkPolicy.Restricted([], TestContext.Current.CancellationToken).Validate(Chat.BaseUri));
     }
 
+    [Fact]
+    public async Task RevocationStopsAnAlreadyOpenResponseStream()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var revoke = new CancellationTokenSource();
+        using var stream = new WaitingStream();
+        var policy = CodexProviderNetworkPolicy.Restricted(["chatgpt.com"], revoke.Token);
+        using var client = new HttpClient(new CodexProviderNetworkPolicy.PolicyHandler(policy, Chat, new StreamingHandler(stream)));
+        using var response = await client.GetAsync("https://chatgpt.com/backend-api/codex/responses", HttpCompletionOption.ResponseHeadersRead, ct);
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+        await using var body = await response.Content.ReadAsStreamAsync(ct);
+        var pending = body.ReadAsync(new byte[16], ct).AsTask();
+        await stream.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);
+        revoke.Cancel();
+        var error = await Assert.ThrowsAsync<CodexProviderRouteException>(() => pending);
+        Assert.Equal(CodexProviderRouteFailure.NetworkPolicyRevoked, error.Failure);
+        Assert.True(stream.Disposed);
+        await Assert.ThrowsAsync<CodexProviderRouteException>(() => body.ReadAsync(new byte[16], ct).AsTask());
+    }
+
+    [Fact]
+    public async Task BufferedReadCannotStartAfterHeadersAreRevoked()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var revoke = new CancellationTokenSource();
+        using var stream = new WaitingStream();
+        using var client = new HttpClient(new CodexProviderNetworkPolicy.PolicyHandler(
+            CodexProviderNetworkPolicy.Unrestricted(revoke.Token), Chat, new StreamingHandler(stream)));
+        using var response = await client.GetAsync("https://chatgpt.com/backend-api/codex/responses", HttpCompletionOption.ResponseHeadersRead, ct);
+        revoke.Cancel();
+        var error = await Assert.ThrowsAsync<CodexProviderRouteException>(() => response.Content.ReadAsByteArrayAsync(ct));
+        Assert.Equal(CodexProviderRouteFailure.NetworkPolicyRevoked, error.Failure);
+        Assert.False(stream.Entered.Task.IsCompleted);
+    }
+
+    [Fact]
+    public async Task OrdinaryBodyReadPreservesBytesAndContentHeaders()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var stream = new MemoryStream([1, 2, 3, 4]);
+        using var client = new HttpClient(new CodexProviderNetworkPolicy.PolicyHandler(
+            CodexProviderNetworkPolicy.Unrestricted(ct), Chat, new StreamingHandler(stream)));
+        using var response = await client.GetAsync("https://chatgpt.com/backend-api/codex/responses", ct);
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, await response.Content.ReadAsByteArrayAsync(ct));
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    private sealed class StreamingHandler(Stream body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var content = new StreamContent(body);
+            content.Headers.ContentType = new("text/event-stream");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+        }
+    }
+
+    private sealed class WaitingStream : Stream
+    {
+        internal TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal bool Disposed { get; private set; }
+        public override bool CanRead => !Disposed;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            Entered.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void Flush() => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing) { Disposed = true; base.Dispose(disposing); }
+    }
+
     private sealed class BlockingHandler(TaskCompletionSource entered) : HttpMessageHandler
     {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

@@ -184,7 +184,20 @@ public sealed class CodexProviderNetworkPolicy
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, policy.revoked);
             try
             {
-                return await base.SendAsync(request, linked.Token).ConfigureAwait(false);
+                var response = await base.SendAsync(request, linked.Token).ConfigureAwait(false);
+                try
+                {
+                    policy.Validate(destination);
+                    // Keep the policy alive throughout SSE and other streamed response bodies.
+                    response.Content = new CodexRevocableHttpContent(response.Content, policy.revoked);
+                    policy.Validate(destination);
+                    return response;
+                }
+                catch
+                {
+                    response.Dispose();
+                    throw;
+                }
             }
             catch (OperationCanceledException) when (policy.revoked.IsCancellationRequested)
             {
