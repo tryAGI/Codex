@@ -150,61 +150,73 @@ public sealed partial class CodexClient : IDisposable
     public async Task<CodexRealtimeConnection> ConnectSidebandAsync(string callId, string protocol, CancellationToken cancellationToken = default)
     {
         if (CodexRealtimeProtocol.CallId(callId) != callId) throw new ArgumentException("Invalid call ID.", nameof(callId));
-        var uri = CodexRealtimeProtocol.SidebandUri(options.SidebandBaseUri, callId, protocol);
-        var auth = await credentials.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
-        return await CodexSidebandRetry.ConnectAsync(
-            token => CodexRealtimeConnection.ConnectAsync(uri, auth, options, token, protocol),
-            options.RequestTimeout, cancellationToken).ConfigureAwait(false);
+        return await ConnectSidebandCoreAsync(callId, protocol, null, false, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Native V3 audio WebSocket, using the reviewed Live provider URI.
-    /// This creates a new session; it does not duplicate an existing WebRTC call.
+    /// <summary>Joins a call created by this client. Legacy V1/V2 sends a session update; V3 does not reset the session.</summary>
+    public async Task<CodexRealtimeConnection> ConnectSidebandAsync(string callId, CodexRealtimeSessionOptions session, CancellationToken cancellationToken = default)
+    {
+        _ = session.Protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(session) : CodexRealtimeProtocol.SessionUpdate(session);
+        return await ConnectSidebandCoreAsync(callId, session.Protocol, session, false, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<CodexRealtimeConnection> ConnectSidebandCoreAsync(string callId, string protocol, CodexRealtimeSessionOptions? session, bool activation, CancellationToken ct)
+    {
+        if (CodexRealtimeProtocol.CallId(callId) != callId) throw new ArgumentException("Invalid call ID.", nameof(callId));
+        var destination = realtimeApiKeyProvider is null ? options.SidebandBaseUri : RealtimeApiBaseUri;
+        if (!destination.IdnHost.Equals("api.openai.com", StringComparison.OrdinalIgnoreCase) ||
+            !destination.IsDefaultPort || destination.UserInfo.Length != 0 || destination.Fragment.Length != 0 ||
+            destination.Scheme is not ("https" or "wss"))
+            throw new ArgumentException("Realtime sideband requires the trusted OpenAI API origin.");
+        var uri = CodexRealtimeProtocol.SidebandUri(destination, callId, protocol);
+        var auth = await GetRealtimeAuthorizationAsync(ct).ConfigureAwait(false);
+        var connect = (CancellationToken token) => CodexRealtimeConnection.ConnectAsync(uri, auth.Token, auth.AccountId,
+            options, token, protocol, chatGptCall: realtimeApiKeyProvider is null, session);
+        var connection = activation
+            ? await CodexSidebandActivation.ConnectAsync(connect, options.RequestTimeout, ct).ConfigureAwait(false)
+            : await CodexSidebandRetry.ConnectAsync(connect, options.RequestTimeout, ct).ConfigureAwait(false);
+        try
+        {
+            if (session is not null && protocol != "v3") await connection.UpdateSessionAsync(session, ct).ConfigureAwait(false);
+            return connection;
+        }
+        catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
+    }
+
+    /// <summary>Creates a new direct realtime WebSocket session. API-key clients support V1/V2/V3.
+    /// The existing ChatGPT OAuth V3 and GA V2 routes retain their distinct authorization behavior.
     /// The host owns usage reservations, PCM input/output and reconnection.</summary>
     public async Task<CodexRealtimeConnection> ConnectRealtimeWebSocketAsync(CodexRealtimeSessionOptions session, CancellationToken cancellationToken = default)
     {
-        if (session.Protocol == "v2") return await ConnectGaRealtimeAsync(session, cancellationToken).ConfigureAwait(false);
-        if (session.Protocol != "v3") throw new ArgumentException("The direct audio WebSocket host supports V3 only; use the reviewed existing-call V1 sideband diagnostic.", nameof(session));
-        _ = CodexRealtimeProtocol.SessionUpdate(session, chatGptCall: false);
-        var auth = await credentials.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
-        // ChatGPT OAuth credentials belong to the ChatGPT backend. The API Live URI is a
-        // different authorization surface and can accept the socket before rejecting session setup.
-        var uri = DirectRealtimeUri(options.BackendBaseUri, session.Model);
-        var connection = await CodexRealtimeConnection.ConnectAsync(uri, auth, options, cancellationToken, chatGptCall: false).ConfigureAwait(false);
+        var api = realtimeApiKeyProvider is not null;
+        var uri = DirectRealtimeDestination(session, api);
+        _ = session.Protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(session) : CodexRealtimeProtocol.SessionUpdate(session, chatGptCall: false);
+        var auth = await GetRealtimeAuthorizationAsync(cancellationToken).ConfigureAwait(false);
+        var connection = await CodexRealtimeConnection.ConnectAsync(uri, auth.Token, auth.AccountId, options, cancellationToken,
+            session.Protocol, chatGptCall: false, session).ConfigureAwait(false);
         try
         {
-            await connection.UpdateSessionAsync(session, cancellationToken).ConfigureAwait(false);
-            await connection.WaitForSessionStartedAsync(options.RequestTimeout, cancellationToken).ConfigureAwait(false);
+            await connection.InitializeDirectSessionAsync(session, options.RequestTimeout, legacyOAuthGa: !api && session.Protocol == "v2", cancellationToken).ConfigureAwait(false);
             return connection;
         }
         catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
     }
-    private async Task<CodexRealtimeConnection> ConnectGaRealtimeAsync(CodexRealtimeSessionOptions session, CancellationToken ct)
+
+    internal Uri DirectRealtimeDestination(CodexRealtimeSessionOptions session, bool api)
     {
-        _ = CodexRealtimeGaProtocol.Session(session);
-        var auth = await credentials.GetCredentialsAsync(ct).ConfigureAwait(false);
-        // Explicit trusted GA route, same secure OAuth provider; never fall back to an API key.
-        var uri = new Uri("wss://api.openai.com/v1/realtime?model=" + Uri.EscapeDataString(session.Model));
-        var connection = await CodexRealtimeConnection.ConnectAsync(uri, auth, options, ct, "v2").ConfigureAwait(false);
-        try
-        {
-            await connection.WaitForSessionAsync("session.created", options.RequestTimeout, ct, session.Model).ConfigureAwait(false);
-            await connection.UpdateSessionAsync(session, ct).ConfigureAwait(false);
-            await connection.WaitForSessionAsync("session.updated", options.RequestTimeout, ct, session.Model).ConfigureAwait(false);
-            foreach (var item in session.InitialItems)
-                await connection.SendEventAsync(CodexRealtimeGaProtocol.Message(item.Role, item.Text), ct).ConfigureAwait(false);
-            return connection;
-        }
-        catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
+        CodexRealtimeProtocol.ValidateSessionOptions(session);
+        if (!api && session.Protocol == "v1")
+            throw new ArgumentException("Direct V1 requires explicit API credentials. Use ForRealtimeApi.", nameof(session));
+        if (!api && session.Protocol == "v3") ValidateChatGptCallDestination(options.BackendBaseUri);
+        // Preserve the previously explicit GA OAuth route without falling back across credential types.
+        return DirectRealtimeUri(api || session.Protocol == "v2" ? RealtimeApiBaseUri : options.BackendBaseUri, session.Model, session.Protocol);
     }
-    internal static Uri DirectRealtimeUri(Uri backend, string model)
+
+    internal static Uri DirectRealtimeUri(Uri backend, string model, string protocol = "v3")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         if (model.Length > 128 || model.Any(char.IsControl)) throw new ArgumentException("Invalid realtime model.");
-        var path = backend.AbsolutePath.TrimEnd('/');
-        if (path is "" or "/v1") path = "/v1/live";
-        else if (path.EndsWith("/realtime", StringComparison.Ordinal)) path = path[..^9] + "/live";
-        return new UriBuilder(backend) { Scheme = "wss", Port = -1, Path = path,
-            Query = "model=" + Uri.EscapeDataString(model) }.Uri;
+        return CodexRealtimeProtocol.RealtimeSocketUri(backend, protocol, model);
     }
 
     private async Task<HttpRequestMessage> RequestAsync(string path, JsonObject body, CancellationToken ct)

@@ -10,13 +10,9 @@ public sealed partial class CodexClient
     public async Task<CodexRealtimeConnection> ConnectExistingCallSidebandAsync(string callId,
         string protocol = "v3", CancellationToken cancellationToken = default)
     {
-        if (CodexRealtimeProtocol.CallId(callId) != callId)
-            throw new ArgumentException("Invalid call ID.", nameof(callId));
-        var uri = CodexRealtimeProtocol.SidebandUri(options.SidebandBaseUri, callId, protocol);
-        var auth = await credentials.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
-        return await CodexSidebandActivation.ConnectAsync(
-            token => CodexRealtimeConnection.ConnectAsync(uri, auth, options, token, protocol),
-            options.RequestTimeout, cancellationToken).ConfigureAwait(false);
+        if (protocol is not ("v1" or "v3"))
+            throw new ArgumentException("Existing AVAS calls require V1 or V3.", nameof(protocol));
+        return await ConnectSidebandCoreAsync(callId, protocol, null, true, cancellationToken).ConfigureAwait(false);
     }
 }
 

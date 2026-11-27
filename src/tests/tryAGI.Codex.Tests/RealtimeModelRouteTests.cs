@@ -30,7 +30,7 @@ public sealed class RealtimeModelRouteTests
     public async Task RouteVersionsAreNotInterchangeable()
     {
         var uri = new Uri("wss://api.openai.com/v1/live");
-        Assert.Equal("wss://api.openai.com/v1/realtime?call_id=rtc_test", CodexRealtimeProtocol.SidebandUri(uri, "rtc_test", "v1").AbsoluteUri);
+        Assert.Equal("wss://api.openai.com/v1/realtime?intent=quicksilver&call_id=rtc_test", CodexRealtimeProtocol.SidebandUri(uri, "rtc_test", "v1").AbsoluteUri);
         Assert.Equal("wss://api.openai.com/v1/live/rtc_test", CodexRealtimeProtocol.SidebandUri(uri, "rtc_test", "v3").AbsoluteUri);
         Assert.Throws<ArgumentException>(() => CodexRealtimeProtocol.Session(new("silent") { Protocol = "v2" }));
         Assert.Throws<ArgumentException>(() => CodexRealtimeProtocol.Session(new("silent") { Protocol = "v1", InitialItems = [new("user", "x")] }));

@@ -48,12 +48,18 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     internal CodexRealtimeConnection(WebSocket socket, int maximumBytes, string protocol = "v3", bool chatGptCall = true) =>
         (this.socket, this.maximumBytes, this.protocol, this.chatGptCall) = (socket, maximumBytes, protocol, chatGptCall);
 
-    internal static async Task<CodexRealtimeConnection> ConnectAsync(Uri uri, CodexCredentials auth, CodexEndpointOptions options, CancellationToken ct, string protocol = "v3", bool chatGptCall = true)
+    internal static Task<CodexRealtimeConnection> ConnectAsync(Uri uri, CodexCredentials auth, CodexEndpointOptions options, CancellationToken ct, string protocol = "v3", bool chatGptCall = true)
+        => ConnectAsync(uri, auth.AccessToken, auth.AccountId, options, ct, protocol, chatGptCall);
+
+    internal static async Task<CodexRealtimeConnection> ConnectAsync(Uri uri, string accessToken, string? accountId, CodexEndpointOptions options,
+        CancellationToken ct, string protocol = "v3", bool chatGptCall = true, CodexRealtimeSessionOptions? session = null)
     {
         var socket = new ClientWebSocket();
         socket.Options.CollectHttpResponseDetails = true;
-        socket.Options.SetRequestHeader("Authorization", "Bearer " + auth.AccessToken);
-        socket.Options.SetRequestHeader("ChatGPT-Account-Id", auth.AccountId);
+        socket.Options.SetRequestHeader("Authorization", "Bearer " + accessToken);
+        if (accountId is not null) socket.Options.SetRequestHeader("ChatGPT-Account-Id", accountId);
+        if (session?.SessionId is { } id) socket.Options.SetRequestHeader("x-session-id", id);
+        if (session?.VoiceSessionId is { } voiceId) socket.Options.SetRequestHeader("voice-session-id", voiceId);
         if (protocol != "v2") socket.Options.SetRequestHeader("openai-alpha", protocol == "v1" ? "quicksilver=v1" : "quicksilver=v2");
         socket.Options.SetRequestHeader("originator", options.Originator);
         socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
@@ -75,6 +81,18 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
             throw HandshakeFailure(status, requestId, failure);
         }
         catch { socket.Dispose(); throw; }
+    }
+
+    internal async Task InitializeDirectSessionAsync(CodexRealtimeSessionOptions session, TimeSpan timeout, bool legacyOAuthGa, CancellationToken ct)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(timeout);
+        // The official API adapter updates immediately; only frameless V3 waits for session.started.
+        // Retain the older GA OAuth route's explicit model verification for compatibility.
+        if (legacyOAuthGa) await WaitForSessionAsync("session.created", timeout, deadline.Token, session.Model).ConfigureAwait(false);
+        await UpdateSessionAsync(session, deadline.Token).ConfigureAwait(false);
+        if (protocol == "v3") await WaitForSessionStartedAsync(timeout, deadline.Token).ConfigureAwait(false);
+        if (legacyOAuthGa) await WaitForSessionAsync("session.updated", timeout, deadline.Token, session.Model).ConfigureAwait(false);
     }
 
     internal async Task WaitForSessionStartedAsync(TimeSpan timeout, CancellationToken ct)
@@ -273,12 +291,15 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         finally { writeGate.Release(); }
     }
     /// <summary>Sends new session settings. Keep reading events to see whether they were accepted.</summary>
-    public Task UpdateSessionAsync(CodexRealtimeSessionOptions options, CancellationToken cancellationToken = default) =>
-        SendAsync(protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(options) : CodexRealtimeProtocol.SessionUpdate(options, chatGptCall), cancellationToken);
+    public Task UpdateSessionAsync(CodexRealtimeSessionOptions options, CancellationToken cancellationToken = default)
+    {
+        if (options.Protocol != protocol) throw new ArgumentException("Cannot change the wire protocol of an attached session.", nameof(options));
+        return SendAsync(protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(options) : CodexRealtimeProtocol.SessionUpdate(options, chatGptCall), cancellationToken);
+    }
     /// <summary>Native V3 PCM audio transport for direct WebSocket sessions. Do not duplicate
     /// audio already sent over WebRTC. Server capability/transport admission belongs to the caller.</summary>
     public Task AppendAudioAsync(ReadOnlyMemory<byte> pcm16, CancellationToken cancellationToken = default) =>
-        SendAsync(protocol == "v2" ? CodexRealtimeGaProtocol.AudioAppend(pcm16.Span) : CodexRealtimeProtocol.AudioAppend(pcm16.Span), cancellationToken);
+        SendAsync(protocol == "v3" ? CodexRealtimeProtocol.AudioAppend(pcm16.Span) : CodexRealtimeGaProtocol.AudioAppend(pcm16.Span), cancellationToken);
     /// <summary>Bounded raw provider event. Preserves model-specific capabilities without an allowlist or automatic replay.</summary>
     public Task SendEventAsync(JsonObject message, CancellationToken cancellationToken = default) => SendAsync((JsonObject)message.DeepClone(), cancellationToken);
     private async Task AppendGaUserAsync(string text, CancellationToken ct)
