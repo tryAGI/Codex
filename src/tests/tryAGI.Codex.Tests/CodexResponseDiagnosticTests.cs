@@ -90,7 +90,7 @@ public sealed class CodexResponseDiagnosticTests
         var error = new JsonObject { ["code"] = code, ["message"] = "PRIVATE_PROVIDER_MESSAGE", ["param"] = "PRIVATE_PARAMETER" };
         var terminal = type == "error"
             ? new JsonObject { ["type"] = type, ["error"] = error }.ToJsonString()
-            : new JsonObject { ["type"] = type, ["response"] = new JsonObject { ["id"] = "response_failure", ["error"] = error,
+            : new JsonObject { ["type"] = type, ["response"] = new JsonObject { ["id"] = "response_created", ["error"] = error,
                 ["incomplete_details"] = new JsonObject { ["reason"] = code },
                 ["usage"] = new JsonObject { ["input_tokens"] = 42, ["output_tokens"] = 7 } } }.ToJsonString();
         var usage = new Usage();
@@ -107,7 +107,7 @@ public sealed class CodexResponseDiagnosticTests
         Assert.Equal(new[] { "reserve", "unknown" }, usage.Events);
         var terminalPoint = Assert.Single(points, p => p.Phase == type + "." + category);
         Assert.Equal(points[0].RequestId, terminalPoint.RequestId);
-        Assert.Equal(type == "error" ? "response_created" : "response_failure", terminalPoint.ResponseId);
+        Assert.Equal("response_created", terminalPoint.ResponseId);
         Assert.Equal(1, terminalPoint.RequestNumber);
         Assert.True(terminalPoint.ElapsedMilliseconds >= points[0].ElapsedMilliseconds);
         Assert.Null(terminalPoint.InputTokens); Assert.Null(terminalPoint.OutputTokens);
@@ -127,6 +127,27 @@ public sealed class CodexResponseDiagnosticTests
         await Assert.ThrowsAsync<CodexProtocolException>(async () =>
         { await foreach (var _ in client.StreamResponseAsync(new("model", "instructions"), [], observeDiagnostics: points.Add, cancellationToken: TestContext.Current.CancellationToken)) { } });
         Assert.Single(points, p => p.Phase == expected);
+    }
+
+    [Fact]
+    public async Task ConflictingSseResponseIdIsNotAttributedOrCompleted()
+    {
+        var usage = new Usage();
+        using var client = new CodexClient(new Credentials(), handler: new Handler(_ =>
+            Sse("""{"type":"response.created","response":{"id":"expected"}}""") +
+            Sse("""{"type":"response.completed","response":{"id":"different","output":[],"usage":{"input_tokens":100}}}""")),
+            usageObserver: usage);
+        List<CodexResponseDiagnostic> points = [];
+        var exception = await Assert.ThrowsAsync<CodexProtocolException>(async () =>
+        {
+            await foreach (var _ in client.StreamResponseAsync(new("model", "instructions"), [],
+                TestContext.Current.CancellationToken, points.Add)) { }
+        });
+        Assert.Contains("response_id_mismatch", exception.Message);
+        Assert.Equal(new[] { "reserve", "unknown" }, usage.Events);
+        var rejection = Assert.Single(points, point => point.Phase == "response.protocol_rejected.response_id_mismatch");
+        Assert.Equal("expected", rejection.ResponseId);
+        Assert.DoesNotContain(points, point => point.Phase == "response.completed");
     }
 
     [Fact]

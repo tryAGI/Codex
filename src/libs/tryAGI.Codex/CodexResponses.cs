@@ -54,7 +54,10 @@ public sealed record CodexResponseEvent(string Type, JsonElement Payload, double
     /// <summary>Local reservation identifier.</summary>
     public string? RequestId { get; init; }
     /// <summary>Observed provider accounting data, if this event carries it.</summary>
-    public CodexObservedUsage? Usage => CodexObservedUsage.Read(Payload, Identity, RequestId, ObservedAt);
+    public CodexObservedUsage? Usage => CodexObservedUsage.Read(Payload, Identity, RequestId, ObservedAt) is { } usage
+        ? usage with { ResponseId = usage.ResponseId ?? ResponseId } : null;
+    /// <summary>Provider response identifier established by this event or an earlier frame of the same stream.</summary>
+    public string? ResponseId { get; init; }
     /// <summary>Local receipt time.</summary>
     public DateTimeOffset ObservedAt { get; init; } = DateTimeOffset.UtcNow;
 }
@@ -176,15 +179,24 @@ public sealed partial class CodexClient
         var events = ws is not null ? ws.ReadAsync(deadline.Token) : ReadSseAsync(stream!, options.MaximumMessageBytes, deadline.Token);
         var completed = false;
         var outputValidation = new CodexResponseOutputValidation();
+        var correlation = ws?.NewCorrelation() ?? new CodexResponsesCorrelation();
         await foreach (var data in events.ConfigureAwait(false))
         {
             if (data == "[DONE]") break;
             using var document = JsonDocument.Parse(data);
             var payload = document.RootElement.Clone();
             var type = CodexRealtimeProtocol.Text(payload, "type") ?? throw new CodexProtocolException("Responses event omitted its type.");
+            if (correlation.Observe(type, payload) is { } correlationFailure)
+            {
+                diagnostics.Mark("response.protocol_rejected." + correlationFailure);
+                throw new CodexProtocolException("Responses stream identity rejected (" + correlationFailure + "); usage is unknown and output must not execute.");
+            }
+            diagnostics.BindResponseId(correlation.ResponseId);
+            responsesRouting.CaptureEvent(payload, type, routingGeneration);
             if (type is "error" or "response.failed" or "response.incomplete")
             {
-                incompleteUsage = CodexObservedUsage.Read(payload, identity, accountingId);
+                incompleteUsage = CodexObservedUsage.Read(payload, identity, accountingId) is { } observed
+                    ? observed with { ResponseId = observed.ResponseId ?? correlation.ResponseId } : null;
                 var category = diagnostics.Failure(type, payload);
                 var error = payload.TryGetProperty("response", out var failed) && failed.ValueKind == JsonValueKind.Object &&
                     failed.TryGetProperty("error", out var nested) ? nested :
@@ -208,7 +220,7 @@ public sealed partial class CodexClient
             }
             ws?.Observe(type, payload, body);
             completed |= type == "response.completed";
-            yield return new(type, payload, Stopwatch.GetElapsedTime(started).TotalMilliseconds) { Identity = identity, RequestId = accountingId };
+            yield return new(type, payload, Stopwatch.GetElapsedTime(started).TotalMilliseconds) { Identity = identity, RequestId = accountingId, ResponseId = correlation.ResponseId };
             if (completed) yield break;
         }
         if (!completed)

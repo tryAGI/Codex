@@ -1,42 +1,71 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace tryAGI.Codex;
 
-// Rust ModelClientSession owns one immutable sticky-routing token per turn and auth owner.
-// Keep one bounded active scope per native client. Late headers from retired scopes cannot
-// repopulate the cache, including when a client is reused across accounts or turns.
+// Rust ModelClientSession owns one immutable routing token per turn and auth owner.
+// Different backing threads can run concurrently on a native client. Keep at most one
+// active scope per logical thread, bounded by an LRU; a retired scope cannot capture headers.
 internal sealed class CodexResponsesRouting
 {
     private const string Header = "x-codex-turn-state";
+    private const int MaximumThreads = 64;
     private readonly object gate = new();
-    private Scope? active;
-    private object generation = new();
-    private string? state;
+    private readonly Dictionary<ThreadKey, Entry> entries = [];
+    private readonly LinkedList<ThreadKey> order = [];
+    private Owner? activeOwner;
 
-    private sealed record Scope(CodexResponsesIdentity Identity, Uri Endpoint, string Account,
-        string CredentialFingerprint);
+    private sealed record Owner(Uri Endpoint, string Account, string CredentialFingerprint);
+    private sealed record ThreadKey(string SessionId, string ThreadId);
+    private sealed class Entry(CodexResponsesIdentity identity, LinkedListNode<ThreadKey> node)
+    {
+        internal CodexResponsesIdentity Identity { get; } = identity;
+        internal LinkedListNode<ThreadKey> Node { get; } = node;
+        internal string? State { get; set; }
+    }
 
     internal object Prepare(HttpRequestMessage request, CodexResponsesIdentity? identity)
     {
         var account = request.Headers.TryGetValues("ChatGPT-Account-Id", out var accounts)
             ? accounts.SingleOrDefault() : null;
         var bearer = request.Headers.Authorization?.Parameter;
-        var next = identity is not null && request.RequestUri is { } endpoint &&
+        var owner = identity is not null && request.RequestUri is { } endpoint &&
             account is not null && bearer is not null
-            ? new Scope(identity, endpoint, account,
+            ? new Owner(endpoint, account,
                 Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(bearer))))
             : null;
         lock (gate)
         {
-            if (next is null || next != active)
+            if (owner is null || owner != activeOwner)
             {
-                active = next;
-                generation = new object();
-                state = null;
+                entries.Clear();
+                order.Clear();
+                activeOwner = owner;
             }
-            if (state is not null) request.Headers.Add(Header, state);
-            return generation;
+            if (owner is null || identity is null) return new object();
+            var key = new ThreadKey(identity.SessionId, identity.ThreadId);
+            if (entries.TryGetValue(key, out var entry))
+            {
+                order.Remove(entry.Node);
+                if (entry.Identity != identity) entry = null;
+            }
+            if (entry is null)
+            {
+                entry = new Entry(identity, order.AddLast(key));
+                entries[key] = entry;
+            }
+            else order.AddLast(entry.Node);
+
+            if (entries.Count > MaximumThreads)
+            {
+                var oldest = order.First!;
+                entries.Remove(oldest.Value);
+                order.RemoveFirst();
+            }
+
+            if (entry.State is not null) request.Headers.Add(Header, entry.State);
+            return entry;
         }
     }
 
@@ -45,9 +74,24 @@ internal sealed class CodexResponsesRouting
         if (response.Headers.TryGetValues(Header, out var values)) Capture(values, requestGeneration);
     }
 
+    // Rust captures sticky state from response.metadata, independently of handshake headers.
+    internal void CaptureEvent(JsonElement payload, string type, object requestGeneration)
+    {
+        if (type != "response.metadata" || !payload.TryGetProperty("headers", out var headers) ||
+            headers.ValueKind != JsonValueKind.Object) return;
+        var found = headers.EnumerateObject()
+            .Where(property => property.Name.Equals(Header, StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();
+        if (found.Length != 1) return;
+        var value = found[0].Value;
+        while (value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 1)
+            value = value[0];
+        if (value.ValueKind == JsonValueKind.String && value.GetString() is { } state)
+            Capture([state], requestGeneration);
+    }
+
     internal string? GetState(object requestGeneration)
     {
-        lock (gate) return ReferenceEquals(generation, requestGeneration) ? state : null;
+        lock (gate) return Current(requestGeneration)?.State;
     }
 
     internal void Capture(IEnumerable<string> values, object requestGeneration)
@@ -56,10 +100,12 @@ internal sealed class CodexResponsesRouting
         if (headers.Length != 1 || !Valid(headers[0])) return;
         lock (gate)
         {
-            if (active is not null && ReferenceEquals(generation, requestGeneration))
-                state ??= headers[0];
+            if (Current(requestGeneration) is { } entry) entry.State ??= headers[0];
         }
     }
+
+    private Entry? Current(object generation) => generation is Entry candidate &&
+        entries.TryGetValue(candidate.Node.Value, out var active) && ReferenceEquals(active, candidate) ? candidate : null;
 
     private static bool Valid(string value) =>
         value.Length is > 0 and <= 8192 && value.All(c => c is >= '!' and <= '~' && c != ',');

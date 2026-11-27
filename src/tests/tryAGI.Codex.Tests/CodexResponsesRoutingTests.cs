@@ -98,6 +98,43 @@ public sealed class CodexResponsesRoutingTests
     }
 
     [Fact]
+    public async Task InterleavedThreadsRetainIndependentTurnStatesAndAccountChangeClearsAll()
+    {
+        var credentials = new Credentials();
+        var sent = new List<string?>();
+        using var client = new CodexClient(credentials, handler: new Handler(request =>
+        {
+            sent.Add(State(request));
+            var thread = Assert.Single(request.Headers.GetValues("thread-id"));
+            return Task.FromResult(Completed("sticky-" + thread));
+        }));
+        var other = Identity with { ThreadId = "other" };
+        await Read(client, Identity);
+        await Read(client, other);
+        await Read(client, Identity);
+        await Read(client, other);
+        credentials.Active = new("changed-token", "changed-account");
+        await Read(client, Identity);
+        await Read(client, other);
+        Assert.Equal(new string?[] { null, null, "sticky-thread", "sticky-other", null, null }, sent);
+    }
+
+    [Fact]
+    public async Task EvictedThreadCannotRetainOrRestoreStaleTurnState()
+    {
+        var sent = new List<string?>();
+        using var client = new CodexClient(new Credentials(), handler: new Handler(request =>
+        {
+            sent.Add(State(request));
+            return Task.FromResult(Completed("sticky"));
+        }));
+        await Read(client, Identity);
+        for (var i = 0; i < 64; i++) await Read(client, Identity with { ThreadId = "other-" + i });
+        await Read(client, Identity);
+        Assert.All(sent, Assert.Null);
+    }
+
+    [Fact]
     public async Task MissingOrAmbiguousStateDoesNotBecomeRoutingState()
     {
         var count = 0;

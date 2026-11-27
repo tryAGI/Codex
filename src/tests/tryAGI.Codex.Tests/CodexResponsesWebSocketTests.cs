@@ -121,6 +121,64 @@ public sealed class CodexResponsesWebSocketTests
     }
 
     [Fact]
+    public async Task PrewarmMetadataCapturesStickyStateForSubsequentRequests()
+    {
+        var socket = new Socket(
+            """{"type":"response.metadata","response_id":"warm","headers":{"X-Codex-Turn-State":["sticky-from-stream"]}}""",
+            Completed("warm"),
+            """{"type":"response.metadata","response_id":"first","headers":{"x-codex-turn-state":"ignored-replacement"}}""",
+            Completed("first"), Completed("second"));
+        await using var session = new CodexResponsesWebSocketSession((_, _) =>
+            Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket)));
+        using var client = new CodexClient(new Credentials(), handler: new Handler());
+        var settings = new CodexResponseOptions("model", "instructions")
+        { Identity = Identity, WebSocketSession = session, PrewarmWebSocket = true };
+        await Read(client, settings, User);
+        await Read(client, settings, User, Tool);
+        Assert.Null(socket.Frames[0]["client_metadata"]!["x-codex-turn-state"]);
+        Assert.Equal("sticky-from-stream", socket.Frames[1]["client_metadata"]!["x-codex-turn-state"]!.GetValue<string>());
+        Assert.Equal("sticky-from-stream", socket.Frames[2]["client_metadata"]!["x-codex-turn-state"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task PriorTerminalCannotSettleAnotherReservationOnReusedSocket()
+    {
+        var socket = new Socket(Completed("first"), Completed("first"), Completed("second"));
+        await using var session = new CodexResponsesWebSocketSession((_, _) =>
+            Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket)));
+        var observer = new Observer();
+        var handler = new Handler();
+        using var client = new CodexClient(new Credentials(), usageObserver: observer, handler: handler);
+        var settings = new CodexResponseOptions("model", "instructions") { Identity = Identity, WebSocketSession = session };
+        await Read(client, settings, User);
+        var failure = await Assert.ThrowsAsync<CodexProtocolException>(() => Read(client, settings, User, Tool));
+        Assert.Contains("retired_response_id", failure.Message);
+        Assert.Equal(1, observer.Completed);
+        Assert.Equal(1, observer.Incomplete);
+        Assert.Equal(0, handler.Calls);
+        Assert.Equal(WebSocketState.Closed, socket.State);
+    }
+
+    [Fact]
+    public async Task ConflictingResponseIdAndMissingTerminalIdNeverAuthorizeOutput()
+    {
+        foreach (var terminal in new[] { Completed("different"), """{"type":"response.completed","response":{"output":[]}}""" })
+        {
+            var socket = new Socket("""{"type":"response.created","response":{"id":"expected"}}""", terminal);
+            await using var session = new CodexResponsesWebSocketSession((_, _) =>
+                Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket)));
+            var observer = new Observer();
+            var handler = new Handler();
+            using var client = new CodexClient(new Credentials(), usageObserver: observer, handler: handler);
+            var settings = new CodexResponseOptions("model", "instructions") { Identity = Identity, WebSocketSession = session };
+            await Assert.ThrowsAsync<CodexProtocolException>(() => Read(client, settings, User));
+            Assert.Equal(0, observer.Completed);
+            Assert.Equal(1, observer.Incomplete);
+            Assert.Equal(0, handler.Calls);
+        }
+    }
+
+    [Fact]
     public async Task ChangedPropertiesOrTurnDoNotUsePriorResponseId()
     {
         var first = new Socket(Completed("first"), Completed("second"));

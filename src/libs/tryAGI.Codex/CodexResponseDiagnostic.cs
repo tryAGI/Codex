@@ -68,6 +68,8 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
     private CodexResponseDiagnostic Point(string phase) => new(phase, requestId, Stopwatch.GetElapsedTime(started).TotalMilliseconds)
     { StartedTimestamp = started, InputItems = inputItems, ToolCount = toolCount, RequestBytes = RequestBytes, ResponseId = responseId, Identity = Identity };
 
+    internal void BindResponseId(string? id) => responseId = id ?? responseId;
+
     internal void Mark(string phase)
     {
         lastTransportPhase = phase;
@@ -105,7 +107,7 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
         terminalFailure = true;
         var phase = type + "." + category;
         lastTransportPhase = phase;
-        observe?.Invoke(Point(phase) with { Usage = CodexObservedUsage.Read(payload, Identity, requestId) });
+        observe?.Invoke(Point(phase) with { Usage = ReadUsage(payload) });
         return category;
     }
 
@@ -135,7 +137,7 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
             });
         if (type == "response.created") Mark(type);
         if (type == "codex.rate_limits")
-            observe(Point(type) with { Usage = CodexObservedUsage.Read(payload, Identity, requestId) });
+            observe(Point(type) with { Usage = ReadUsage(payload) });
         if (type == "response.completed")
         {
             lastTransportPhase = type;
@@ -145,7 +147,7 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
                 CachedInputTokens = Number(response, "usage", "input_tokens_details", "cached_tokens"),
                 OutputTokens = Number(response, "usage", "output_tokens"),
                 ReasoningTokens = Number(response, "usage", "output_tokens_details", "reasoning_tokens"),
-                Usage = CodexObservedUsage.Read(payload, Identity, requestId),
+                Usage = ReadUsage(payload),
             });
             // Structural evidence, not a claim that the host accepted this response. A later
             // protocol rejection remains distinct from provider completion and paid usage.
@@ -171,6 +173,10 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
     {
         if (quotas is { Count: > 0 }) observe?.Invoke(Point("response.quota_headers") with { Quotas = quotas });
     }
+
+    private CodexObservedUsage? ReadUsage(JsonElement payload) =>
+        CodexObservedUsage.Read(payload, Identity, requestId) is { } usage
+            ? usage with { ResponseId = usage.ResponseId ?? responseId } : null;
 
     private static string MergeShape(string? previous, string current)
     {

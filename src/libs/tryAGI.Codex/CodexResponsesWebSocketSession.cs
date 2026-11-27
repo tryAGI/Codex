@@ -20,6 +20,8 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
     private JsonObject? previous;
     private JsonArray? previousOutput;
     private string? responseId;
+    private const int MaximumCompletedResponses = 1024;
+    private readonly HashSet<string> completedResponses = new(StringComparer.Ordinal);
 
     /// <summary>Create an optional WebSocket transport, with SSE fallback before dispatch only.</summary>
     public CodexResponsesWebSocketSession() : this(ConnectNativeAsync) { }
@@ -46,7 +48,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
             }
             if (fallback) return null;
             IReadOnlyList<CodexObservedQuota>? quotas = null;
-            if (socket?.State != WebSocketState.Open)
+            if (socket?.State != WebSocketState.Open || completedResponses.Count >= MaximumCompletedResponses)
             {
                 Reset();
                 var connection = await connect(request, ct).ConfigureAwait(false);
@@ -168,6 +170,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
         previous = null;
         previousOutput = null;
         responseId = null;
+        completedResponses.Clear();
     }
 
     /// <summary>Release the native connection and all cached request/output continuation state.</summary>
@@ -189,6 +192,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
 
         internal IReadOnlyList<CodexObservedQuota>? Quotas { get; init; }
         internal bool NeedsPrewarm => owner.previous is null;
+        internal CodexResponsesCorrelation NewCorrelation() => new(owner.completedResponses.Contains, requireTerminalId: true);
 
         internal async Task SendAsync(JsonObject body, bool prewarm, CancellationToken ct)
         {
@@ -220,11 +224,15 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
         internal async Task PrewarmAsync(JsonObject body, CancellationToken ct)
         {
             await SendAsync(body, true, ct).ConfigureAwait(false);
+            var correlation = NewCorrelation();
             await foreach (var data in ReadAsync(ct).ConfigureAwait(false))
             {
                 using var document = JsonDocument.Parse(data);
                 var payload = document.RootElement;
-                var type = CodexRealtimeProtocol.Text(payload, "type");
+                var type = CodexRealtimeProtocol.Text(payload, "type") ?? throw new CodexProtocolException("Responses prewarm event omitted its type.");
+                if (correlation.Observe(type, payload) is { } failure)
+                    throw new CodexProtocolException("Responses prewarm rejected (" + failure + ").");
+                routing.CaptureEvent(payload, type, generation);
                 if (type is "error" or "response.failed" or "response.incomplete" or "response.output_item.added" or "response.output_item.done")
                     throw new CodexProtocolException("Responses prewarm did not prove a non-generating completion.");
                 if (type != "response.completed") continue;
@@ -235,6 +243,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
                     response.TryGetProperty("usage", out var usage) && usage.ValueKind != JsonValueKind.Null &&
                     (usage.ValueKind != JsonValueKind.Object || !HasOnlyZeroUsage(usage)))
                     throw new CodexProtocolException("Responses prewarm unexpectedly produced output or usage.");
+                owner.completedResponses.Add(correlation.ResponseId!);
                 owner.Remember(body, response, maximumBytes);
                 return;
             }
@@ -261,6 +270,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
             if (type != "response.completed") return;
             var response = payload.GetProperty("response");
             var output = response.GetProperty("output");
+            owner.completedResponses.Add(response.GetProperty("id").GetString()!);
             // If streaming and terminal output disagree, never infer a continuation prefix.
             if (!streamedOverflow && (streamed.Count == 0 ||
                 streamed.Count == output.GetArrayLength() && streamed.Zip(output.EnumerateArray()).All(pair =>
