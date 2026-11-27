@@ -104,10 +104,26 @@ public sealed partial class CodexClient : IDisposable
     /// The offer is sent as application/sdp to realtime/calls. Never retried after dispatch.</summary>
     /// <param name="offerSdp">SDP offer from the caller's peer connection.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    public async Task<CodexRealtimeCall> CreateRealtimeCallFromSdpAsync(string offerSdp, CancellationToken cancellationToken = default)
+    public Task<CodexRealtimeCall> CreateRealtimeCallFromSdpAsync(string offerSdp, CancellationToken cancellationToken = default) =>
+        CreateRealtimeCallFromSdpWithHeadersAsync(offerSdp, cancellationToken: cancellationToken);
+
+    /// <summary>Creates a raw SDP call with optional explicit correlation and adapter headers.
+    /// No session payload, legacy query parameters, or credential overrides are introduced.</summary>
+    /// <param name="offerSdp">SDP offer from the caller's peer connection.</param>
+    /// <param name="sessionId">Optional client-generated session identity.</param>
+    /// <param name="voiceSessionId">Optional caller voice-session identity.</param>
+    /// <param name="protocol">Optional wire adapter: V1 selects quicksilver=v1, V3 selects quicksilver=v2,
+    /// V2 and null do not add a Quicksilver header. This does not configure the provider session.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public async Task<CodexRealtimeCall> CreateRealtimeCallFromSdpWithHeadersAsync(string offerSdp,
+        string? sessionId = null, string? voiceSessionId = null, string? protocol = null, CancellationToken cancellationToken = default)
     {
         using var activity = ActivitySource.StartActivity("codex.realtime.call.create");
         ArgumentException.ThrowIfNullOrWhiteSpace(offerSdp);
+        CodexRealtimeProtocol.ValidateSessionIdentity(sessionId, nameof(sessionId));
+        CodexRealtimeProtocol.ValidateSessionIdentity(voiceSessionId, nameof(voiceSessionId));
+        if (protocol is not (null or "v1" or "v2" or "v3"))
+            throw new ArgumentException("Unsupported realtime protocol.", nameof(protocol));
         var api = realtimeApiKeyProvider is not null;
         if (!api) ValidateChatGptCallDestination(options.BackendBaseUri);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -119,6 +135,10 @@ public sealed partial class CodexClient : IDisposable
             Version = HttpVersion.Version20, VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
         };
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/sdp");
+        if (sessionId is not null) request.Headers.Add("x-session-id", sessionId);
+        if (voiceSessionId is not null) request.Headers.Add("voice-session-id", voiceSessionId);
+        if (protocol is "v1" or "v3")
+            request.Headers.Add("openai-alpha", protocol == "v1" ? "quicksilver=v1" : "quicksilver=v2");
         return await SendRealtimeCallAsync(request, deadline.Token).ConfigureAwait(false);
     }
 

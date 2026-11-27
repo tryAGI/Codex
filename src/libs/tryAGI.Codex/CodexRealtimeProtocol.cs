@@ -273,11 +273,16 @@ internal static class CodexRealtimeProtocol
         CodexRealtimeStartupContext.ValidateInitialItems(options.InitialItems);
         if (options.Protocol != "v3" && options.InitialItems.Count != 0)
             throw new ArgumentException("Initial items require V3.", nameof(options));
-        foreach (var id in new[] { options.SessionId, options.VoiceSessionId })
-            if (id is not null && (id.Length is < 1 or > 128 || id.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('_' or '-' or '.'))))
-                throw new ArgumentException("Invalid realtime session identity.", nameof(options));
+        ValidateSessionIdentity(options.SessionId, nameof(options));
+        ValidateSessionIdentity(options.VoiceSessionId, nameof(options));
         if (options.Protocol != "v3" && (options.LiveDecisionTriggers.Count != 0 || options.LiveDecisionDelegationQuestions.Count != 0 || options.LiveCustomVoiceId is not null || options.LiveVoiceDescription is not null))
             throw new ArgumentException("Live features require explicit V3 capability verification.", nameof(options));
+    }
+
+    internal static void ValidateSessionIdentity(string? id, string parameterName)
+    {
+        if (id is not null && (id.Length is < 1 or > 128 || id.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('_' or '-' or '.'))))
+            throw new ArgumentException("Invalid realtime session identity.", parameterName);
     }
 
     public static JsonObject Session(CodexRealtimeSessionOptions options, bool chatGptCall = true)

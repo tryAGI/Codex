@@ -69,6 +69,56 @@ public sealed class RealtimeApiCallTests
     }
 
     [Theory]
+    [InlineData(true, "v1", "quicksilver=v1")]
+    [InlineData(true, "v3", "quicksilver=v2")]
+    [InlineData(false, "v1", "quicksilver=v1")]
+    [InlineData(false, "v3", "quicksilver=v2")]
+    [InlineData(true, "v2", null)]
+    [InlineData(false, null, null)]
+    public async Task RawSdpExplicitHeadersPreserveTrustedRoutingAndBody(bool api, string? protocol, string? expectedAlpha)
+    {
+        const string offer = "v=offer\r\n";
+        var keys = new ApiKeys();
+        var oauth = new OAuth();
+        var handler = new Handler(async (request, ct) =>
+        {
+            Assert.Equal(api ? "https://api.openai.com/v1/realtime/calls" :
+                "https://chatgpt.com/backend-api/codex/realtime/calls", request.RequestUri?.AbsoluteUri);
+            Assert.Equal(api ? "api-test-key" : "oauth-test-token", request.Headers.Authorization?.Parameter);
+            Assert.Equal(!api, request.Headers.Contains("ChatGPT-Account-Id"));
+            Assert.Equal("session-1", request.Headers.GetValues("x-session-id").Single());
+            Assert.Equal("voice_2", request.Headers.GetValues("voice-session-id").Single());
+            Assert.Equal(expectedAlpha, request.Headers.TryGetValues("openai-alpha", out var values) ? values.Single() : null);
+            var content = request.Content ?? throw new InvalidDataException("Missing SDP.");
+            Assert.Equal("application/sdp", content.Headers.ContentType?.ToString());
+            Assert.Equal(offer, await content.ReadAsStringAsync(ct));
+            var response = new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("v=0\r\n") };
+            response.Headers.TryAddWithoutValidation("Location", "/v1/realtime/calls/rtc_test");
+            return response;
+        });
+        using var client = api ? CodexClient.ForRealtimeApi(keys, handler: handler) : new CodexClient(oauth, handler: handler);
+        var call = await client.CreateRealtimeCallFromSdpWithHeadersAsync(offer, "session-1", "voice_2", protocol, TestContext.Current.CancellationToken);
+        Assert.Equal("rtc_test", call.CallId);
+        Assert.Equal(api ? 1 : 0, keys.Requests);
+        Assert.Equal(api ? 0 : 1, oauth.Requests);
+    }
+
+    [Theory]
+    [InlineData("", null, null)]
+    [InlineData("session\r\nAuthorization: invalid", null, null)]
+    [InlineData(null, "bad identity", null)]
+    [InlineData(null, null, "v4")]
+    public async Task RawSdpInvalidHeadersFailBeforeCredentialAcquisition(string? sessionId, string? voiceId, string? protocol)
+    {
+        var keys = new ApiKeys();
+        using var client = CodexClient.ForRealtimeApi(keys,
+            handler: new Handler((_, _) => throw new InvalidOperationException("Invalid header dispatched.")));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.CreateRealtimeCallFromSdpWithHeadersAsync(
+            "v=offer", sessionId, voiceId, protocol, TestContext.Current.CancellationToken));
+        Assert.Equal(0, keys.Requests);
+    }
+
+    [Theory]
     [InlineData("invalid SDP", "/v1/realtime/calls/rtc_test")]
     [InlineData("v=0\r\n", null)]
     [InlineData("v=0\r\n", "/v1/realtime/calls/not-a-call-id")]
