@@ -2780,9 +2780,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.LocationAcceptsExactRustUuid"
         ]
@@ -2806,9 +2806,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.LocationWithoutCallIdIsRejected"
         ]
@@ -2856,9 +2856,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.UntrustedFramelessCallIdsCannotBecomePaths(id: \".\")",
           "tryAGI.Codex.Tests.RustParityRoutingTests.UntrustedFramelessCallIdsCannotBecomePaths(id: \"..\")",
@@ -2876,9 +2876,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.FramelessRewritesExistingRealtimePathAndPreservesQuery"
         ]
@@ -3038,9 +3038,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.V2ExistingCallUsesCallIdAndNoModelOrIntent"
         ]
@@ -3064,9 +3064,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.LegacyNestedV1BaseAppendsRealtimePath"
         ]
@@ -3082,9 +3082,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.LegacyV1BaseAppendsRealtimePath"
         ]
@@ -3100,9 +3100,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.SecureWebSocketBaseDefaultsToRealtimePath"
         ]
@@ -3126,9 +3126,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityRoutingTests.V2RootWithoutModelOmitsIntent"
         ]
@@ -4353,26 +4353,64 @@
     "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_charges_image_only_messages": {
       "ownerIssue": 45,
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
-      "rationale": "Exact pinned line 1400 image-only inline plus newest with legacy image-budget disabled at two tokens: one minimum token charged to image-only item, older dropped. All theory cases required."
+      "rationale": "Exact pinned line 1400 image-only inline plus newest with legacy image-budget disabled at two tokens: one minimum token charged to image-only item, older dropped. All theory cases required.",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
+        "cases": [
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: False, budget: 1, count: 1, images: 0)",
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: False, budget: 2, count: 2, images: 1)",
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 0, count: 0, images: 0)",
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 1844, count: 1, images: 0)",
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 1845, count: 2, images: 1)"
+        ]
+      }
     },
     "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_drops_image_only_messages_after_budget_is_spent": {
       "ownerIssue": 45,
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
-      "rationale": "Pinned line 1428 image-only boundary with one-token budget leaves newest only; C# includes an additional older item which is also excluded. All theory cases required."
+      "rationale": "Pinned line 1428 image-only boundary with one-token budget leaves newest only; C# includes an additional older item which is also excluded. All theory cases required.",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
+        "cases": [
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: False, budget: 1, count: 1, images: 0)",
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: False, budget: 2, count: 2, images: 1)",
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 0, count: 0, images: 0)",
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 1844, count: 1, images: 0)",
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 1845, count: 2, images: 1)"
+        ]
+      }
     },
     "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_keeps_newest_messages_first": {
       "ownerIssue": 45,
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation",
-      "rationale": "Exact Rust line 1244 fixture: old-old/middle1234/new at 3 tokens, exact UTF-8 truncation marker, newest and unknown content kind preserved."
+      "rationale": "Exact Rust line 1244 fixture: old-old/middle1234/new at 3 tokens, exact UTF-8 truncation marker, newest and unknown content kind preserved.",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
+        "cases": [
+          "tryAGI.Codex.Tests.CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation"
+        ]
+      }
     },
     "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_preserves_images_and_truncates_later_text_parts": {
       "ownerIssue": 45,
@@ -4929,26 +4967,59 @@
     "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:file_audio_cutoff_does_not_backfill_older_uncharged_media": {
       "ownerIssue": 45,
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityRetainedMediaTests.cs::RustParityRetainedMediaTests.FileAudioCutoffDropsAllEarlierUnchargedMediaInBothModes",
-      "rationale": "Pinned lines 182–226: both image-budget modes preserve only trailing after text; no earlier inline audio/image can backfill across unaffordable file audio. Synthetic image label used; exact retained semantic content asserted."
+      "rationale": "Pinned lines 182–226: both image-budget modes preserve only trailing after text; no earlier inline audio/image can backfill across unaffordable file audio. Synthetic image label used; exact retained semantic content asserted.",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityRetainedMediaTests.FileAudioCutoffDropsAllEarlierUnchargedMediaInBothModes(chargeImages: False)",
+          "tryAGI.Codex.Tests.RustParityRetainedMediaTests.FileAudioCutoffDropsAllEarlierUnchargedMediaInBothModes(chargeImages: True)"
+        ]
+      }
     },
     "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:file_audio_is_charged_and_atomic_in_both_image_budget_modes": {
       "ownerIssue": 45,
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityRetainedMediaTests.cs::RustParityRetainedMediaTests.FileAudioBoundaryPreservesExactAnnotatedSuffixInBothBudgetModes",
-      "rationale": "Pinned lines 98–179: unknown file audio reserves upstream maximum; three adjacent boundaries, both modes, exact retained suffix, exact kinds sidecar, immutable input."
+      "rationale": "Pinned lines 98–179: unknown file audio reserves upstream maximum; three adjacent boundaries, both modes, exact retained suffix, exact kinds sidecar, immutable input.",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityRetainedMediaTests.FileAudioBoundaryPreservesExactAnnotatedSuffixInBothBudgetModes(chargeImages: False)",
+          "tryAGI.Codex.Tests.RustParityRetainedMediaTests.FileAudioBoundaryPreservesExactAnnotatedSuffixInBothBudgetModes(chargeImages: True)"
+        ]
+      }
     },
     "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:image_only_boundary_is_atomic_and_does_not_backfill_older_messages": {
       "ownerIssue": 45,
       "applicability": "applicable",
-      "status": "source-reviewed",
+      "status": "passed",
       "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityRetainedMediaTests.cs::RustParityRetainedMediaTests.InlineAndOriginalFileImagesAreAtomicWithoutOlderBackfill",
-      "rationale": "Pinned lines 71–95: inline resized and original file image, charge mode enabled; exact retained image/newest at cost+1 and newest only at cost or 1. Both media kinds tested."
+      "rationale": "Pinned lines 71–95: inline resized and original file image, charge mode enabled; exact retained image/newest at cost+1 and newest only at cost or 1. Both media kinds tested.",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "passed",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
+        "cases": [
+          "tryAGI.Codex.Tests.RustParityRetainedMediaTests.InlineAndOriginalFileImagesAreAtomicWithoutOlderBackfill(file: False)",
+          "tryAGI.Codex.Tests.RustParityRetainedMediaTests.InlineAndOriginalFileImagesAreAtomicWithoutOlderBackfill(file: True)"
+        ]
+      }
     },
     "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:image_treatment_preserves_client_developer_boundary_behavior": {
       "ownerIssue": 45,
@@ -7163,9 +7234,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityPresentationTests.LegacyInterruptedToolReceiptRetainsOriginalSessionAndStablePosition"
         ]
@@ -7225,9 +7296,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.NativeBackingArtifactTests.OnlyCompletedCodexAppMcpCallPromotesAndReplacesItsExactRawCallProjection",
           "tryAGI.Codex.Tests.RustParityPresentationTests.LegacyMcpPresentationSplitsSpeechAndExcludesNonAppOrFailedCalls"
@@ -8762,9 +8833,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery(api: False, uri: \"https://chatgpt.com/backend-api/codex/realtime/cal\"···, location: \"/v1/realtime/calls/calls/rtc_backend_test\", callId: \"rtc_backend_test\")",
           "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery(api: True, uri: \"https://api.openai.com/v1/realtime/calls\", location: \"/v1/realtime/calls/calls/12345678-abcd-4321-aabc-1\"···, callId: \"12345678-abcd-4321-aabc-123456789abc\")",
@@ -8782,9 +8853,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery(api: False, uri: \"https://chatgpt.com/backend-api/codex/realtime/cal\"···, location: \"/v1/realtime/calls/calls/rtc_backend_test\", callId: \"rtc_backend_test\")",
           "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery(api: True, uri: \"https://api.openai.com/v1/realtime/calls\", location: \"/v1/realtime/calls/calls/12345678-abcd-4321-aabc-1\"···, callId: \"12345678-abcd-4321-aabc-123456789abc\")",
@@ -8906,9 +8977,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion(websocket: False)",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion(websocket: True)"
@@ -8925,9 +8996,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")"
         ]
@@ -10731,9 +10802,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
@@ -10755,9 +10826,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
@@ -10779,9 +10850,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
@@ -10803,9 +10874,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
@@ -10835,9 +10906,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
@@ -10899,9 +10970,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
@@ -10923,9 +10994,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
@@ -10943,9 +11014,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation"
         ]
@@ -10997,9 +11068,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.CancelBeforeDispatchKeepsUnusedSocketAndReleasesReservation",
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck(beforeId: False, terminalFirst: False)",
@@ -11060,9 +11131,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput"
         ]
@@ -11142,9 +11213,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput"
         ]
@@ -11160,9 +11231,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput"
         ]
@@ -11178,9 +11249,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesIdentityTests.OpenAiSummaryDeliveryRequiresExplicitFeatureAndSummary(summary: \"auto\", enabled: False, expected: False)",
           "tryAGI.Codex.Tests.CodexResponsesIdentityTests.OpenAiSummaryDeliveryRequiresExplicitFeatureAndSummary(summary: \"auto\", enabled: True, expected: True)",
@@ -11263,9 +11334,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation"
         ]
@@ -11404,9 +11475,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesIdentityTests.OpenAiSummaryDeliveryRequiresExplicitFeatureAndSummary(summary: \"auto\", enabled: False, expected: False)",
           "tryAGI.Codex.Tests.CodexResponsesIdentityTests.OpenAiSummaryDeliveryRequiresExplicitFeatureAndSummary(summary: \"auto\", enabled: True, expected: True)",
@@ -11453,9 +11524,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck(beforeId: False, terminalFirst: False)",
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck(beforeId: False, terminalFirst: True)",
@@ -11526,9 +11597,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesIdentityTests.OpenAiSummaryDeliveryRequiresExplicitFeatureAndSummary(summary: \"auto\", enabled: False, expected: False)",
           "tryAGI.Codex.Tests.CodexResponsesIdentityTests.OpenAiSummaryDeliveryRequiresExplicitFeatureAndSummary(summary: \"auto\", enabled: True, expected: True)",
@@ -11572,9 +11643,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")"
         ]
@@ -11826,9 +11897,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
@@ -11857,9 +11928,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck(beforeId: False, terminalFirst: False)",
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck(beforeId: False, terminalFirst: True)",
@@ -11882,9 +11953,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck(beforeId: False, terminalFirst: False)",
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.CancellationWaitsForIdAndBothTerminalAndAck(beforeId: False, terminalFirst: True)",
@@ -11906,9 +11977,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.FailedOrLostAckRetiresSocketButPreservesTerminalUsage(acknowledgement: \"{\\\"type\\\":\\\"response.interrupt.accepted\\\",\\\"response_id\"···)",
           "tryAGI.Codex.Tests.CodexResponsesInterruptionTests.FailedOrLostAckRetiresSocketButPreservesTerminalUsage(acknowledgement: \"{\\\"type\\\":\\\"response.interrupt.failed\\\",\\\"response_id\\\":\"···)",
@@ -11942,9 +12013,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion(websocket: False)",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion(websocket: True)"
@@ -12406,9 +12477,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")"
         ]
@@ -12425,9 +12496,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")"
         ]
@@ -12443,9 +12514,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")"
         ]
@@ -12461,9 +12532,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")"
         ]
@@ -12479,9 +12550,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")"
         ]
@@ -12497,9 +12568,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")"
         ]
@@ -12529,9 +12600,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"session.updated\")"
         ]
@@ -12547,9 +12618,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_audio.delta\")"
         ]
@@ -12565,9 +12636,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.delta\")"
         ]
@@ -12583,9 +12654,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.delta\")"
         ]
@@ -12601,9 +12672,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.turn_marked\")"
         ]
@@ -12619,9 +12690,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.handoff.requested\")",
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.delta\")",
@@ -12675,9 +12746,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_transcript.delta\")"
         ]
@@ -12693,9 +12764,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_text.delta\")"
         ]
@@ -12711,9 +12782,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.delta\")"
         ]
@@ -12729,9 +12800,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.done\")"
         ]
@@ -12747,9 +12818,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.added\")"
         ]
@@ -12765,9 +12836,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.done\")"
         ]
@@ -12783,9 +12854,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.handoff.requested\")"
         ]
@@ -12801,9 +12872,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"error\")"
         ]
@@ -12819,9 +12890,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"session.updated\")"
         ]
@@ -12837,9 +12908,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio.delta\")"
         ]
@@ -12855,9 +12926,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.audio.delta\")"
         ]
@@ -12873,9 +12944,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.handoff.requested\")",
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.delta\")",
@@ -12929,9 +13000,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.delta\")"
         ]
@@ -12947,9 +13018,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_text.done\")"
         ]
@@ -12965,9 +13036,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.done\")"
         ]
@@ -12983,9 +13054,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"input_audio_buffer.speech_started\")"
         ]
@@ -13001,9 +13072,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.added\")"
         ]
@@ -13019,9 +13090,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.created\")"
         ]
@@ -13037,9 +13108,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.done\")"
         ]
@@ -13055,9 +13126,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.created\")"
         ]
@@ -13073,9 +13144,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.cancelled\")"
         ]
@@ -13091,9 +13162,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.done\")"
         ]
@@ -13109,9 +13180,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"error\")"
         ]
@@ -13127,9 +13198,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.started\")"
         ]
@@ -13145,9 +13216,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.updated\")"
         ]
@@ -13163,9 +13234,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"output_transcript.added\")"
         ]
@@ -13181,9 +13252,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"error\")"
         ]
@@ -13202,9 +13273,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
@@ -13223,9 +13294,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
         ]
@@ -13244,9 +13315,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
@@ -13265,9 +13336,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")"
         ]
@@ -13285,9 +13356,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
         ]
@@ -13305,9 +13376,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
         ]
@@ -13325,9 +13396,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
         ]
@@ -13346,9 +13417,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
@@ -13365,9 +13436,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents(protocol: \"v1\", type: \"quicksilver\", audioType: \"input_audio_buffer.append\")",
           "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents(protocol: \"v2\", type: \"realtime\", audioType: \"input_audio_buffer.append\")",
@@ -13385,9 +13456,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates(ack: False)",
           "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates(ack: True)",
@@ -13413,9 +13484,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions"
         ]
@@ -13439,9 +13510,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: False, model: \"gpt-realtime-1.5\", voice: \"cove\")",
           "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: True, model: \"gpt-realtime-1.5\", voice: \"cove\")",
@@ -13469,9 +13540,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot(protocol: \"v1\")",
           "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot(protocol: \"v2\")"
@@ -13496,9 +13567,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: False, model: \"gpt-realtime-1.5\", voice: \"cove\")",
           "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: True, model: \"gpt-realtime-1.5\", voice: \"cove\")",
@@ -13783,9 +13854,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.ThreadAgentTests.ActualNativeMcpInvocationProducesDurableBackingArtifactWithoutDuplicateDispatch(serverName: \"codex_app\", isError: False)",
           "tryAGI.Codex.Tests.ThreadAgentTests.ActualNativeMcpInvocationProducesDurableBackingArtifactWithoutDuplicateDispatch(serverName: \"codex_app\", isError: True)",
@@ -13807,9 +13878,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.NativeBackingArtifactTests.ImageAndSubagentPresentationPreservesIdentityAcrossCompletionAndVoiceClosure"
         ]
@@ -13826,9 +13897,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimePresentationTests.PreviewAdmissionRejectsUnknownRequestAndRetainsInterruptedArtifactWithoutModelOutput"
         ]
@@ -13845,9 +13916,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimePresentationTests.SuccessfulDynamicToolSplitsSpeechAndDelayedFinalDoesNotDuplicatePrefix"
         ]
@@ -13867,9 +13938,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.DirectRealtimeLifecycleTests.DirectSocketClosesOnceAfterDrainingFinalSpeech"
         ]
@@ -13891,9 +13962,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.DirectRealtimeLifecycleTests.CancellationBeforeClaimDoesNotCreateSocketAndAmbiguousCreationIsNeverReplayed",
           "tryAGI.Codex.Tests.DirectRealtimeLifecycleTests.CancelledCreationAfterDispatchRemainsFenced",
@@ -13916,9 +13987,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityLifecycleTests.RecoveredSidebandAdmitsNewHandoffOnlyAfterDurableTranscript"
         ]
@@ -13939,9 +14010,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RealtimeResponseLifecycleTests.AmbiguousFencedReceiptIsNeverResent",
           "tryAGI.Codex.Tests.RealtimeResponseLifecycleTests.FencedReceiptRejectedBeforeDispatchCanBeRetriedByCurrentGeneration",
@@ -13963,9 +14034,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.ThreadAgentTests.OrdinaryReasoningTurnCanSpeakAndSteerWithoutRebindingInflightResponse"
         ]
@@ -13981,9 +14052,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityLifecycleTests.AudioDelegationToolFeedbackFollowupAndStandaloneSpeechStayOnOneThread"
         ]
@@ -14000,9 +14071,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityLifecycleTests.AudioDelegationToolFeedbackFollowupAndStandaloneSpeechStayOnOneThread"
         ]
@@ -14019,9 +14090,9 @@
       "evidence": {
         "lane": "offline",
         "outcome": "passed",
-        "csharpCommit": "bbec40497c23fcca92952fe7f5bfe1c57f372481",
-        "receipt": "docs/realtime-parity-evidence/ci-bbec404-45961444934.json",
-        "receiptSha256": "842e7f4d1d18f27394c9cc988e5f66fe727db8108fc600311264a23a39af9225",
+        "csharpCommit": "0a84141b5f6a7fbd3c43fa85a482e104dff0b7c3",
+        "receipt": "docs/realtime-parity-evidence/ci-0a84141-45962443998.json",
+        "receiptSha256": "414484c3c89975b775c9fcbbded777a6c4bfa14eb00cb62beef00b035ba0fa2a",
         "cases": [
           "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")"
         ]
