@@ -9,8 +9,12 @@ namespace tryAGI.Codex;
 /// <summary>Explicit automatic compaction policy for native thread execution; the default is disabled.</summary>
 public sealed record CodexThreadCompactionOptions
 {
-    /// <summary>Host-selected approximate context threshold. It is not a provider usage or quota claim.</summary>
+    /// <summary>Host-selected context threshold, evaluated against observed or estimated active context.</summary>
     public required long TokenThreshold { get; init; }
+    /// <summary>Optional host-known model capacity; a smaller explicit provider capacity takes precedence.</summary>
+    public long? ContextWindowTokens { get; init; }
+    /// <summary>Percentage of the known model context window usable before forced compaction (1–100).</summary>
+    public int EffectiveContextWindowPercent { get; init; } = 100;
     /// <summary>Retained message and media selection policy.</summary>
     public CodexRetainedContextOptions? Retention { get; init; }
     /// <summary>Maximum additional compaction attempts during an active turn, zero disables inline compaction.</summary>
@@ -125,8 +129,11 @@ public static class CodexThreadCompaction
     public static bool ShouldCompact(CodexResponseOptions settings, IReadOnlyList<JsonElement> closedPrefix,
         IReadOnlyList<JsonElement> upcomingInput, CodexThreadCompactionOptions policy)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(policy.TokenThreshold);
-        return closedPrefix.Count != 0 && EstimateTokens(settings, [.. closedPrefix, .. upcomingInput]) >= policy.TokenThreshold;
+        CodexContextWindow.ValidatePolicy(policy);
+        var threshold = policy.ContextWindowTokens is { } capacity
+            ? Math.Min(policy.TokenThreshold, Math.Max(1, (long)((decimal)capacity * policy.EffectiveContextWindowPercent / 100)))
+            : policy.TokenThreshold;
+        return closedPrefix.Count != 0 && EstimateTokens(settings, [.. closedPrefix, .. upcomingInput]) >= threshold;
     }
 
     internal static string ScopeHash(CodexResponseOptions settings) => Hash(writer =>

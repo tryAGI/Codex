@@ -7,7 +7,11 @@ namespace tryAGI.Codex;
 /// <summary>Outcome of <see cref="CodexThreadAgent.RunAsync"/>.</summary>
 /// <param name="Thread">The thread after the turn was recorded.</param>
 /// <param name="Result">The agent run.</param>
-public sealed record CodexThreadAgentResult(CodexThreadDocument Thread, CodexAgentResult Result);
+public sealed record CodexThreadAgentResult(CodexThreadDocument Thread, CodexAgentResult Result)
+{
+    /// <summary>Projected context at the terminal boundary, separating provider observations from estimates.</summary>
+    public CodexContextWindowStatus? ContextWindow { get; init; }
+}
 
 /// <summary>Executes a new turn against a durable native journal. The host still resolves
 /// settings, owns execution leases, supplies financial admission and authorizes every tool.
@@ -90,7 +94,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         if (historyTurnLimit is < 1 or > 4096) throw new ArgumentOutOfRangeException(nameof(historyTurnLimit));
         if (options.AutomaticCompaction is { } configured)
         {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(configured.TokenThreshold);
+            CodexContextWindow.ValidatePolicy(configured);
             if (configured.MaximumInlineCompactions is < 0 or > 32)
                 throw new ArgumentOutOfRangeException(nameof(configured.MaximumInlineCompactions));
             if (configured.BackgroundTokenThreshold is { } threshold &&
@@ -107,14 +111,16 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         var guard = new AccountCredentials(credentials, before.AccountId);
         var authOwner = CodexThreadCompactionScheduler.AuthOwner.From(
             await guard.GetCredentialsAsync(cancellationToken).ConfigureAwait(false));
-        if (options.AutomaticCompaction?.BackgroundTokenThreshold is not null)
-            guard = new AccountCredentials(credentials, before.AccountId, authOwner);
+        // Observed context is funding-owner scoped, including during ordinary foreground turns.
+        guard = new AccountCredentials(credentials, before.AccountId, authOwner);
         if (historyTurnLimit is null && options.AutomaticCompaction is { } compaction && before.Turns.Length != 0 &&
             before.Turns.All(turn => turn.Status != "inProgress"))
         {
             var candidate = CodexThreadStore.CaptureCompaction(before, options);
             var upcoming = CodexThreadStore.RealtimeCarryoverBeforeTurn(before, before.Turns.Length).Concat(input).ToArray();
-            var hardThresholdReached = CodexThreadCompaction.ShouldCompact(options, candidate.History, upcoming, compaction);
+            var hardThresholdReached = candidate.History.Count != 0 && CodexContextWindow.Evaluate(options,
+                [.. candidate.History, .. upcoming], CodexContextWindow.ReadObservation(before.Turns[^1]),
+                before.CompactionCheckpoint, authOwner).TokenLimitReached;
             var adopted = false;
             if (compaction.BackgroundTokenThreshold is not null && BackgroundCompactions is { } scheduler)
             {
@@ -162,7 +168,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             if (!accepted.Admitted) throw new InvalidOperationException("Realtime handoff already committed; runner replay refused.");
             started = accepted.Thread;
         }
-        using var execution = new Execution(store, started, turnId, ownerId, budget, input, journalProjection, historyTurnLimit, control, options);
+        using var execution = new Execution(store, started, turnId, ownerId, budget, input, journalProjection, historyTurnLimit, control, options, authOwner);
         control?.BindRealtimeAdmission(execution.AdmitRealtimeSteerAsync);
         control?.BindRealtimeMode(execution.CaptureRealtimeModeAsync);
         try
@@ -186,12 +192,14 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 PrepareNativeHistory = historyTurnLimit is null && journalProjection is null && options.AutomaticCompaction is not null
                     ? (settings, history, ct) => execution.PrepareWireHistoryAsync(client, settings, history, observeDiagnostics, ct,
                         BackgroundCompactions, authOwner, guard,
-                        (candidate, effective) =>
+                        (candidate, effective, context) =>
                         {
                             if (BackgroundCompactions is { } scheduler)
-                                ScheduleBackground(scheduler, candidate, effective, authOwner);
+                                ScheduleBackground(scheduler, candidate, effective, authOwner, context);
                         })
                     : null,
+                ObserveNativeCompletion = historyTurnLimit is null && journalProjection is null
+                    ? execution.ObserveNativeCompletion : null,
             };
             var result = await runner.RunWithToolsAsync(options, execution.Seed,
                 (call, ct) => execution.ExecuteAsync(call, execute, ct, control), Validated,
@@ -208,7 +216,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 BackgroundCompactions is { } background &&
                 (execution.LastEffectiveSettings ?? options).AutomaticCompaction?.BackgroundTokenThreshold is not null)
             {
-                try { ScheduleBackground(background, execution.Current, execution.LastEffectiveSettings ?? options, authOwner); }
+                try { ScheduleBackground(background, execution.Current, execution.LastEffectiveSettings ?? options, authOwner, execution.ContextWindow); }
                 catch (Exception error) when (error is not OutOfMemoryException)
                 {
                     // The turn is already terminal. A failed speculative preparation is not
@@ -216,7 +224,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                     background.RecordPreparationFailure();
                 }
             }
-            return new(execution.Current, result);
+            return new(execution.Current, result) { ContextWindow = execution.ContextWindow };
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
@@ -228,11 +236,11 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
     }
 
     private void ScheduleBackground(CodexThreadCompactionScheduler scheduler, CodexThreadDocument current,
-        CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner owner)
-        => ScheduleBackground(scheduler, CodexThreadStore.CaptureCompaction(current, settings), settings, owner);
+        CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner owner, CodexContextWindowStatus? context)
+        => ScheduleBackground(scheduler, CodexThreadStore.CaptureCompaction(current, settings), settings, owner, context);
 
     private void ScheduleBackground(CodexThreadCompactionScheduler scheduler, CodexThreadCompactionCandidate candidate,
-        CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner owner)
+        CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner owner, CodexContextWindowStatus? context)
     {
         if (settings.AutomaticCompaction is not { BackgroundTokenThreshold: { } lower } policy ||
             lower <= 0 || lower >= policy.TokenThreshold) return;
@@ -244,8 +252,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             OutputSchema = settings.OutputSchema?.Clone(), RequiredFirstFunction = null,
             WebSocketSession = null, PrewarmWebSocket = false, WebSocketDrain = default,
         };
-        var estimate = CodexThreadCompaction.EstimateTokens(snapshot, candidate.History);
-        if (estimate < lower || estimate >= policy.TokenThreshold) return;
+        var estimate = context?.ProjectedActiveTokens ?? CodexThreadCompaction.EstimateTokens(snapshot, candidate.History);
+        if (context is not null ? !context.BackgroundThresholdReached : estimate < lower || estimate >= policy.TokenThreshold) return;
         scheduler.TrySchedule(store, budget, owner, candidate, async ct =>
         {
             var guard = new AccountCredentials(credentials, candidate.AccountId, owner);
@@ -288,6 +296,10 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private string? inlineCallId;
         private int inlineAttempts;
         private bool changedWireProjection;
+        private readonly CodexThreadCompactionScheduler.AuthOwner authOwner;
+        private CodexStoredContextWindowObservation? contextObservation;
+        private bool observedForegroundCompletion;
+        internal CodexContextWindowStatus? ContextWindow { get; private set; }
         private readonly SemaphoreSlim gate = new(1, 1);
         private readonly ConcurrentDictionary<string, JsonElement> observed = new(StringComparer.Ordinal);
         internal CodexThreadDocument Current { get; private set; }
@@ -298,9 +310,12 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
 
         internal Execution(CodexThreadStore store, CodexThreadDocument current, Guid turnId, string owner, ICodexUsageObserver budget,
             IReadOnlyList<JsonElement> currentInput, Func<JsonElement, JsonElement>? projection, int? historyTurnLimit, CodexAgentControl? control,
-            CodexResponseOptions settings)
+            CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner authOwner)
         {
             this.store = store; Current = current; this.turnId = turnId; this.owner = owner; this.budget = budget; this.projection = projection; this.control = control;
+            this.authOwner = authOwner;
+            if (projection is null && historyTurnLimit is null && current.Turns.Length > 1)
+                contextObservation = CodexContextWindow.ReadObservation(current.Turns[^2]);
             var firstTurnIndex = Math.Max(0, current.Turns.Length - (historyTurnLimit ?? current.Turns.Length));
             Seed = CodexThreadCompaction.Project(current, historyTurnLimit is null ? current.CompactionCheckpoint : null,
                 settings.Model, CodexThreadCompaction.ScopeHash(settings), current.Turns.Length, firstTurnIndex, turnId, currentInput);
@@ -375,12 +390,20 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             finally { gate.Release(); }
         }
 
+        internal void ObserveNativeCompletion(CodexResponseOptions settings, IReadOnlyList<JsonElement> input,
+            CodexResponseEvent terminal)
+        {
+            LastEffectiveSettings = settings;
+            observedForegroundCompletion = true;
+            contextObservation = CodexContextWindow.Capture(settings, Current.CompactionCheckpoint, authOwner, input, terminal);
+        }
+
         internal async Task<IReadOnlyList<JsonElement>> PrepareWireHistoryAsync(CodexClient client,
             CodexResponseOptions settings, IReadOnlyList<JsonElement> originalHistory,
             Action<CodexResponseDiagnostic>? observeDiagnostics, CancellationToken ct,
             CodexThreadCompactionScheduler? scheduler, CodexThreadCompactionScheduler.AuthOwner authOwner,
             ICodexCredentialProvider credentialGuard,
-            Action<CodexThreadCompactionCandidate, CodexResponseOptions> schedule)
+            Action<CodexThreadCompactionCandidate, CodexResponseOptions, CodexContextWindowStatus> schedule)
         {
             CodexThreadCompactionCandidate? candidate = null;
             CodexThreadDocument? captured = null;
@@ -407,9 +430,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 {
                     if (policy.MaximumInlineCompactions is < 0 or > 32)
                         throw new ArgumentOutOfRangeException(nameof(policy.MaximumInlineCompactions));
-                    hardThresholdReached = CodexThreadCompaction.ShouldCompact(settings, preparedWireHistory, [], policy);
-                    var speculative = policy.BackgroundTokenThreshold is { } lower && scheduler is not null &&
-                        CodexThreadCompaction.EstimateTokens(settings, preparedWireHistory) >= lower;
+                    ContextWindow = CodexContextWindow.Evaluate(settings, preparedWireHistory, contextObservation, checkpoint, authOwner);
+                    hardThresholdReached = preparedWireHistory.Count != 0 && ContextWindow.TokenLimitReached;
+                    var speculative = scheduler is not null && ContextWindow.BackgroundThresholdReached;
                     if (Turn.Output.Length > 0 && (hardThresholdReached || speculative))
                     {
                         captured = Current;
@@ -445,6 +468,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                             Current = await store.InstallActiveBackgroundCompactionAsync(ready.Candidate, ready.Result,
                                 settings, Current.Revision, turnId, owner, backgroundPolicy.Retention, ct).ConfigureAwait(false);
                             changedWireProjection = true;
+                            contextObservation = null;
                             preparedWireHistory = Array.AsReadOnly(CodexThreadCompaction.Project(Current,
                                 Current.CompactionCheckpoint, settings.Model, CodexThreadCompaction.ScopeHash(settings),
                                 Current.Turns.Length, currentTurnId: turnId, includeActiveOutput: true).ToArray());
@@ -461,7 +485,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 }
                 if (!hardThresholdReached && !ct.IsCancellationRequested)
                 {
-                    try { schedule(candidate, settings); }
+                    try { schedule(candidate, settings, ContextWindow!); }
                     catch (Exception error) when (error is not OutOfMemoryException)
                     { scheduler.RecordPreparationFailure(); }
                 }
@@ -495,6 +519,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                             inlineCallId ?? throw new CodexProtocolException("Missing compaction inference receipt."),
                             owner, settings.AutomaticCompaction!.Retention, ct).ConfigureAwait(false);
                         changedWireProjection = true;
+                        contextObservation = null;
                         preparedWireHistory = Array.AsReadOnly(Current.CompactionCheckpoint!.Projection
                             .Select(item => item.Clone()).ToArray());
                     }
@@ -665,7 +690,18 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             {
                 var output = history.Skip(Seed.Count).ToArray();
                 await SynchronizeAsync(output, ct).ConfigureAwait(false);
-                await JournalAsync(doc => store.CompleteAsync(doc.Id, doc.Revision, turnId, owner, "completed", Turn.Output, ct), ct).ConfigureAwait(false);
+                CodexStoredContextWindowObservation? snapshot = null;
+                if (observedForegroundCompletion && LastEffectiveSettings is { } settings)
+                {
+                    var projected = CodexThreadCompaction.Project(Current, Current.CompactionCheckpoint, settings.Model,
+                        CodexThreadCompaction.ScopeHash(settings), Current.Turns.Length,
+                        currentTurnId: turnId, includeActiveOutput: true);
+                    ContextWindow = CodexContextWindow.Evaluate(settings, projected, contextObservation,
+                        Current.CompactionCheckpoint, authOwner);
+                    snapshot = ContextWindow.Observation;
+                }
+                await JournalAsync(doc => store.CompleteWithContextAsync(doc.Id, doc.Revision, turnId, owner,
+                    "completed", Turn.Output, snapshot, ct), ct).ConfigureAwait(false);
             }
             finally { gate.Release(); }
         }

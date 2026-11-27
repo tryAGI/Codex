@@ -32,6 +32,7 @@ public sealed class CodexAgent(CodexClient client)
     // The native journal can prepare a compacted wire projection without modifying
     // the original history accumulated by this runner or its executed-call fence.
     internal Func<CodexResponseOptions, IReadOnlyList<JsonElement>, CancellationToken, Task<IReadOnlyList<JsonElement>>>? PrepareNativeHistory { get; init; }
+    internal Action<CodexResponseOptions, IReadOnlyList<JsonElement>, CodexResponseEvent>? ObserveNativeCompletion { get; init; }
 
     /// <summary>Runs one turn with flat function tools until the model answers without calling one.</summary>
     /// <param name="options">Model, instructions and advertised tools.</param>
@@ -138,7 +139,11 @@ public sealed class CodexAgent(CodexClient client)
             {
                 observe?.Invoke(item);
                 if (observeAsync is not null) await observeAsync(item, cancellationToken).ConfigureAwait(false);
-                if (item.CompletedOutput is not null) completedOutput = item.CompletedOutput;
+                if (item.CompletedOutput is not null)
+                {
+                    completedOutput = item.CompletedOutput;
+                    ObserveNativeCompletion?.Invoke(requestOptions, wireHistory, item);
+                }
             }
             cancellationToken.ThrowIfCancellationRequested();
             var items = completedOutput ?? throw new CodexProtocolException("Completed response has no validated output.");

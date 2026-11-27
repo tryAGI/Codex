@@ -78,6 +78,9 @@ public sealed record CodexStoredTurn(
 
     /// <summary>Durable model-visible realtime mode changes, indexed into the stored output timeline.</summary>
     public CodexStoredRealtimeModeTransition[]? RealtimeModeTransitions { get; init; }
+
+    /// <summary>Last matching context-window observation of the completed reasoning turn.</summary>
+    public CodexStoredContextWindowObservation? ContextWindowObservation { get; init; }
 }
 
 /// <summary>Request digest binds a call ID to its exact input bytes. Unknown outcomes remain

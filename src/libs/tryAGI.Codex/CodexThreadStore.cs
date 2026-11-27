@@ -175,6 +175,12 @@ public sealed partial class CodexThreadStore
     /// <summary>Completes a turn with its final status and output items.</summary>
     public Task<CodexThreadDocument> CompleteAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string status, IReadOnlyList<JsonElement> output, CancellationToken cancellationToken = default)
+        => CompleteWithContextAsync(threadId, expectedRevision, turnId, ownerId, status, output, null, cancellationToken);
+
+    // The optional provider observation and the ordinary terminal transition share one CAS.
+    internal Task<CodexThreadDocument> CompleteWithContextAsync(Guid threadId, long expectedRevision, Guid turnId,
+        string ownerId, string status, IReadOnlyList<JsonElement> output, CodexStoredContextWindowObservation? context,
+        CancellationToken cancellationToken)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             var turn = Active(document, turnId, ownerId);
@@ -182,7 +188,12 @@ public sealed partial class CodexThreadStore
             if (turn.Dispatches.Any(d => d.State == "dispatching") ||
                 status == "completed" && turn.Dispatches.Any(d => d.State == "unknown"))
                 throw new InvalidOperationException("Unsettled dispatches prevent this terminal transition.");
-            var updated = turn with { Status = status, Output = Items(output), CompletedAt = time.GetUtcNow() };
+            var updated = turn with
+            {
+                Status = status, Output = Items(output), CompletedAt = time.GetUtcNow(),
+                ContextWindowObservation = context,
+            };
+            if (context is not null) CodexContextWindow.Validate(updated, context);
             return PromoteRealtimeArtifacts(Replace(document, updated), turn, updated);
         }, cancellationToken);
 
@@ -215,7 +226,7 @@ public sealed partial class CodexThreadStore
             if (index < 0) throw new KeyNotFoundException("Fork cutoff turn not found.");
             count = index + (lastTurnId is not null ? 1 : 0);
         }
-        var selected = source.Turns.Take(count).ToArray();
+        var selected = source.Turns.Take(count).Select(turn => turn with { ContextWindowObservation = null }).ToArray();
         if (selected.Any(t => t.Status == "inProgress")) throw new InvalidOperationException("Cannot fork an active turn.");
         var now = time.GetUtcNow();
         return await PublishAsync(null, source with { Id = destinationId, Revision = 1, CreatedAt = now, UpdatedAt = now,
