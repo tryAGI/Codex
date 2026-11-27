@@ -59,6 +59,11 @@ public sealed partial class CodexThreadStore
             identity.QueuedTurn || identity.GoalTurn)
             throw new ArgumentException("Wake requires exact host-owned recipient, turn and parent identities.", nameof(options));
         identity.Validate();
+        if (recipient.SpawnOrigin is { } origin && prefix.Any(mail => mail.Id == origin.InitialMessageId) &&
+            (!Guid.TryParse(identity.ParentTurnId, out var spawningTurn) || spawningTurn != origin.ParentTurnId ||
+             !Guid.TryParse(identity.RootTurnId, out var rootTurn) || rootTurn != origin.RootTurnId ||
+             AgentMailFingerprint(prefix.Single(mail => mail.Id == origin.InitialMessageId)) != origin.InitialMessageFingerprint))
+            throw new ArgumentException("Initial named-agent wake must retain the original spawning and root turn identities.", nameof(options));
         var thread = await CurrentAsync(recipientThreadId, expectedThreadRevision, cancellationToken).ConfigureAwait(false);
         RequireDurableThread(thread);
         RequireUnarchived(thread);

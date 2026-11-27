@@ -8,7 +8,11 @@ namespace tryAGI.Codex;
 /// <param name="Role">Optional resolved role name.</param>
 /// <param name="Nickname">Optional display nickname.</param>
 public sealed record CodexNamedAgentIdentity(Guid ThreadId, Guid? ParentThreadId, Guid RootThreadId,
-    string Path, string? Role = null, string? Nickname = null);
+    string Path, string? Role = null, string? Nickname = null)
+{
+    /// <summary>Immutable initial spawn admission, when created through the native named-spawn transaction.</summary>
+    public CodexAgentSpawnOrigin? SpawnOrigin { get; init; }
+}
 
 /// <summary>A consistent storage snapshot of topology and persisted child identity metadata.
 /// Graph-only children whose creation has not settled can be present without metadata.</summary>
@@ -44,11 +48,14 @@ public sealed class CodexAgentIdentityDirectory
         activeIds = [root.ThreadId];
         var edges = graph.Edges.ToDictionary(edge => edge.ChildThreadId);
         var supplied = new Dictionary<Guid, CodexNamedAgentIdentity>();
+        var spawnDispatches = new HashSet<(Guid Parent, Guid Turn, string Dispatch)>();
         foreach (var identity in identities)
         {
             if (identity is null || identity.RootThreadId != graph.RootThreadId ||
                 !edges.TryGetValue(identity.ThreadId, out var edge) || identity.ParentThreadId != edge.ParentThreadId ||
                 !ValidMetadata(identity.Role) || !ValidMetadata(identity.Nickname) ||
+                identity.SpawnOrigin is { } origin && (!origin.IsValid ||
+                    !spawnDispatches.Add((edge.ParentThreadId, origin.ParentTurnId, origin.SourceDispatchId))) ||
                 !supplied.TryAdd(identity.ThreadId, identity))
                 throw new InvalidDataException("Invalid or duplicate recorded agent identity.");
             try
@@ -118,6 +125,10 @@ public sealed class CodexAgentIdentityDirectory
         chain.Reverse();
         return chain.AsReadOnly();
     }
+
+    internal bool ContainsSpawnDispatch(Guid parentId, Guid turnId, string dispatchId)
+        => recorded.Values.Any(identity => identity.ParentThreadId == parentId && identity.SpawnOrigin is { } origin &&
+            origin.ParentTurnId == turnId && origin.SourceDispatchId == dispatchId);
 
     private static bool ValidMetadata(string? value)
         => value is null || value is { Length: > 0 and <= 512 } &&
