@@ -10,7 +10,8 @@ public sealed record CodexStoredRealtimePromotion(
     [property: JsonRequired] Guid TurnId,
     [property: JsonRequired] string ItemId,
     [property: JsonRequired] string Presentation,
-    int? Index = null);
+    int? Index = null,
+    CodexStoredRealtimeArtifactPreview? Preview = null);
 
 internal static class CodexRealtimePresentation
 {
@@ -153,6 +154,16 @@ public sealed partial class CodexThreadStore
                 !turns.TryGetValue(promotion.TurnId, out var turn) ||
                 !known.Add((promotion.TurnId, promotion.ItemId, promotion.Presentation, promotion.Index)))
                 throw new InvalidDataException("Realtime promotion has invalid backing identity.");
+            if (promotion.Preview is { } preview)
+            {
+                if (!CodexRealtimeArtifactStream.ValidId(preview.RequestId) ||
+                    preview.Text is null || System.Text.Encoding.UTF8.GetByteCount(preview.Text) > CodexRealtimeArtifactStream.MaximumPreviewBytes ||
+                    preview.Phase is not (null or "commentary" or "partial_answer" or "final_answer") ||
+                    !turn.Dispatches.Any(d => d.Kind == "inference" && d.CallId == preview.RequestId) ||
+                    !CodexRealtimePresentation.AssistantPresentations(preview.Text).Contains((promotion.Presentation, promotion.Index)))
+                    throw new InvalidDataException("Realtime streaming presentation lacks its admitted public preview.");
+                continue;
+            }
             var key = (promotion.TurnId, promotion.SessionId);
             if (!eligible.TryGetValue(key, out var candidates))
                 eligible.Add(key, candidates = CodexRealtimePresentation.Eligible(turn, promotion.SessionId).ToHashSet());

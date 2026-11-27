@@ -200,6 +200,8 @@ public sealed partial class CodexThreadRpc
         {
             var id = Text(item, "id") ?? turn.Id + ":" + index; index++;
             var type = Text(item, "type"); var role = Text(item, "role");
+            // Native realtime mode context is not a visible backing-agent artifact.
+            if (CodexRealtimeModeContext.IsModeFragment(item)) continue;
             if (role == "user")
             {
                 var content = new JsonArray();

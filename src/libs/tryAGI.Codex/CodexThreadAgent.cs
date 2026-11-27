@@ -210,7 +210,11 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 }, cancellationToken, observeDiagnostics,
                 canExecuteConcurrently: canExecuteConcurrently,
                 previouslyExecutedCallIds: CodexThreadStore.DispatchedToolCallIds(started), control: control,
-                observeAsync: observeAsync).ConfigureAwait(false);
+                observeAsync: async (item, ct) =>
+                {
+                    await execution.ObserveArtifactPreviewAsync(item, ct).ConfigureAwait(false);
+                    if (observeAsync is not null) await observeAsync(item, ct).ConfigureAwait(false);
+                }).ConfigureAwait(false);
             await execution.FinishAsync(result.History, cancellationToken).ConfigureAwait(false);
             if (!cancellationToken.IsCancellationRequested && historyTurnLimit is null && journalProjection is null &&
                 BackgroundCompactions is { } background &&
@@ -291,6 +295,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private readonly Func<JsonElement, JsonElement>? projection;
         private readonly CodexAgentControl? control;
         private CodexRealtimeModeCapture? pendingMode;
+        private readonly CodexRealtimeArtifactStream artifacts = new();
         private IReadOnlyList<JsonElement>? preparedWireHistory;
         private CodexThreadCompactionCandidate? inlineCandidate;
         private string? inlineCallId;
@@ -371,6 +376,20 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 return await JournalAsync(doc => store.AdmitRealtimeHandoffAsync(doc.Id, doc.Revision,
                     handoff.SessionId, handoff.OwnerId, handoff.AttachmentId, handoff.HandoffId,
                     handoff.SubmissionId, turnId, owner, handoff.ContextualInput, ct), result => result.Thread, ct).ConfigureAwait(false);
+            }
+            finally { gate.Release(); }
+        }
+
+        internal async Task ObserveArtifactPreviewAsync(CodexResponseEvent item, CancellationToken ct)
+        {
+            // A host projection may intentionally redact assistant content. Never retain
+            // raw preview bytes behind that projection's back.
+            if (projection is not null || artifacts.Observe(item) is not { } candidate) return;
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                await JournalAsync(doc => store.RecordRealtimeArtifactPreviewAsync(doc.Id, doc.Revision,
+                    turnId, owner, candidate, ct), ct).ConfigureAwait(false);
             }
             finally { gate.Release(); }
         }

@@ -25,7 +25,9 @@ public sealed partial class CodexThreadRpc
         // Filter in canonical stored order; duplicates in the request do not duplicate results.
         foreach (var storedTurn in thread.Turns.Where(t => t.Id.ToString() == turn.GetString()))
         {
-            foreach (var item in Items(storedTurn))
+            var previews = CodexThreadStore.ProjectRealtimeArtifactPreviews(thread, storedTurn.Id)
+                .Where(item => selected.Contains(item["id"]!.GetValue<string>())).ToArray();
+            foreach (var item in Items(storedTurn).Concat(previews))
             {
                 ct.ThrowIfCancellationRequested();
                 if (item["id"]?.GetValue<string>() is not { } id || !selected.Contains(id)) continue;

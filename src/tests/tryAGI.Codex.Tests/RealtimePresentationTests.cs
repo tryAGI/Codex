@@ -17,6 +17,55 @@ public sealed class RealtimePresentationTests
     private static string Type(JsonObject item) => item["type"]!.GetValue<string>();
 
     [Fact]
+    public async Task PreviewAdmissionRejectsUnknownRequestAndRetainsInterruptedArtifactWithoutModelOutput()
+    {
+        var (_, store, thread, _) = await RealtimeHistoryTests.Setup();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        var candidate = new CodexRealtimeArtifactCandidate("preview", new("request", "::codex-realtime-inline{}\nObserved"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.RecordRealtimeArtifactPreviewAsync(
+            thread.Id, thread.Revision, turn, "runner", candidate, Ct));
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "request", "inference", Json("{}"), Ct)).Thread;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.RecordRealtimeArtifactPreviewAsync(
+            thread.Id, thread.Revision, turn, "wrong-owner", candidate, Ct));
+        thread = await store.RecordRealtimeArtifactPreviewAsync(thread.Id, thread.Revision, turn, "runner", candidate, Ct);
+        var replay = await store.RecordRealtimeArtifactPreviewAsync(thread.Id, thread.Revision, turn, "runner", candidate, Ct);
+        Assert.Equal(thread.Revision, replay.Revision);
+        Assert.Empty(replay.Turns.Single().Output);
+        var original = Assert.Single(Items(thread), x => Type(x) == "bemItemPromoted");
+        thread = await store.RecoverInterruptedAsync(thread.Id, thread.Revision, turn, "runner", Ct);
+        var recovered = await store.ReadAsync(thread.Id, Ct);
+        Assert.Empty(recovered.Turns.Single().Output);
+        Assert.Equal("unknown", recovered.Turns.Single().Dispatches.Single().State);
+        Assert.Equal(original.ToJsonString(), Assert.Single(Items(recovered), x => Type(x) == "bemItemPromoted").ToJsonString());
+        var preview = Assert.Single(CodexThreadStore.ProjectRealtimeArtifactPreviews(recovered, turn));
+        Assert.Equal("preview", preview["id"]!.GetValue<string>());
+        Assert.Equal(candidate.Preview.Text, preview["text"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void StreamingPresentationRequiresExplicitPublicAssistantItemAndExactRequest()
+    {
+        var stream = new CodexRealtimeArtifactStream();
+        static CodexResponseEvent Event(string request, string wire)
+        {
+            var json = Json(wire);
+            return new(json.GetProperty("type").GetString()!, json, 0) { RequestId = request };
+        }
+        Assert.Null(stream.Observe(Event("r1", """{"type":"response.output_text.delta","item_id":"unknown","delta":"::codex-realtime-inline{}\nNot a known item"}""")));
+        Assert.Null(stream.Observe(Event("r1", """{"type":"response.output_item.added","item":{"id":"private","type":"reasoning","role":"assistant","content":[]}}""")));
+        Assert.Null(stream.Observe(Event("r1", """{"type":"response.output_text.delta","item_id":"private","delta":"::codex-realtime-inline{}\nNot public output"}""")));
+        Assert.Null(stream.Observe(Event("r1", """{"type":"response.output_item.added","item":{"id":"public","type":"message","role":"assistant","content":[]}}""")));
+        Assert.Null(stream.Observe(Event("r1", """{"type":"response.output_text.delta","item_id":"public","delta":"::codex-realtime-"}""")));
+        var first = stream.Observe(Event("r1", """{"type":"response.output_text.delta","item_id":"public","delta":"inline{}\nVisible"}"""));
+        Assert.NotNull(first);
+        Assert.Equal("public", first.ItemId);
+        Assert.Equal("r1", first.Preview.RequestId);
+        Assert.Null(stream.Observe(Event("r1", """{"type":"response.output_text.delta","item_id":"public","delta":" more"}""")));
+        Assert.Null(stream.Observe(Event("r2", """{"type":"response.output_text.delta","item_id":"public","delta":"::codex-inline-vis{second}"}""")));
+    }
+
+    [Fact]
     public async Task PromotesCompletedInlineMarkdownAndDistinctVisualizationsOnce()
     {
         var (_, store, thread, attachment) = await RealtimeHistoryTests.Setup();

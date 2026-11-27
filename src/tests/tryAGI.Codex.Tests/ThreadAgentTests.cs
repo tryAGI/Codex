@@ -66,6 +66,7 @@ public sealed class ThreadAgentTests
         internal readonly Queue<string> Replies = [];
         internal readonly List<JsonElement> Requests = [];
         internal Func<Task>? BeforeResponse;
+        internal string[] PrefixEvents = [];
         internal HttpMessageHandler Handler() => new Transport(this);
         private sealed class Transport(Server server) : HttpMessageHandler
         {
@@ -78,7 +79,8 @@ public sealed class ThreadAgentTests
                 var terminal = new JsonObject { ["type"] = "response.completed", ["response"] = new JsonObject
                 { ["id"] = "resp_test_" + server.Requests.Count, ["status"] = "completed", ["model"] = "test", ["output"] = output,
                     ["usage"] = new JsonObject { ["input_tokens"] = 1, ["output_tokens"] = 1 } } };
-                return new(HttpStatusCode.OK) { Content = new StringContent("data: " + terminal.ToJsonString() + "\n\n", Encoding.UTF8, "text/event-stream") };
+                var prefix = string.Concat(server.PrefixEvents.Select(value => "data: " + value + "\n\n"));
+                return new(HttpStatusCode.OK) { Content = new StringContent(prefix + "data: " + terminal.ToJsonString() + "\n\n", Encoding.UTF8, "text/event-stream") };
             }
         }
     }
@@ -91,6 +93,63 @@ public sealed class ThreadAgentTests
     private static CodexThreadAgent Agent(CodexThreadStore store, Credentials auth, Budget budget, Server server) =>
         new(store, auth, budget, clientFactory: (credentials, observer) => new(credentials, handler: server.Handler(), usageObserver: observer));
     private static Task<CodexToolOutput> NoTools(CodexToolCall call, CancellationToken ct) => throw new InvalidOperationException("Unexpected tool.");
+
+    [Fact]
+    public async Task NativeStreamingArtifactIsQueryableBeforeTerminalOutputAndPromotedOnlyOnce()
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "rtc_stream", "v3", "voice-owner", Ct);
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "voice-owner", Guid.NewGuid(), Ct);
+        var turnId = Guid.NewGuid();
+        server.PrefixEvents =
+        [
+            """{"type":"response.output_item.added","output_index":0,"item":{"type":"message","role":"assistant","id":"streamed","content":[]}}""",
+            """{"type":"response.output_text.delta","output_index":0,"content_index":0,"item_id":"streamed","delta":"::codex-realtime-"}""",
+            """{"type":"response.output_text.delta","output_index":0,"content_index":0,"item_id":"streamed","delta":"inline{}\nPreview"}""",
+            """{"type":"response.output_text.delta","output_index":0,"content_index":0,"item_id":"streamed","delta":" and final"}""",
+        ];
+        server.Replies.Enqueue("""{"type":"message","role":"assistant","id":"streamed","content":[{"type":"output_text","text":"::codex-realtime-inline{}\nPreview and final"}]}""");
+        var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+            Json("{}"), (_, _, _) => throw new InvalidOperationException("Use the native agent."), (_, _) => Task.CompletedTask);
+        async Task<JsonElement> Read(CancellationToken ct)
+        {
+            var response = await rpc.InvokeAsync("thread/items/read", Json(new JsonObject
+            {
+                ["threadId"] = thread.Id.ToString(), ["turnId"] = turnId.ToString(),
+                ["itemIds"] = new JsonArray(JsonValue.Create("streamed")),
+            }.ToJsonString()), ct);
+            return Assert.Single(response.GetProperty("data").EnumerateArray()).GetProperty("item");
+        }
+        string? promotionId = null;
+        var checks = 0;
+        var result = await Agent(store, auth, budget, server).RunAsync(thread.Id, thread.Revision, turnId, "owner",
+            Options(thread.Id, turnId), [Input("show")], NoTools, cancellationToken: Ct, observeAsync: async (item, ct) =>
+            {
+                if (item.Type != "response.output_text.delta") return;
+                var current = await store.ReadAsync(thread.Id, ct);
+                var entries = CodexThreadStore.ProjectRealtimeItems(current);
+                if (CodexRealtimeProtocol.Text(item.Payload, "delta") == "::codex-realtime-")
+                {
+                    Assert.DoesNotContain(entries, x => x["type"]!.GetValue<string>() == "bemItemPromoted");
+                    return;
+                }
+                Assert.Equal("inProgress", current.Turns.Single().Status);
+                Assert.DoesNotContain(current.Turns.Single().Output, x => CodexRealtimeProtocol.Text(x, "id") == "streamed");
+                var promotion = Assert.Single(entries, x => x["type"]!.GetValue<string>() == "bemItemPromoted");
+                promotionId ??= promotion["id"]!.GetValue<string>();
+                Assert.Equal(promotionId, promotion["id"]!.GetValue<string>());
+                Assert.Equal("streamed", promotion["item_id"]!.GetValue<string>());
+                Assert.Equal("::codex-realtime-inline{}\nPreview", (await Read(ct)).GetProperty("text").GetString());
+                checks++;
+            });
+        Assert.Equal(2, checks);
+        Assert.Equal("completed", result.Thread.Turns.Single().Status);
+        var finalPromotion = Assert.Single(CodexThreadStore.ProjectRealtimeItems(result.Thread),
+            x => x["type"]!.GetValue<string>() == "bemItemPromoted");
+        Assert.Equal(promotionId, finalPromotion["id"]!.GetValue<string>());
+        Assert.Equal("::codex-realtime-inline{}\nPreview and final", (await Read(Ct)).GetProperty("text").GetString());
+        Assert.Single(server.Requests);
+    }
 
     [Fact]
     public async Task CompletedTurnsAndPixelsContinueAfterReloadAndFork()
