@@ -378,7 +378,7 @@ def self_test(data):
     reject(lambda d: d["rows"].append(d["rows"][0]))
     reject(lambda d: d["rows"][0].update(source="https://example.invalid"))
     reject(lambda d: d["rows"][0].update(status="passed", applicability="applicable"))
-    reject(lambda d: d["rows"][0].update(status="not-applicable", applicability="not-applicable"))
+    reject(lambda d: d["rows"][0].update(status="not-applicable", applicability="not-applicable", rationale=""))
     reject(lambda d: d["rows"][0].update(ownerIssue=0))
     sample = copy.deepcopy(data)
     sample["inventoryReviewed"] = True

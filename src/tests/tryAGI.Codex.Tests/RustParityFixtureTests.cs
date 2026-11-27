@@ -293,6 +293,100 @@ public sealed class RustParityFixtureTests
         }
     }
 
+    [Theory]
+    [InlineData("rust-prefix")]
+    [InlineData("rust-non-input-property")]
+    [InlineData("rust-prewarm-opaque-tool-prefix")]
+    public async Task MockResponsesWebSocketMatchesPinnedContinuation(string id)
+    {
+        var fixture = Fixture().GetProperty("reasoningWebSocket").EnumerateArray()
+            .Single(x => x.GetProperty("id").GetString() == id);
+        var steps = fixture.GetProperty("steps").EnumerateArray().ToArray();
+        var incoming = steps.SelectMany(step =>
+            (step.TryGetProperty("prewarmEvents", out var warmup) ? warmup.EnumerateArray().ToArray() : [])
+                .Concat(step.GetProperty("events").EnumerateArray()));
+        var socket = new ReplaySocket(incoming);
+        var connects = 0;
+        var httpCalls = 0;
+        await using var session = new CodexResponsesWebSocketSession((_, _) =>
+        {
+            connects++;
+            return Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket));
+        });
+        using var client = new CodexClient(new Credentials(), handler: new ReplayHttp((_, _) =>
+        {
+            httpCalls++;
+            throw new InvalidOperationException("An admitted WebSocket generation must not fall back to HTTP.");
+        }));
+        var identity = new CodexResponsesIdentity("fixture-session", "fixture-thread", "fixture-turn");
+        var ct = TestContext.Current.CancellationToken;
+        foreach (var step in steps)
+        {
+            var expectedEvents = step.GetProperty("events").EnumerateArray().ToArray();
+            var actualEvents = new List<CodexResponseEvent>();
+            var options = new CodexResponseOptions(step.GetProperty("model").GetString()!, "fixture instructions")
+            {
+                Identity = identity, WebSocketSession = session,
+                PrewarmWebSocket = fixture.GetProperty("prewarm").GetBoolean(),
+            };
+            await foreach (var item in client.StreamResponseAsync(options,
+                step.GetProperty("input").EnumerateArray().ToArray(), ct))
+                actualEvents.Add(item);
+            Assert.Equal(expectedEvents.Length, actualEvents.Count);
+            for (var i = 0; i < expectedEvents.Length; i++)
+                Assert.True(Equal(expectedEvents[i], actualEvents[i].Payload), $"Response event {i} differs.");
+        }
+
+        Assert.Equal(1, connects);
+        Assert.Equal(0, httpCalls);
+        var expectedFrames = steps.SelectMany(step => step.GetProperty("frames").EnumerateArray()).ToArray();
+        Assert.Equal(expectedFrames.Length, socket.Sent.Count);
+        for (var i = 0; i < expectedFrames.Length; i++)
+        {
+            var frame = socket.Sent[i];
+            Assert.Empty(Differences(expectedFrames[i].GetProperty("expected"), frame));
+            foreach (var path in expectedFrames[i].GetProperty("absent").EnumerateArray())
+                Assert.False(TryPath(frame, path.GetString()!, out _));
+            Assert.DoesNotContain("synthetic-fixture-token", frame.GetRawText());
+        }
+    }
+
+    // Exact Rust SSE test fixture. A redundant terminal output array is not required.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MockResponsesAcceptPinnedSparseCompletion(bool websocket)
+    {
+        var incoming = Fixture().GetProperty("sparseResponses").GetProperty("incoming").EnumerateArray().ToArray();
+        var socket = new ReplaySocket(incoming);
+        var httpCalls = 0;
+        await using var session = new CodexResponsesWebSocketSession((_, _) =>
+            Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket)));
+        using var client = new CodexClient(new Credentials(), handler: new ReplayHttp((_, _) =>
+        {
+            httpCalls++;
+            var sse = string.Concat(incoming.Select(x =>
+                $"event: {x.GetProperty("type").GetString()}\ndata: {JsonSerializer.Serialize(x)}\n\n"));
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(sse, Encoding.UTF8, "text/event-stream"),
+            });
+        }));
+        var options = new CodexResponseOptions("fixture-model", "fixture instructions")
+        {
+            Identity = new("fixture-session", "fixture-thread", "fixture-turn"),
+            WebSocketSession = websocket ? session : null,
+        };
+        var actual = new List<CodexResponseEvent>();
+        await foreach (var item in client.StreamResponseAsync(options, [], TestContext.Current.CancellationToken))
+            actual.Add(item);
+        Assert.Equal(incoming.Length, actual.Count);
+        for (var i = 0; i < incoming.Length; i++)
+            Assert.True(Equal(incoming[i], actual[i].Payload), $"Pinned sparse response event {i} differs.");
+        Assert.Equal(websocket ? 0 : 1, httpCalls);
+        Assert.Equal(websocket ? 1 : 0, socket.Sent.Count);
+    }
+
     [Fact]
     public void DifferentialComparatorRejectsMissingFieldsWrongTypesAndArrayReordering()
     {

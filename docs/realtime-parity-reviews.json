@@ -2,6 +2,3296 @@
   "schemaVersion": 1,
   "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
   "rows": {
+    "rust-type:app-server-protocol/src/protocol/common.rs:AuthMode": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Authentication mode affects native RPC and authorized provider routing. Compare applicable API key, OAuth, and host-header modes; upstream internal-only auth is not authorized by this inventory."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/methods.rs:RealtimeTranscriptState": {
+      "ownerIssue": 30,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeTranscriptAccumulator.cs::CodexRealtimeTranscriptAccumulator",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeTranscriptAccumulatorTests.cs::RealtimeTranscriptAccumulatorTests.HandoffBetweenDeltasCapturesOnlyOnceAndRetainsNextUtterance",
+      "rationale": "Transcript accumulation and handoff-tail semantics."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/methods.rs:RealtimeWebsocketClient": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSocketParityTests.cs::RealtimeSocketParityTests.RustDirectAndSidebandUris",
+      "rationale": "Rust websocket connection setup and routing; native transport candidate."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/methods.rs:RealtimeWebsocketConnection": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire",
+      "rationale": "Rust connection ownership and lifecycle; native connection candidate."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/methods.rs:RealtimeWebsocketEvents": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.ReadEventsAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents",
+      "rationale": "Rust inbound events and transcript state; native event-reader candidate."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/methods.rs:RealtimeWebsocketWriter": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire",
+      "rationale": "Rust writer serializes protocol-specific outbound frames; native adapter candidate."
+    },
+    "rust-type:codex-api/src/requests/responses.rs:Compression": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust optional request-body compression (None or Zstd); applicability to supported provider routing and exact request handling still needs implementation/test review."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_common.rs:error": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadError",
+      "test": null,
+      "rationale": "Rust realtime error event projection."
+    },
+    "wire-symbol:codex-api/src/sse/responses_error.rs:error": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust terminal nested error parsing and Retry-After behavior; preserve exact quota/error semantics."
+    },
+    "wire-symbol:codex-api/src/sse/responses_error_tests.rs:error": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned synthetic provider error fixture; compare terminal classification."
+    },
+    "wire-symbol:codex-api/src/sse/responses_error_tests.rs:response.completed": {
+      "ownerIssue": 58,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned completion fixture: terminal receipt is not necessarily a redundant output array. Verify exact upstream terminal behavior."
+    },
+    "wire-symbol:codex-api/src/sse/responses_error_tests.rs:response.failed": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned failed response fixture; compare terminal classification and accounting."
+    },
+    "wire-symbol:codex-api/tests/responses_websocket_logging.rs:response.completed": {
+      "ownerIssue": 58,
+      "applicability": "applicable",
+      "status": "divergent",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponseOutputValidation.cs::CodexResponseOutputValidation.Event",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "failed",
+        "receipt": "codex-parity-sparse-r1-20261127",
+        "detail": "Both exact sparse completion cases (SSE and WebSocket) fail invalid_output_array; 15 passed, 2 failed, 0 skipped in the full fixture run. Shared working-tree diagnostic, not revision-bound evidence."
+      },
+      "rationale": "Pinned logging test uses id-only response.completed. Current regression fixture confirms rejection; separate log privacy assertion remains to be reviewed."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:parses_items_and_completed": {
+      "ownerIssue": 58,
+      "applicability": "applicable",
+      "status": "divergent",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponseOutputValidation.cs::CodexResponseOutputValidation.Event",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "failed",
+        "receipt": "codex-parity-sparse-r1-20261127",
+        "detail": "Both exact sparse completion cases (SSE and WebSocket) fail invalid_output_array; 15 passed, 2 failed, 0 skipped in the full fixture run. Shared working-tree diagnostic, not revision-bound evidence."
+      },
+      "rationale": "Exact pinned Rust two-message + id-only response.completed fixture; both native reasoning transports reject it."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_creates_with_previous_response_id_on_prefix": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+      "rationale": "Independent Rust-prefix replay matched both request frames and raw response sequence in diagnostic run; revision-bound receipt pending."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendAudioParams.audio": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendAudioParams.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendSpeechParams.text": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendSpeechParams.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendTextParams.role": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendTextParams.text": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendTextParams.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAudioChunk.data": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAudioChunk.item_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAudioChunk.num_channels": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAudioChunk.sample_rate": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAudioChunk.samples_per_channel": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeClosedNotification.reason": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeClosedNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeErrorNotification.message": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeErrorNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeFrameChannels.voice_transcript": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeInitialItem.role": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeInitialItem.text": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItem.content": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItem.id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItem.observed_at_ms": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItem.realtime_session_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemAddedNotification.item": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemAddedNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemCompletedNotification.item": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemCompletedNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemStartedNotification.item": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemStartedNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemTranscriptDeltaNotification.delta": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemTranscriptDeltaNotification.item_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemTranscriptDeltaNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeListVoicesResponse.voices": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeOutputAudioDeltaNotification.audio": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeOutputAudioDeltaNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeSdpNotification.sdp": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeSdpNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.backend_reasoning_status": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.client_managed_handoffs": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.codex_response_handoff_channel_prefixes": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.codex_response_handoff_mode": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.codex_response_item_prefix": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.codex_responses_as_items": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.delegation_ack_filler": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.flush_transcript_tail_on_session_end": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.include_startup_context": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.initial_items": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.model": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.output_modality": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.prompt": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.realtime_end_instructions": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.realtime_session_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.realtime_start_instructions": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.transport": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.version": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.voice": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams.voice_session_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartedNotification.realtime_session_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartedNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartedNotification.version": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStopParams.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptDeltaNotification.delta": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptDeltaNotification.role": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptDeltaNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptDoneNotification.role": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptDoneNotification.text": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptDoneNotification.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeVoiceTranscript.role": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeVoiceTranscript.text": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendAudioParams": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendAudioResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendSpeechParams": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendSpeechResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendTextParams": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAppendTextResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeAudioChunk": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeBemItemPresentation": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeClosedNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeErrorNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeFrameChannels": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeHandoffMode": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeInitialItem": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItem": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemAddedNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemCompletedNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemContent": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemStartedNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeItemTranscriptDeltaNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeListVoicesParams": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeListVoicesResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeOutputAudioDeltaNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeSdpNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeSessionInputReason": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeSessionOutcome": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartParams": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartTransport": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStartedNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStopParams": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeStopResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptDeltaNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptDoneNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeTranscriptRole": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime.rs:ThreadRealtimeVoiceTranscript": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeEntry.item": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeEntry.position": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.after_position": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.cursor": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.event_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.from_observed_at_ms": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.limit": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.order": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.required_through_position": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.session_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.snapshot_end": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.thread_id": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams.to_observed_at_ms": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListResponse.coverage": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListResponse.data": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListResponse.next_cursor": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListResponse.projected_through_item_index": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListResponse.snapshot_end": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeCoverage": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeEntry": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListParams": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeListResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-type:app-server-protocol/src/protocol/v2/realtime_history.rs:ThreadRealtimeOrder": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime RPC parameter, notification, frame or history contract; native RPC representation and independent integration tests remain to be verified."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchParams.cancellation_token": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchParams.query": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchParams.roots": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResponse.files": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResult.file_name": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResult.indices": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResult.match_type": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResult.path": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResult.root": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResult.score": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionCompletedNotification.session_id": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionStartParams.roots": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionStartParams.session_id": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionStopParams.session_id": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionUpdateParams.query": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionUpdateParams.session_id": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionUpdatedNotification.files": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionUpdatedNotification.query": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionUpdatedNotification.session_id": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:ServerNotificationEnvelope.emitted_at_ms": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-field:app-server-protocol/src/protocol/common.rs:ServerNotificationEnvelope.notification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ClientNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ClientRequest": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ClientRequestSerializationScope": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ClientResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ClientResponsePayload": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchMatchType": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchParams": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResponse": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchResult": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionCompletedNotification": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionStartParams": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionStartResponse": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionStopParams": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionStopResponse": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionUpdateParams": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionUpdateResponse": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:FuzzyFileSearchSessionUpdatedNotification": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "This declaration belongs to the unrelated App Server fuzzy-file-search facility, not native realtime or its backing reasoning thread. General App Server interoperability remains separate."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ServerNotification": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ServerNotificationEnvelope": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ServerRequest": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ServerRequestPayload": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-type:app-server-protocol/src/protocol/common.rs:ServerResponse": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:error": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/closed": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/error": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/item/completed": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/item/started": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/item/transcript/delta": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/list": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/sdp": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/start": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/started": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/stop": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/transcript/delta": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:thread/realtime/transcript/done": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:turn/completed": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:turn/diff/updated": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:turn/interrupt": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:turn/plan/updated": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:turn/settings/update": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:turn/start": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:turn/started": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "wire-symbol:app-server-protocol/src/protocol/common.rs:turn/steer": {
+      "ownerIssue": 48,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Applicable native RPC envelope, realtime method/notification, or backing reasoning turn lifecycle. Exact native RPC implementation/test mapping remains open."
+    },
+    "rust-field:protocol/src/realtime.rs:RealtimeFrameChannels.voice_transcript": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-field:protocol/src/realtime.rs:RealtimeItem.content": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-field:protocol/src/realtime.rs:RealtimeItem.id": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-field:protocol/src/realtime.rs:RealtimeItem.observed_at_ms": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-field:protocol/src/realtime.rs:RealtimeItem.realtime_session_id": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-field:protocol/src/realtime.rs:RealtimeVoiceTranscript.role": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-field:protocol/src/realtime.rs:RealtimeVoiceTranscript.text": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:BemItemPresentation": {
+      "ownerIssue": 37,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:RealtimeFrameChannels": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:RealtimeHandoffMode": {
+      "ownerIssue": 37,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:RealtimeItem": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:RealtimeItemContent": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:RealtimeSessionOutcome": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:RealtimeTranscriptRole": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:RealtimeVoiceTranscript": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-type:protocol/src/realtime.rs:SessionInputReason": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned internal Rust realtime history/frame or handoff mode is externally observable through native lifecycle or RPC; exact persistence/projection and tests still need independent review."
+    },
+    "rust-field:codex-api/src/common.rs:MemorySummarizeInput.model": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:MemorySummarizeInput.raw_memories": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:MemorySummarizeInput.reasoning": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:MemorySummarizeOutput.memory_summary": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:MemorySummarizeOutput.raw_memory": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:PromptCacheOptions.ttl": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:RawMemory.id": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:RawMemory.items": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:RawMemory.metadata": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:RawMemoryMetadata.source_path": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-field:codex-api/src/common.rs:Reasoning.context": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:Reasoning.effort": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:Reasoning.summary": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.access_programs": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.client_metadata": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.generate": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+      ],
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.include": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+      ],
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.input": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+      ],
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.model": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+      ],
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.parallel_tool_calls": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.previous_response_id": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+      ],
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.prompt_cache_key": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.prompt_cache_options": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.reasoning": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.request_country": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.service_tier": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.store": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+      ],
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.stream": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+      ],
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.stream_options": {
+      "ownerIssue": 56,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.text": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.tool_choice": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.tool_results": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseCreateWsRequest.tools": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseStream.interrupt": {
+      "ownerIssue": 55,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses WebSocket interrupt contract is missing, tracked in #55."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseStream.routing_affinity": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseStream.rx_event": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponseStream.upstream_request_id": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.access_programs": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.client_metadata": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.include": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput",
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.input": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.model": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.parallel_tool_calls": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.prompt_cache_key": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.prompt_cache_options": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.reasoning": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.request_country": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.service_tier": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.store": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput",
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.stream": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput",
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.stream_options": {
+      "ownerIssue": 56,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.text": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.tool_choice": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:ResponsesApiRequest.tools": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:SafetyBuffering.faster_model": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:SafetyBuffering.reasons": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:SafetyBuffering.show_buffering_ui": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:SafetyBuffering.use_cases": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:SafetyBufferingTreatment.faster_model": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:StreamOptions.reasoning_summary_delivery": {
+      "ownerIssue": 56,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+    },
+    "rust-field:codex-api/src/common.rs:TextControls.format": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:TextControls.verbosity": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:TextFormat.name": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:TextFormat.schema": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-field:codex-api/src/common.rs:TextFormat.strict": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:AccessPrograms": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:MemorySummarizeInput": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-type:codex-api/src/common.rs:MemorySummarizeOutput": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-type:codex-api/src/common.rs:OpenAiVerbosity": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:PromptCacheOptions": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:RawMemory": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-type:codex-api/src/common.rs:RawMemoryMetadata": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust common.rs defines a separate memory summarization request/response family, not the Responses request/stream or realtime thread contract under #25."
+    },
+    "rust-type:codex-api/src/common.rs:Reasoning": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ReasoningContext": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ReasoningRemovalReason": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ReasoningSummaryDelivery": {
+      "ownerIssue": 56,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+    },
+    "rust-type:codex-api/src/common.rs:ResponseCreateWsRequest": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ResponseEvent": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ResponseId": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ResponseInterrupt": {
+      "ownerIssue": 55,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses WebSocket interrupt contract is missing, tracked in #55."
+    },
+    "rust-type:codex-api/src/common.rs:ResponseStream": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ResponsesApiRequest": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ResponsesApiTools": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:ResponsesWsRequest": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:SafetyBuffering": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:SafetyBufferingTreatment": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:StreamOptions": {
+      "ownerIssue": 56,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned optional stream-options/request metadata shape is missing, tracked in #56."
+    },
+    "rust-type:codex-api/src/common.rs:TextControls": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:TextFormat": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/common.rs:TextFormatType": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "wire-symbol:codex-api/src/common.rs:response.create": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+      "rationale": "Pinned Responses request, continuation or observation shape; exact field-level evidence is required before acceptance."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:AudioFormatType": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:ConversationContentType": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:ConversationFunctionCallOutputItem": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:ConversationItemContent": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:ConversationItemPayload": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:ConversationItemType": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:ConversationMessageItem": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:FramelessContentType": {
+      "ownerIssue": 37,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:FramelessInputTextContent": {
+      "ownerIssue": 37,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:NoiseReductionType": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeContextAppendChannel": {
+      "ownerIssue": 37,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeEventParser": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeOutboundMessage": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionMode": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionAudio": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionAudioFormat": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionAudioInput": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionAudioOutput": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionAudioOutputFormat": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionFunctionTool": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionInputAudioTranscription": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionNoiseReduction": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionToolType": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionTurnDetection": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionType": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:SessionUpdateSession": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "rust-type:codex-api/src/endpoint/realtime_websocket/protocol.rs:TurnDetectionType": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned realtime adapter serialization declaration; field values, defaults and optional shape need exact tests rather than merely a recognized type."
+    },
+    "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:error": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses WebSocket event; exact handling and raw receipt preservation require independent validation."
+    },
+    "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.create": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prefix\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-non-input-property\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesWebSocketMatchesPinnedContinuation(id: \"rust-prewarm-opaque-tool-prefix\")"
+      ],
+      "rationale": "Exact Rust create and prefix/previous_response_id behavior, checked by the independent synthetic WebSocket fixtures."
+    },
+    "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.created": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses WebSocket event; exact handling and raw receipt preservation require independent validation."
+    },
+    "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.interrupt": {
+      "ownerIssue": 55,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust sends an ID-bound response.interrupt after response.created and fences accepted/failed acknowledgement; inspected C# transport has no corresponding send/ack lifecycle."
+    },
+    "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.interrupt.accepted": {
+      "ownerIssue": 55,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust sends an ID-bound response.interrupt after response.created and fences accepted/failed acknowledgement; inspected C# transport has no corresponding send/ack lifecycle."
+    },
+    "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.interrupt.failed": {
+      "ownerIssue": 55,
+      "applicability": "applicable",
+      "status": "missing",
+      "implementation": null,
+      "test": null,
+      "rationale": "Rust sends an ID-bound response.interrupt after response.created and fences accepted/failed acknowledgement; inspected C# transport has no corresponding send/ack lifecycle."
+    },
+    "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:response.output_text.delta": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses WebSocket event; exact handling and raw receipt preservation require independent validation."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:error": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.completed": {
+      "ownerIssue": 58,
+      "applicability": "applicable",
+      "status": "divergent",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponseOutputValidation.cs::CodexResponseOutputValidation.Event",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockResponsesAcceptPinnedSparseCompletion",
+      "evidence": {
+        "lane": "offline",
+        "outcome": "failed",
+        "receipt": "codex-parity-sparse-r1-20261127",
+        "detail": "Both exact sparse completion cases (SSE and WebSocket) fail invalid_output_array; 15 passed, 2 failed, 0 skipped in the full fixture run. Shared working-tree diagnostic, not revision-bound evidence."
+      },
+      "rationale": "Exact pinned Rust two-message + id-only response.completed fixture; both native reasoning transports reject it."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.content_part.added": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.content_part.done": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.created": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.custom_tool_call_input.delta": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.custom_tool_call_input.done": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.failed": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.function_call_arguments.delta": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.function_call_arguments.done": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.in_progress": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.incomplete": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.mcp_call_arguments.delta": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.metadata": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.new_tool_event": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Synthetic unknown-event literal exercises forward-compatible parsing; do not count as a provider-supported typed event. Preserve unknown raw events without inventing semantics."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.output_item.added": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.output_item.done": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.output_text.delta": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.output_text.done": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.reasoning_summary_part.added": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.reasoning_summary_part.done": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.reasoning_summary_text.delta": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.reasoning_summary_text.done": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.reasoning_text.delta": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "wire-symbol:codex-api/src/sse/responses.rs:response.refusal.delta": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Responses SSE event or event-test literal. Review actual processing/error behavior and raw receipt retention; recognized names alone are insufficient."
+    },
+    "config-field:core/src/config/mod.rs:async_compaction_threshold_percent": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:auto_compact_fallback_buffer_tokens": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:auto_compact_fallback_prompt": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:compact_prompt": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:context_window_as_tool_output": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:experimental_realtime_start_instructions": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:experimental_realtime_webrtc_call_base_url": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:experimental_realtime_ws_backend_prompt": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:experimental_realtime_ws_base_url": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:experimental_realtime_ws_model": {
+      "ownerIssue": 26,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:experimental_realtime_ws_startup_context": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:model_auto_compact_token_limit": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:model_auto_compact_token_limit_scope": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:model_context_window": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:model_post_turn_compact_threshold_percent": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:realtime": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:core/src/config/mod.rs:realtime_audio": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:compact_prompt": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:experimental_compact_prompt_file": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:experimental_realtime_start_instructions": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:experimental_realtime_webrtc_call_base_url": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:experimental_realtime_ws_backend_prompt": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:experimental_realtime_ws_base_url": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:experimental_realtime_ws_model": {
+      "ownerIssue": 26,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:experimental_realtime_ws_startup_context": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:model_auto_compact_token_limit": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:model_auto_compact_token_limit_scope": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:model_context_window": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:model_post_turn_compact_threshold_percent": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:realtime": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
+    "config-field:config/src/config_toml.rs:voice": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Pinned Rust realtime or reasoning/compaction configuration field; map to native options or document a justified host-only equivalent before acceptance."
+    },
     "rust-test:core/tests/suite/realtime_conversation.rs:conversation_records_history_without_an_event_observer": {
       "ownerIssue": 41,
       "applicability": "applicable",

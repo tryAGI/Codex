@@ -484,6 +484,579 @@
       "transportClosed": false
     }
   ],
+  "reasoningWebSocket": [
+    {
+      "id": "rust-prefix",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client_websockets.rs#L2505-L2544",
+      "description": "Pinned assistant-output prefix scenario, using synthetic model identity.",
+      "prewarm": false,
+      "steps": [
+        {
+          "model": "fixture-model",
+          "input": [
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                }
+              ]
+            }
+          ],
+          "frames": [
+            {
+              "expected": {
+                "/type": "response.create",
+                "/store": false,
+                "/stream": true,
+                "/include": [
+                  "reasoning.encrypted_content"
+                ],
+                "/input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "hello"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "absent": [
+                "/previous_response_id",
+                "/generate"
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "response.created",
+              "response": {
+                "id": "resp-1"
+              }
+            },
+            {
+              "type": "response.output_item.done",
+              "item": {
+                "type": "message",
+                "id": "msg_1",
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "output_text",
+                    "text": "assistant output"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "response.completed",
+              "response": {
+                "id": "resp-1",
+                "output": [
+                  {
+                    "type": "message",
+                    "id": "msg_1",
+                    "role": "assistant",
+                    "content": [
+                      {
+                        "type": "output_text",
+                        "text": "assistant output"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "model": "fixture-model",
+          "input": [
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                }
+              ]
+            },
+            {
+              "type": "message",
+              "id": "msg_1",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "assistant output"
+                }
+              ]
+            },
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "second"
+                }
+              ]
+            }
+          ],
+          "frames": [
+            {
+              "expected": {
+                "/type": "response.create",
+                "/store": false,
+                "/stream": true,
+                "/include": [
+                  "reasoning.encrypted_content"
+                ],
+                "/input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "second"
+                      }
+                    ]
+                  }
+                ],
+                "/previous_response_id": "resp-1"
+              },
+              "absent": [
+                "/generate"
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "response.created",
+              "response": {
+                "id": "resp-2"
+              }
+            },
+            {
+              "type": "response.completed",
+              "response": {
+                "id": "resp-2",
+                "output": []
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rust-non-input-property",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client_websockets.rs#L2550-L2602",
+      "description": "Pinned non-input model change forces a full create, not a continuation.",
+      "prewarm": false,
+      "steps": [
+        {
+          "model": "fixture-model",
+          "input": [
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                }
+              ]
+            }
+          ],
+          "frames": [
+            {
+              "expected": {
+                "/type": "response.create",
+                "/store": false,
+                "/stream": true,
+                "/include": [
+                  "reasoning.encrypted_content"
+                ],
+                "/input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "hello"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "absent": [
+                "/previous_response_id",
+                "/generate"
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "response.created",
+              "response": {
+                "id": "resp-1"
+              }
+            },
+            {
+              "type": "response.completed",
+              "response": {
+                "id": "resp-1",
+                "output": []
+              }
+            }
+          ]
+        },
+        {
+          "model": "fixture-model-changed",
+          "input": [
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                }
+              ]
+            },
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "second"
+                }
+              ]
+            }
+          ],
+          "frames": [
+            {
+              "expected": {
+                "/type": "response.create",
+                "/store": false,
+                "/stream": true,
+                "/include": [
+                  "reasoning.encrypted_content"
+                ],
+                "/input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "hello"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "second"
+                      }
+                    ]
+                  }
+                ],
+                "/model": "fixture-model-changed"
+              },
+              "absent": [
+                "/previous_response_id",
+                "/generate"
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "response.created",
+              "response": {
+                "id": "resp-2"
+              }
+            },
+            {
+              "type": "response.completed",
+              "response": {
+                "id": "resp-2",
+                "output": []
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rust-prewarm-opaque-tool-prefix",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client_websockets.rs#L811-L852",
+      "additionalSource": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client_websockets.rs#L2505-L2544",
+      "description": "Synthetic encrypted reasoning and tool receipt extend the upstream prewarm/prefix assertions. Per-request request_kind and summary delivery are tracked separately in #56.",
+      "prewarm": true,
+      "steps": [
+        {
+          "model": "fixture-model",
+          "input": [
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                }
+              ]
+            }
+          ],
+          "frames": [
+            {
+              "expected": {
+                "/type": "response.create",
+                "/store": false,
+                "/stream": true,
+                "/include": [
+                  "reasoning.encrypted_content"
+                ],
+                "/input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "hello"
+                      }
+                    ]
+                  }
+                ],
+                "/generate": false
+              },
+              "absent": [
+                "/previous_response_id"
+              ]
+            },
+            {
+              "expected": {
+                "/type": "response.create",
+                "/store": false,
+                "/stream": true,
+                "/include": [
+                  "reasoning.encrypted_content"
+                ],
+                "/input": [],
+                "/previous_response_id": "warm-1"
+              },
+              "absent": [
+                "/generate"
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "response.created",
+              "response": {
+                "id": "resp-1"
+              }
+            },
+            {
+              "type": "response.output_item.done",
+              "item": {
+                "type": "reasoning",
+                "id": "rs_fixture",
+                "summary": [
+                  {
+                    "type": "summary_text",
+                    "text": "Synthetic summary"
+                  }
+                ],
+                "encrypted_content": "synthetic-opaque-continuation"
+              }
+            },
+            {
+              "type": "response.output_item.done",
+              "item": {
+                "type": "function_call",
+                "id": "fc_fixture",
+                "call_id": "call_fixture",
+                "name": "fixture_tool",
+                "arguments": "{}"
+              }
+            },
+            {
+              "type": "response.completed",
+              "response": {
+                "id": "resp-1",
+                "output": [
+                  {
+                    "type": "reasoning",
+                    "id": "rs_fixture",
+                    "summary": [
+                      {
+                        "type": "summary_text",
+                        "text": "Synthetic summary"
+                      }
+                    ],
+                    "encrypted_content": "synthetic-opaque-continuation"
+                  },
+                  {
+                    "type": "function_call",
+                    "id": "fc_fixture",
+                    "call_id": "call_fixture",
+                    "name": "fixture_tool",
+                    "arguments": "{}"
+                  }
+                ]
+              }
+            }
+          ],
+          "prewarmEvents": [
+            {
+              "type": "response.created",
+              "response": {
+                "id": "warm-1"
+              }
+            },
+            {
+              "type": "response.completed",
+              "response": {
+                "id": "warm-1",
+                "output": []
+              }
+            }
+          ]
+        },
+        {
+          "model": "fixture-model",
+          "input": [
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                }
+              ]
+            },
+            {
+              "type": "reasoning",
+              "id": "rs_fixture",
+              "summary": [
+                {
+                  "type": "summary_text",
+                  "text": "Synthetic summary"
+                }
+              ],
+              "encrypted_content": "synthetic-opaque-continuation"
+            },
+            {
+              "type": "function_call",
+              "id": "fc_fixture",
+              "call_id": "call_fixture",
+              "name": "fixture_tool",
+              "arguments": "{}"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "call_fixture",
+              "output": "synthetic receipt"
+            }
+          ],
+          "frames": [
+            {
+              "expected": {
+                "/type": "response.create",
+                "/store": false,
+                "/stream": true,
+                "/include": [
+                  "reasoning.encrypted_content"
+                ],
+                "/input": [
+                  {
+                    "type": "function_call_output",
+                    "call_id": "call_fixture",
+                    "output": "synthetic receipt"
+                  }
+                ],
+                "/previous_response_id": "resp-1"
+              },
+              "absent": [
+                "/generate"
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "response.created",
+              "response": {
+                "id": "resp-2"
+              }
+            },
+            {
+              "type": "response.completed",
+              "response": {
+                "id": "resp-2",
+                "output": []
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sparseResponses": {
+    "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/sse/responses.rs#L836-L885",
+    "description": "Exact upstream synthetic sparse terminal fixture; both SSE and WebSocket must preserve the streamed output and original completion.",
+    "incoming": [
+      {
+        "type": "response.output_item.done",
+        "item": {
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Hello"
+            }
+          ],
+          "phase": "commentary"
+        }
+      },
+      {
+        "type": "response.output_item.done",
+        "item": {
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "World"
+            }
+          ]
+        }
+      },
+      {
+        "type": "response.completed",
+        "response": {
+          "id": "resp1"
+        }
+      }
+    ]
+  },
   "http": {
     "call": {
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_call.rs#L709-L763",
