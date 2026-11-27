@@ -86,6 +86,8 @@ public sealed partial class CodexThreadRpc
             }, p);
             if (Text(p, "serviceTierForTurn") is { } tier)
                 options = Apply(options, Element(new JsonObject { ["serviceTier"] = tier }));
+            ValidateConfigurationOptions(options,
+                thread.Settings.TryGetProperty("nativeConfigurationRequirements", out var turnRequirements) ? turnRequirements : null);
             validateOptions?.Invoke(options);
             var defaultsForFutureTurns = Object(effectiveSettings);
             foreach (var field in new[] { "model", "effort", "summary", "personality" })

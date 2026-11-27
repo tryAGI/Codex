@@ -75,7 +75,7 @@ public sealed class CodexConfigurationResolutionTests
     [Fact]
     public async Task LaterRequirementCannotEraseMalformedHostConstraint()
     {
-        var directory = Directory.CreateTempSubdirectory("codex-config-resolution-");
+        var directory = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "codex-config-resolution-" + Guid.NewGuid().ToString("N")));
         try
         {
             var path = Path.Combine(directory.FullName, "requirements.toml");
@@ -91,6 +91,87 @@ public sealed class CodexConfigurationResolutionTests
                 new("thread/start", null, directory.FullName), account, TestContext.Current.CancellationToken));
         }
         finally { directory.Delete(recursive: true); }
+    }
+
+    [Fact]
+    public async Task LegacyManagedLayersAreLoadedAboveSessionFlagsAndCannotBeBypassedByTurnOptions()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var directory = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "codex-managed-config-" + Guid.NewGuid().ToString("N")));
+        try
+        {
+            var file = Path.Combine(directory.FullName, "managed.toml");
+            var mdm = Path.Combine(directory.FullName, "mdm.toml");
+            await File.WriteAllTextAsync(file, "model = \"file-model\"\nservice_tier = \"default\"\n", ct);
+            await File.WriteAllTextAsync(mdm, "model = \"managed-model\"\n", ct);
+            var source = new CodexFileConfigurationSource(new(directory.FullName)
+            {
+                IgnoreProjectConfig = true, LegacyManagedConfigFile = file, LegacyManagedMdmConfigFile = mdm
+            });
+            var snapshot = await source.LoadAsync(new("thread/start", null, directory.FullName),
+                new("base", [Layer(CodexConfigurationLayerKind.User, "account", """{"model":"account-model"}""")]), ct);
+            Assert.Equal(CodexConfigurationLayerKind.LegacyManagedMdm, snapshot.Layers[^1].Kind);
+            var raw = CodexConfigurationResolver.Resolve(snapshot);
+            Assert.Equal("managed-model", raw.Config.GetProperty("model").GetString());
+            Assert.Equal(CodexConfigurationLayerKind.LegacyManagedMdm, raw.Origins["/model"].Kind);
+
+            var storage = new TestStorage();
+            var store = new CodexThreadStore(storage, "account");
+            var host = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+                Defaults(directory.FullName), (_, _, _) => throw new InvalidOperationException("Unexpected dispatch."),
+                (_, _) => Task.CompletedTask, configurationSource: (_, _) => Task.FromResult(snapshot));
+            var response = await host.InvokeAsync("thread/start", Json("""{"model":"requested","serviceTier":"priority"}"""), ct);
+            var id = Guid.Parse(response.GetProperty("thread").GetProperty("id").GetString()!);
+            var thread = await store.ReadAsync(id, ct);
+            Assert.Equal("managed-model", thread.Settings.GetProperty("model").GetString());
+            Assert.Equal("default", thread.Settings.GetProperty("serviceTier").GetString());
+            Assert.Equal("requested", thread.Settings.GetProperty("nativeConfigurationOverrides").GetProperty("model").GetString());
+
+            var revision = thread.Revision;
+            await Assert.ThrowsAsync<CodexThreadRpcException>(() => host.InvokeAsync("turn/start",
+                Json($$"""{"threadId":"{{id}}","input":[{"type":"text","text":"hello"}],"serviceTierForTurn":"priority"}"""), ct));
+            await Assert.ThrowsAsync<CodexThreadRpcException>(() => host.InvokeAsync("turn/start",
+                Json($$"""{"threadId":"{{id}}","input":[{"type":"text","text":"hello"}],"model":"override"}"""), ct));
+            Assert.Equal(revision, (await store.ReadAsync(id, ct)).Revision);
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [Fact]
+    public async Task LegacyManagedCannotRelaxModernRequirements()
+    {
+        var storage = new TestStorage();
+        var store = new CodexThreadStore(storage, "account");
+        var snapshot = new CodexThreadConfigurationSnapshot("revision",
+            [Layer(CodexConfigurationLayerKind.LegacyManagedFile, "managed", """{"model":"legacy"}""")],
+            Json("""{"model":["required"]}"""));
+        var host = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+            Defaults(Path.GetTempPath()), (_, _, _) => throw new InvalidOperationException("Unexpected dispatch."),
+            (_, _) => Task.CompletedTask, configurationSource: (_, _) => Task.FromResult(snapshot));
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => host.InvokeAsync("thread/start", Json("{}"), TestContext.Current.CancellationToken));
+        Assert.Empty(storage.Rows);
+    }
+
+    private static JsonElement Defaults(string cwd) => Json($$"""{"model":"initial","modelProvider":"openai","cwd":{{JsonSerializer.Serialize(cwd)}},"approvalPolicy":"never","sandbox":"read-only","approvalsReviewer":"user"}""");
+
+    private static JsonElement Json(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+
+    private sealed class TestStorage : ICodexThreadStorage
+    {
+        internal Dictionary<Guid, JsonElement> Rows { get; } = [];
+        public Task<JsonElement?> ReadAsync(Guid threadId, CancellationToken cancellationToken) =>
+            Task.FromResult(Rows.TryGetValue(threadId, out var row) ? (JsonElement?)row.Clone() : null);
+        public Task<bool> CompareExchangeAsync(Guid threadId, long? expectedRevision, JsonElement document, CancellationToken cancellationToken)
+        {
+            var actual = Rows.TryGetValue(threadId, out var row) ? (long?)row.GetProperty("revision").GetInt64() : null;
+            if (actual != expectedRevision) return Task.FromResult(false);
+            Rows[threadId] = document.Clone();
+            return Task.FromResult(true);
+        }
     }
 
     private static CodexThreadConfigurationLayer Layer(CodexConfigurationLayerKind kind, string name, string json, bool trusted = true)

@@ -29,6 +29,7 @@ public sealed partial class CodexThreadRpc
             if (defaults.TryGetProperty(target, out var initial)) settings[target] = JsonNode.Parse(initial.GetRawText());
         }
         var sources = new JsonArray();
+        var locked = new JsonObject();
         if (snapshot is not null)
         {
             var effective = CodexConfigurationResolver.Resolve(snapshot);
@@ -40,6 +41,30 @@ public sealed partial class CodexThreadRpc
             settings["nativeConfigurationRevision"] = snapshot.Revision;
             settings.Remove("nativeConfigurationRequirements");
             if (snapshot.Requirements is { } managed) settings["nativeConfigurationRequirements"] = JsonNode.Parse(managed.GetRawText());
+            var legacy = snapshot.Layers.Where(layer => layer.Kind is CodexConfigurationLayerKind.LegacyManagedFile
+                or CodexConfigurationLayerKind.LegacyManagedMdm).ToArray();
+            if (legacy.Length > 0)
+            {
+                var final = CodexConfigurationResolver.Resolve(new(snapshot.Revision, legacy)).Config;
+                var constraints = settings["nativeConfigurationRequirements"] switch
+                {
+                    null => new JsonObject(),
+                    JsonObject existing => (JsonObject)existing.DeepClone(),
+                    _ => throw Invalid("Invalid managed configuration requirements.")
+                };
+                ApplyConfig(locked, Element(new JsonObject { ["config"] = JsonNode.Parse(final.GetRawText()) }));
+                foreach (var item in final.EnumerateObject())
+                {
+                    // A legacy layer selects an exact value, but cannot relax modern requirements.
+                    if (constraints.TryGetPropertyValue(item.Name, out var existing) &&
+                        (existing is not JsonArray permitted || permitted.Count is < 1 or > 64 ||
+                        permitted.Any(value => value is not JsonValue scalar || !scalar.TryGetValue<string>(out _)) ||
+                        !permitted.Any(value => JsonNode.DeepEquals(value, JsonNode.Parse(item.Value.GetRawText())))))
+                        throw Invalid("Legacy managed setting conflicts with a requirement: " + item.Name);
+                    constraints[item.Name] = new JsonArray(JsonNode.Parse(item.Value.GetRawText()));
+                }
+                settings["nativeConfigurationRequirements"] = constraints;
+            }
         }
         var inherited = new JsonObject();
         if (threadId is not null)
@@ -58,7 +83,16 @@ public sealed partial class CodexThreadRpc
                     if (baseline.TryGetProperty(target, out var value)) inherited[target] = JsonNode.Parse(value.GetRawText());
         }
         foreach (var field in inherited) settings[field.Key] = field.Value?.DeepClone();
+        // Resolve the request first to keep validation of unsupported or unsafe host options intact.
+        // Then apply higher-priority legacy managed values and validate the resulting host settings again.
         var resolved = Object(Resolve(parameters, Element(settings), allowed));
+        if (locked.Count > 0)
+        {
+            if (locked["cwd"] is JsonValue managedCwd && managedCwd.GetValue<string>() != cwd)
+                throw Invalid("Managed cwd cannot change the configuration discovery directory.");
+            foreach (var field in locked) resolved[field.Key] = field.Value?.DeepClone();
+            resolved = Object(Resolve(Element(new JsonObject()), Element(resolved), []));
+        }
         ApplyConfig(inherited, parameters);
         foreach (var target in ConfigurationTargets)
             if (parameters.TryGetProperty(target, out var value) && value.ValueKind != JsonValueKind.Null)
@@ -72,7 +106,7 @@ public sealed partial class CodexThreadRpc
         return Element(resolved);
     }
 
-    private static void ValidateConfigurationRequirements(JsonElement settings, JsonElement? requirements)
+    private static void ValidateConfigurationRequirements(JsonElement settings, JsonElement? requirements, bool partial = false)
     {
         if (requirements is null) return;
         var value = requirements.Value;
@@ -86,8 +120,14 @@ public sealed partial class CodexThreadRpc
             var target = ConfigTarget(requirement.Name);
             foreach (var permitted in requirement.Value.EnumerateArray())
                 if (permitted.ValueKind != JsonValueKind.String) throw Invalid("Managed native requirements must contain strings.");
-            if (settings.TryGetProperty(target, out var actual) && actual.ValueKind != JsonValueKind.Null &&
-                !requirement.Value.EnumerateArray().Any(permitted => JsonElement.DeepEquals(actual, permitted)))
+            var present = settings.TryGetProperty(target, out var actual);
+            if (!present && partial) continue;
+            // An omitted service tier uses the provider's ordinary default; do not infer
+            // that an omitted optional setting selects a premium or restricted tier.
+            if (target == "serviceTier" && (!present || actual.ValueKind == JsonValueKind.Null) &&
+                requirement.Value.EnumerateArray().Any(permitted => permitted.GetString() is "auto" or "default"))
+                continue;
+            if (!present || !requirement.Value.EnumerateArray().Any(permitted => JsonElement.DeepEquals(actual, permitted)))
                 throw Invalid("Managed configuration requirement rejected: " + requirement.Name);
         }
     }
@@ -121,7 +161,7 @@ public sealed partial class CodexThreadRpc
             ["model"] = options.Model, ["effort"] = options.ReasoningEffort,
             ["summary"] = options.ReasoningSummary, ["verbosity"] = options.Verbosity,
             ["serviceTier"] = options.ServiceTier
-        }), requirements);
+        }), requirements, partial: true);
     }
 
 }

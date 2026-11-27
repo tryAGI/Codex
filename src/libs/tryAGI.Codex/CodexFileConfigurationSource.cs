@@ -17,6 +17,10 @@ public sealed record CodexFileConfigurationOptions(string CodexHome)
     public string? SystemConfigFile { get; init; }
     /// <summary>Optional administrator-managed configuration file.</summary>
     public string? AdminConfigFile { get; init; }
+    /// <summary>Optional legacy managed config file applied above runtime overrides.</summary>
+    public string? LegacyManagedConfigFile { get; init; }
+    /// <summary>Optional host-materialized legacy MDM configuration applied last.</summary>
+    public string? LegacyManagedMdmConfigFile { get; init; }
     /// <summary>Configuration files delivered by a cloud service.</summary>
     public IReadOnlyList<string> CloudConfigFiles { get; init; } = [];
     /// <summary><c>requirements.toml</c> files whose constraints settings must satisfy.</summary>
@@ -159,6 +163,8 @@ public sealed class CodexFileConfigurationSource(CodexFileConfigurationOptions o
                 Add(CodexConfigurationLayerKind.Project, path, project);
             }
         }
+        await FileLayer(options.LegacyManagedConfigFile, CodexConfigurationLayerKind.LegacyManagedFile, true).ConfigureAwait(false);
+        await FileLayer(options.LegacyManagedMdmConfigFile, CodexConfigurationLayerKind.LegacyManagedMdm, true).ConfigureAwait(false);
         foreach (var path in options.RequirementsFiles)
         {
             var values = await Read(path, true).ConfigureAwait(false) ?? throw Invalid("Missing requirements source.");

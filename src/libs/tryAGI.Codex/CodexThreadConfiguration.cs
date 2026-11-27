@@ -30,6 +30,12 @@ public enum CodexConfigurationLayerKind
 
     /// <summary>Overrides supplied with the request.</summary>
     Runtime,
+
+    /// <summary>Legacy administrator-managed config.toml applied after session flags.</summary>
+    LegacyManagedFile,
+
+    /// <summary>Legacy MDM-managed configuration with the highest layer precedence.</summary>
+    LegacyManagedMdm,
 }
 
 /// <summary>One configuration layer, already converted from TOML to JSON.</summary>
