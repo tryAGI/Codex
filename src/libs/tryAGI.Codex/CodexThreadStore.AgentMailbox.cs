@@ -54,6 +54,7 @@ public sealed partial class CodexThreadStore
         if (mailbox.Claim is { } claim &&
             (claim.Id == Guid.Empty || claim.TurnId == Guid.Empty || !ValidToken(claim.OwnerId) ||
              claim.MessageCount < 1 || claim.MessageCount > pending.Length ||
+             claim.WakeAdmission is { } binding && (!claim.IsWake || !binding.IsValid) ||
              pending.Take(claim.MessageCount - 1).Any(mail => mail.Mode == CodexAgentMailMode.Followup) ||
              claim.IsWake && pending[claim.MessageCount - 1].Mode != CodexAgentMailMode.Followup))
             throw new InvalidDataException("Invalid native agent mail reservation.");
@@ -145,6 +146,12 @@ public sealed partial class CodexThreadStore
         if (before.Claim is not { } claim || claim.Id != claimId || claim.OwnerId != ownerId)
             throw new InvalidOperationException("Expected agent mail reservation and execution owner do not match.");
 
+        return await SettleObservedAgentMailAsync(before, claim, acknowledge, ct).ConfigureAwait(false);
+    }
+
+    private async Task<CodexAgentMailbox> SettleObservedAgentMailAsync(CodexAgentMailbox before,
+        CodexAgentMailClaim claim, bool acknowledge, CancellationToken ct)
+    {
         var next = before with { Claim = null };
         if (acknowledge)
         {

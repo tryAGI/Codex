@@ -31,7 +31,11 @@ public sealed record CodexAgentMailReceipt(Guid Id, string Fingerprint);
 /// <param name="TurnId">Exact target turn identity, including a proposed wake turn.</param>
 /// <param name="MessageCount">Number of pending messages reserved from the head.</param>
 /// <param name="IsWake">Whether this reservation requests an idle follow-up turn.</param>
-public sealed record CodexAgentMailClaim(Guid Id, string OwnerId, Guid TurnId, int MessageCount, bool IsWake);
+public sealed record CodexAgentMailClaim(Guid Id, string OwnerId, Guid TurnId, int MessageCount, bool IsWake)
+{
+    /// <summary>Exact model-input and graph binding for a native runner wake, if present.</summary>
+    public CodexAgentMailWakeAdmission? WakeAdmission { get; init; }
+}
 
 /// <summary>Recipient-scoped durable mailbox. Its revision is independent of turn journal writes.</summary>
 /// <param name="AccountId">Authenticated storage account.</param>
