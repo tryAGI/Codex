@@ -49,17 +49,7 @@ public sealed partial class CodexClient
     public async Task<CodexModelCatalogSnapshot> GetModelCatalogAsync(string clientVersion,
         bool forceRefresh = false, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientVersion);
-        if (clientVersion.Length > 128 || clientVersion.Any(char.IsControl))
-            throw new ArgumentException("Invalid catalog client version.", nameof(clientVersion));
-        if (realtimeApiKeyProvider is not null) throw new CodexAuthorizationUnavailableException();
-
-        // Catalog metadata is account-specific. Never send an OAuth credential to a custom origin.
-        var backend = options.BackendBaseUri;
-        if (backend.Scheme != "https" || !backend.IdnHost.Equals("chatgpt.com", StringComparison.OrdinalIgnoreCase) ||
-            !backend.IsDefaultPort || backend.UserInfo.Length != 0 || backend.Query.Length != 0 ||
-            backend.Fragment.Length != 0 || backend.AbsolutePath.TrimEnd('/') != "/backend-api/codex")
-            throw new ArgumentException("Model discovery requires the trusted ChatGPT Codex backend.");
+        var backend = ValidateModelCatalogEndpoint(clientVersion);
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(options.RequestTimeout);
@@ -80,36 +70,8 @@ public sealed partial class CodexClient
             generation = ++modelCatalogGeneration;
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get,
-            new Uri(backend.AbsoluteUri.TrimEnd('/') + "/models?client_version=" + Uri.EscapeDataString(clientVersion)));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
-        request.Headers.Add("ChatGPT-Account-Id", auth.AccountId);
-        request.Headers.Add("originator", options.Originator);
-        if (cached?.Snapshot.ETag is { } tag && EntityTagHeaderValue.TryParse(tag, out var parsedTag) && parsedTag.Tag != "*")
-            request.Headers.IfNoneMatch.Add(parsedTag);
-
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        CodexModelCatalogSnapshot snapshot;
-        if (response.StatusCode == HttpStatusCode.NotModified)
-        {
-            if (cached is null || request.Headers.IfNoneMatch.Count != 1)
-                throw new CodexProtocolException("Model catalog returned an unsolicited not-modified response.");
-            snapshot = cached.Snapshot with { ObservedAt = DateTimeOffset.UtcNow };
-        }
-        else
-        {
-            EnsureSuccess(response);
-            try
-            {
-                using var document = JsonDocument.Parse(await ReadBoundedAsync(response.Content, options.MaximumMessageBytes, ct).ConfigureAwait(false));
-                snapshot = new("openai", clientVersion, DateTimeOffset.UtcNow, response.Headers.ETag?.ToString(),
-                    ParseModelCatalog(document.RootElement));
-            }
-            catch (JsonException)
-            {
-                throw new CodexProtocolException("Model catalog response is not valid JSON.");
-            }
-        }
+        var snapshot = await FetchModelCatalogAsync(backend, auth, clientVersion, cached?.Snapshot,
+            TimeProvider.System, ct).ConfigureAwait(false);
 
         // A refresh may have raced with logout, account switching or restricted-account changes.
         var active = await credentials.GetCredentialsAsync(ct).ConfigureAwait(false);
@@ -126,6 +88,52 @@ public sealed partial class CodexClient
                 modelCatalogCache = new(identity, snapshot);
         }
         return snapshot;
+    }
+
+    private Uri ValidateModelCatalogEndpoint(string clientVersion)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientVersion);
+        if (clientVersion.Length > 128 || clientVersion.Any(char.IsControl))
+            throw new ArgumentException("Invalid catalog client version.", nameof(clientVersion));
+        if (realtimeApiKeyProvider is not null) throw new CodexAuthorizationUnavailableException();
+        // Catalog metadata is account-specific. Never send an OAuth credential to a custom origin.
+        var backend = options.BackendBaseUri;
+        if (backend.Scheme != "https" || !backend.IdnHost.Equals("chatgpt.com", StringComparison.OrdinalIgnoreCase) ||
+            !backend.IsDefaultPort || backend.UserInfo.Length != 0 || backend.Query.Length != 0 ||
+            backend.Fragment.Length != 0 || backend.AbsolutePath.TrimEnd('/') != "/backend-api/codex")
+            throw new ArgumentException("Model discovery requires the trusted ChatGPT Codex backend.");
+        return backend;
+    }
+
+    private async Task<CodexModelCatalogSnapshot> FetchModelCatalogAsync(Uri backend, CodexCredentials auth,
+        string clientVersion, CodexModelCatalogSnapshot? cached, TimeProvider clock, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            new Uri(backend.AbsoluteUri.TrimEnd('/') + "/models?client_version=" + Uri.EscapeDataString(clientVersion)));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        request.Headers.Add("ChatGPT-Account-Id", auth.AccountId);
+        request.Headers.Add("originator", options.Originator);
+        if (cached?.ETag is { } tag && EntityTagHeaderValue.TryParse(tag, out var parsedTag) && parsedTag.Tag != "*")
+            request.Headers.IfNoneMatch.Add(parsedTag);
+
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotModified)
+        {
+            if (cached is null || request.Headers.IfNoneMatch.Count != 1)
+                throw new CodexProtocolException("Model catalog returned an unsolicited not-modified response.");
+            return cached with { ObservedAt = clock.GetUtcNow() };
+        }
+        EnsureSuccess(response);
+        try
+        {
+            using var document = JsonDocument.Parse(await ReadBoundedAsync(response.Content, options.MaximumMessageBytes, ct).ConfigureAwait(false));
+            return new("openai", clientVersion, clock.GetUtcNow(), response.Headers.ETag?.ToString(),
+                ParseModelCatalog(document.RootElement));
+        }
+        catch (JsonException)
+        {
+            throw new CodexProtocolException("Model catalog response is not valid JSON.");
+        }
     }
 
     internal static IReadOnlyList<CodexModelCatalogEntry> ParseModelCatalog(JsonElement root)
