@@ -14,13 +14,19 @@ Realtime delegates to #25 and its existing matrix/evidence runner. The global in
 
 `docs/global-parity-reviews.json` records per-capability, per-lane decisions without rewriting the upstream inventory. Each decision binds a full published commit, exact source references, owner and rationale. Source review, missing behavior, divergence, justified N/A and receipt-backed passes are separate. Changed source references invalidate source review; changes to the source tree invalidate negative conclusions and accepted receipts. Typed-only App Server review never receives native credit. A lane without a verified platform, Rust-runtime or live-provider receipt verifier cannot pass.
 
-The CI workflow `global-parity.yml` runs the offline checker and a separate six-class cross-domain test suite, reusing the shared Realtime evidence parser and revision binding. Run locally only with admitted compilation on shared hosts:
+The CI workflow `global-parity.yml` runs the offline checker and a separate explicitly allowlisted cross-domain test suite, reusing the shared Realtime evidence parser and revision binding. Run locally only with admitted compilation on shared hosts:
 
 ```sh
 python3 -B scripts/global_parity_evidence.py --host-admission --output /tmp/global-parity-receipt.json
 ```
 
 Store reviewed sanitized global receipts under `docs/global-parity-evidence/`. The first global receipt (`ci-b3f9229-45956495446.json`) contains 59 passed credential-free cases at the exact published revision; seven typed interop rows reference their exact test cases. `testEvidence` records a verified test-only observation without promoting a row to `passed`, and distinguishes historical from current-source evidence. Non-Realtime cases already present in the Realtime receipt may be referenced directly instead of copying receipts. No offline result proves actual Rust-process or live-provider behavior.
+
+## Real Rust differential acceptance (#90)
+
+The manual `rust-differential.yml` workflow builds the C# test assembly, downloads the official Linux x64 Rust v0.172.0 package with a fixed SHA-256 (the release tag resolves to the pinned commit), and runs five independent filesystem scenarios against both the public native handler and the actual Rust App Server via stdio. It creates a fresh credential-free home, requires a separate Linux network namespace with loopback only, and uses temporary fixture paths. It does not launch provider calls or user commands. The five scenarios compare binary round trips, directory/metadata projection, invalid base64 and relative path errors, and recursive copy/remove effects. Timestamps are checked for type, not equality between separately created files.
+
+The differential receipt is a distinct `rust-runtime-differential` lane, with upstream package and executable digests, exact managed source tree, per-case outcomes and isolation evidence. A failed/skipped case cannot make it eligible. Neither a successful bridge nor an offline mock is native SDK acceptance; independently review the actual behavior and map each exact scenario before any row can receive credit. Ordinary CI and release workflows do not execute the Rust process or promote these receipts automatically.
 
 ## Domain routing
 

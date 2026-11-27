@@ -9,6 +9,10 @@ CLASSES = (
     "AppServerModelSchemaTests", "AppServerThreadLifecycleContractTests",
     "CodexAccountRateLimitsTests", "CodexModelCatalogTests",
     "CodexToolRegistryTests", "CodexFileSystemTests",
+    "ThreadArchiveStoreTests", "CodexModelCatalogRpcTests",
+    "CodexPermissionProfileCatalogTests", "CodexMcpClientTests",
+    "CodexMcpConnectionPoolTests", "CodexMcpHttpTransportTests",
+    "CodexToolRequestLedgerTests", "CodexAsyncUserMessageTests",
 )
 
 

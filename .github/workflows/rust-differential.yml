@@ -1,0 +1,44 @@
+name: Pinned Rust differential
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  filesystem:
+    # Explicit opt-in; no provider credentials or live calls.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Build the managed differential test assembly
+        run: dotnet build src/tests/tryAGI.Codex.Tests/tryAGI.Codex.Tests.csproj
+      - name: Fetch exact upstream Rust release archive
+        run: |
+          set -euo pipefail
+          asset=codex-package-x86_64-unknown-linux-musl.tar.gz
+          curl --fail --location --silent --show-error --max-time 180 --output "$RUNNER_TEMP/$asset" "https://github.com/openai/codex/releases/download/rust-v0.172.0/$asset"
+          printf '%s  %s\n' 63e3b00065ed7f62166d0522e17f663cb866a31d80d03e63365482ed34a1d991 "$RUNNER_TEMP/$asset" | sha256sum --check
+      - name: Compare native and Rust filesystem RPCs with external network disconnected
+        run: |
+          set -euo pipefail
+          parent_netns="$(readlink /proc/self/ns/net)"
+          sudo unshare --net --setgid "$(id -g)" --setuid "$(id -u)" \
+            env -i PATH="$PATH" DOTNET_ROOT="$DOTNET_ROOT" HOME="$HOME" NUGET_PACKAGES="$HOME/.nuget/packages" \
+            python3 -B scripts/rust_differential_receipt.py \
+            --archive "$RUNNER_TEMP/codex-package-x86_64-unknown-linux-musl.tar.gz" \
+            --parent-netns "$parent_netns" --output "$RUNNER_TEMP/rust-differential-receipt.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-filesystem-differential-receipt
+          path: ${{ runner.temp }}/rust-differential-receipt.json
+          if-no-files-found: warn
