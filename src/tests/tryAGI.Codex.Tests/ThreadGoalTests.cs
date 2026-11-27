@@ -50,6 +50,24 @@ public sealed class ThreadGoalTests
         }
     }
 
+    private sealed class GoalClock : TimeProvider
+    {
+        private long ticks;
+        private DateTimeOffset utc = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => ticks;
+        public override DateTimeOffset GetUtcNow() => utc;
+
+        internal void Advance(TimeSpan elapsed)
+        {
+            ticks += elapsed.Ticks;
+            utc += elapsed;
+        }
+
+        internal void ShiftUtc(TimeSpan difference) => utc += difference;
+    }
+
     private sealed class Fixture
     {
         private readonly Storage storage = new();
@@ -57,9 +75,10 @@ public sealed class ThreadGoalTests
         internal List<(string Method, JsonElement Value)> Events { get; } = [];
         internal List<CodexThreadGoalMutation> Authorizations { get; } = [];
 
-        internal Fixture() => Store = new(storage, "account");
+        internal GoalClock Clock { get; } = new();
+        internal Fixture() => Store = new(storage, "account", Clock);
         internal void LoseNextAcknowledgment() => storage.LoseNextAcknowledgment = true;
-        internal CodexThreadStore Reopen() => new(storage, "account");
+        internal CodexThreadStore Reopen() => new(storage, "account", Clock);
         internal CodexThreadRpc Host(bool enabled = true, long? max = null, bool allow = true)
         {
             var host = new CodexThreadRpc(Store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
@@ -175,6 +194,98 @@ public sealed class ThreadGoalTests
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 f.Store.AdmitAsync(thread.Id, current.Revision, id, "owner", "late-" + kind, kind, Json("{}"), Ct));
         Assert.Equal(current.Revision, (await f.Store.ReadAsync(thread.Id, Ct)).Revision);
+    }
+
+    [Fact]
+    public async Task GoalTimeUsesMonotonicIntervalsAndExcludesPauseAndIdle()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work"}""");
+        var current = await f.Store.ReadAsync(thread.Id, Ct);
+        f.Clock.Advance(TimeSpan.FromHours(2));
+        var turn = Guid.NewGuid();
+        current = await f.Store.StartTurnAsync(thread.Id, current.Revision, turn, "owner", [], cancellationToken: Ct);
+        f.Clock.Advance(TimeSpan.FromMilliseconds(750));
+        f.Clock.ShiftUtc(TimeSpan.FromDays(1));
+        var admitted = await f.Store.AdmitAsync(thread.Id, current.Revision, turn, "owner", "request", "inference", Json("{}"), Ct);
+        Assert.Equal(0, admitted.Thread.Goal!.TimeUsedSeconds);
+        Assert.Equal(TimeSpan.FromMilliseconds(750).Ticks, admitted.Thread.Goal.ElapsedRemainderTicks);
+        f.Clock.Advance(TimeSpan.FromMilliseconds(750));
+        current = await f.Store.SettleAsync(thread.Id, admitted.Thread.Revision, turn, "owner", "request", "succeeded",
+            Json("""{"id":"response","usage":{"input_tokens":2,"output_tokens":1}}"""), Ct);
+        Assert.Equal(1, current.Goal!.TimeUsedSeconds);
+        Assert.Equal(TimeSpan.FromMilliseconds(500).Ticks, current.Goal.ElapsedRemainderTicks);
+        f.Clock.Advance(TimeSpan.FromMilliseconds(500));
+        await Goal(host, thread.Id, """{"status":"paused"}""");
+        current = await f.Store.ReadAsync(thread.Id, Ct);
+        Assert.Equal(2, current.Goal!.TimeUsedSeconds);
+        Assert.Null(current.Goal.ElapsedRemainderTicks);
+        Assert.Null(current.GoalExecutionClock!.GoalId);
+        f.Clock.Advance(TimeSpan.FromMinutes(5));
+        await Goal(host, thread.Id, """{"status":"active"}""");
+        f.Clock.Advance(TimeSpan.FromMilliseconds(1250));
+        current = await f.Store.ReadAsync(thread.Id, Ct);
+        current = await f.Store.CompleteAsync(thread.Id, current.Revision, turn, "owner", "completed", [], Ct);
+        Assert.Equal(3, current.Goal!.TimeUsedSeconds);
+        Assert.Equal(TimeSpan.FromMilliseconds(250).Ticks, current.Goal.ElapsedRemainderTicks);
+        Assert.Null(current.GoalExecutionClock);
+        var fork = await f.Store.ForkAsync(thread.Id, current.Revision, Guid.NewGuid(), cancellationToken: Ct);
+        Assert.Equal(3, fork.Goal!.TimeUsedSeconds);
+        Assert.Null(fork.Goal.ElapsedRemainderTicks);
+        Assert.Null(fork.GoalExecutionClock);
+    }
+
+    [Fact]
+    public async Task GoalTimeAcknowledgementLossAndRecoveryPreserveOnlyConfirmedIntervals()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work"}""");
+        var current = await f.Store.ReadAsync(thread.Id, Ct);
+        var turn = Guid.NewGuid();
+        current = await f.Store.StartTurnAsync(thread.Id, current.Revision, turn, "owner", [], cancellationToken: Ct);
+        f.Clock.Advance(TimeSpan.FromSeconds(2));
+        var admitted = await f.Store.AdmitAsync(thread.Id, current.Revision, turn, "owner", "request", "inference", Json("{}"), Ct);
+        f.Clock.Advance(TimeSpan.FromSeconds(3));
+        f.LoseNextAcknowledgment();
+        await Assert.ThrowsAsync<IOException>(() => f.Store.SettleAsync(thread.Id, admitted.Thread.Revision, turn,
+            "owner", "request", "succeeded", Json("""{"id":"response","usage":{"input_tokens":2,"output_tokens":1}}"""), Ct));
+        var saved = await f.Store.ReadAsync(thread.Id, Ct);
+        Assert.Equal(5, saved.Goal!.TimeUsedSeconds);
+        Assert.Equal(3, saved.Goal.TokensUsed);
+        f.Clock.Advance(TimeSpan.FromHours(9));
+        var cold = f.Reopen();
+        current = await cold.RecoverInterruptedAsync(thread.Id, saved.Revision, turn, "owner", Ct);
+        Assert.Equal(5, current.Goal!.TimeUsedSeconds);
+        Assert.Null(current.GoalExecutionClock);
+        var next = Guid.NewGuid();
+        current = await cold.StartTurnAsync(thread.Id, current.Revision, next, "new-owner", [], cancellationToken: Ct);
+        f.Clock.Advance(TimeSpan.FromSeconds(1));
+        current = await cold.CompleteAsync(thread.Id, current.Revision, next, "new-owner", "completed", [], Ct);
+        Assert.Equal(6, current.Goal!.TimeUsedSeconds);
+    }
+
+    [Fact]
+    public async Task GoalTimeStopsAtBudgetAndDoesNotChargeAReplacement()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work","tokenBudget":3}""");
+        var current = await f.Store.ReadAsync(thread.Id, Ct);
+        var turn = Guid.NewGuid();
+        current = await f.Store.StartTurnAsync(thread.Id, current.Revision, turn, "owner", [], cancellationToken: Ct);
+        var admitted = await f.Store.AdmitAsync(thread.Id, current.Revision, turn, "owner", "request", "inference", Json("{}"), Ct);
+        f.Clock.Advance(TimeSpan.FromSeconds(4));
+        current = await f.Store.SettleAsync(thread.Id, admitted.Thread.Revision, turn, "owner", "request", "succeeded",
+            Json("""{"id":"response","usage":{"input_tokens":2,"output_tokens":1}}"""), Ct);
+        Assert.Equal("budgetLimited", current.Goal!.Status);
+        Assert.Equal(4, current.Goal.TimeUsedSeconds);
+        f.Clock.Advance(TimeSpan.FromSeconds(8));
+        await host.InvokeAsync("thread/goal/clear", Args(thread.Id), Ct);
+        await Goal(host, thread.Id, """{"objective":"new goal"}""");
+        current = await f.Store.ReadAsync(thread.Id, Ct);
+        Assert.Equal(0, current.Goal!.TimeUsedSeconds);
+        f.Clock.Advance(TimeSpan.FromSeconds(2));
+        current = await f.Store.CompleteAsync(thread.Id, current.Revision, turn, "owner", "completed", [], Ct);
+        Assert.Equal(2, current.Goal!.TimeUsedSeconds);
     }
 
     [Fact]

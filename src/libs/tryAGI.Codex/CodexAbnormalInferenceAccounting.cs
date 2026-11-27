@@ -109,7 +109,7 @@ public sealed partial class CodexThreadStore
             };
             CodexAbnormalInferenceAccounting.Validate(updated);
             // No model output is promoted from an accounting-only observation.
-            return AccountGoalInference(Replace(document, updated), receipt, evidence,
+            return AccountGoalInference(Replace(document, updated), receipt, turnId, evidence,
                 binding.AccountingKind == CodexAbnormalInferenceAccounting.IncompleteObservation);
         }, ct);
 

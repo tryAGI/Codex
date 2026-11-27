@@ -28,8 +28,9 @@ public sealed partial class CodexThreadStore
     }
 
     private CodexThreadDocument AccountGoalInference(CodexThreadDocument thread, CodexStoredDispatch receipt,
-        JsonElement evidence, bool wrappedEvent = false)
+        Guid turnId, JsonElement evidence, bool wrappedEvent = false)
     {
+        thread = ObserveGoalExecutionTime(thread, turnId, true);
         // Only a request admitted against this goal generation can charge it, including an
         // in-flight response arriving after a pause, block, budget limit or completion.
         if (receipt.GoalInference is not { } binding || binding.OriginThreadId != thread.Id
@@ -51,7 +52,7 @@ public sealed partial class CodexThreadStore
         var delta = output > long.MaxValue - uncached ? long.MaxValue : uncached + output;
         var mode = goal.Status == "complete" ? CodexGoalAccountingMode.ActiveOrComplete : CodexGoalAccountingMode.ActiveOrStopped;
         var updated = ApplyGoalUsage(goal, binding.UsageId, delta, 0, mode);
-        return ReferenceEquals(goal, updated) ? thread : thread with { Goal = updated };
+        return ReferenceEquals(goal, updated) ? thread : RebindGoalClock(thread with { Goal = updated });
     }
 
     internal static bool SameGoalSnapshot(CodexStoredThreadGoal? left, CodexStoredThreadGoal? right)

@@ -33,6 +33,7 @@ public sealed partial class CodexThreadStore
             throw new ArgumentException(rejection);
         RequireGoalContinuationDispatch(before, turn, command.Name);
 
+        before = ObserveGoalExecutionTime(before, turnId, true);
         var goal = before.Goal;
         var now = time.GetUtcNow();
         if (command.Name == CodexNativeGoalTools.Create)
@@ -59,7 +60,7 @@ public sealed partial class CodexThreadStore
         };
         // The goal state and tool receipt have one CAS. Never emit a result or retry a
         // mutation when the CAS acknowledgement is ambiguous.
-        next = PromoteRealtimeArtifacts(next, turn, updated);
+        next = PromoteRealtimeArtifacts(RebindGoalClock(next), turn, updated);
         return new(await PublishAsync(before.Revision, next, ct).ConfigureAwait(false), output,
             command.Name != CodexNativeGoalTools.Get);
     }

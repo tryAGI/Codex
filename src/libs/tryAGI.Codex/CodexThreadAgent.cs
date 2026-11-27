@@ -368,6 +368,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             CodexThreadStore.Encode(document with
             {
                 RealtimeSessions = null, QueuedSubmissions = null, DetachedCompactionReceipts = null, Goal = null,
+                GoalExecutionClock = null, DeferredGoalId = null,
                 Revision = 1, UpdatedAt = default,
                 Turns = document.Turns.Select(t => t with { NativeBackingArtifacts = null }).ToArray(),
             });
@@ -388,7 +389,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                     var actual = await store.ReadAsync(Current.Id, ct).ConfigureAwait(false);
                     if (actual.RealtimeSessions is null && actual.Turns.All(t => t.NativeBackingArtifacts is null)
                         && CodexThreadStore.SameQueuedSubmissions(Current, actual)
-                        && CodexThreadStore.SameGoalSnapshot(Current.Goal, actual.Goal) &&
+                        && CodexThreadStore.SameGoalSnapshot(Current.Goal, actual.Goal)
+                        && Current.GoalExecutionClock == actual.GoalExecutionClock && Current.DeferredGoalId == actual.DeferredGoalId &&
                         !CodexDetachedCompactionAccounting.Appended(Current, actual) ||
                         !JsonElement.DeepEquals(ExecutionSnapshot(Current), ExecutionSnapshot(actual)))
                         throw;

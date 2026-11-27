@@ -78,8 +78,8 @@ public sealed partial class CodexThreadStore
             var turn = new CodexStoredTurn(turnId, rootTurnId ?? turnId, ownerId, "inProgress", time.GetUtcNow(),
                 Items(input), [], [], ClientUserMessageIds: clientUserMessageIds?.ToArray(), TurnTrigger: turnTrigger)
             { GoalContinuation = goalContinuationId is { } goal ? new(document.Id, goal) : null };
-            return BindRealtimePresentation(document with { Turns = [.. document.Turns, turn] },
-                turnId, PresentationSession(document)?.SessionId);
+            return BeginGoalExecutionClock(BindRealtimePresentation(document with { Turns = [.. document.Turns, turn] },
+                turnId, PresentationSession(document)?.SessionId), turnId);
         }, cancellationToken);
 
     /// <summary>Records client message IDs for the turn's user inputs. Existing IDs cannot be rewritten.</summary>
@@ -167,6 +167,7 @@ public sealed partial class CodexThreadStore
             return new(false, before);
         }
         RequireGoalContinuationDispatch(before, active, nativeGoalTool);
+        before = ObserveGoalExecutionTime(before, turnId, true);
         var dispatch = new CodexStoredDispatch(callId, kind, hash, "dispatching")
         { GoalInference = CaptureGoalInference(before, kind) };
         var turn = active with { Dispatches = [.. active.Dispatches, dispatch] };
@@ -190,7 +191,8 @@ public sealed partial class CodexThreadStore
                 ? d with { State = outcome, Result = result?.Clone() } : d).ToArray() };
             var next = Replace(document, updated);
             if (outcome == "succeeded" && result is { } evidence)
-                next = AccountGoalInference(next, prior, evidence);
+                next = AccountGoalInference(next, prior, turnId, evidence);
+            else next = ObserveGoalExecutionTime(next, turnId, true);
             return PromoteRealtimeArtifacts(next, turn, updated);
         }, cancellationToken);
 
@@ -216,6 +218,7 @@ public sealed partial class CodexThreadStore
                 ContextWindowObservation = context,
             };
             if (context is not null) CodexContextWindow.Validate(updated, context);
+            document = ObserveGoalExecutionTime(document, turnId, true) with { GoalExecutionClock = null };
             var next = ApplyGoalTerminal(Replace(document, updated), updated);
             return PublishTerminalReadAttention(PromoteRealtimeArtifacts(next, turn, updated), updated);
         }, cancellationToken);
@@ -224,11 +227,16 @@ public sealed partial class CodexThreadStore
     /// is not that proof. Preserve known results and mark unobserved dispatches unknown; never replay.</summary>
     public Task<CodexThreadDocument> RecoverInterruptedAsync(Guid threadId, long expectedRevision, Guid turnId,
         string lostOwnerId, CancellationToken cancellationToken = default)
-        => ChangeTurnAsync(threadId, expectedRevision, turnId, lostOwnerId, turn => turn with
+        => ChangeAsync(threadId, expectedRevision, document =>
         {
-            Status = "interrupted", CompletedAt = time.GetUtcNow(),
-            Output = RecoverGoalToolOutputs(turn, CodexInferenceRecovery.RecoverOutput(turn)),
-            Dispatches = turn.Dispatches.Select(d => d.State == "dispatching" ? d with { State = "unknown" } : d).ToArray()
+            var turn = Active(document, turnId, lostOwnerId);
+            // Recovery proves a lost owner, not how long it was executing after its last checkpoint.
+            return Replace(document, turn with
+            {
+                Status = "interrupted", CompletedAt = time.GetUtcNow(),
+                Output = RecoverGoalToolOutputs(turn, CodexInferenceRecovery.RecoverOutput(turn)),
+                Dispatches = turn.Dispatches.Select(d => d.State == "dispatching" ? d with { State = "unknown" } : d).ToArray()
+            }) with { GoalExecutionClock = null };
         }, cancellationToken);
 
     /// <summary>Fork one observed source revision. Inclusive last/exclusive before are mutually
@@ -262,7 +270,7 @@ public sealed partial class CodexThreadStore
             InheritedRealtimeCarryover = ForkRealtimeCarryover(source, count, cutoff is null), CompactionCheckpoint = null,
             DetachedCompactionReceipts = null,
             ReadReceipt = null, QueuedSubmissions = null, Goal = goal,
-            DeferredGoalId = deferGoalContinuation ? goal?.Id : null,
+            DeferredGoalId = deferGoalContinuation ? goal?.Id : null, GoalExecutionClock = null,
             Attachments = ForkAttachments(source, effectiveSettings ?? source.Settings, now),
             Settings = effectiveSettings?.Clone() ?? source.Settings }, cancellationToken).ConfigureAwait(false);
     }
@@ -385,6 +393,7 @@ public sealed partial class CodexThreadStore
             }
             ValidateNativeBackingArtifacts(turn);
         }
+        ValidateGoalExecutionClock(value);
         ValidateRealtimeHandoffTurnInputs(value);
         ValidateRealtimePromotions(value);
         if (value.CompactionCheckpoint is { } checkpoint) CodexThreadCompaction.Validate(value, checkpoint);

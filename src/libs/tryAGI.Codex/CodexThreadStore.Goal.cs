@@ -42,6 +42,7 @@ public sealed partial class CodexThreadStore
             || goal.CreatedAt == default || goal.UpdatedAt == default
             || goal.Status == "active" && goal.TokenBudget is { } budget && goal.TokensUsed >= budget
             || goal.EmptyContinuationCount is < 0 or > 3
+            || goal.ElapsedRemainderTicks is < 0 or >= TimeSpan.TicksPerSecond
             || goal.UsageReceipts is { Length: > MaximumGoalUsageReceipts })
             throw new InvalidDataException("Invalid native goal snapshot.");
         var ids = new HashSet<Guid>();
@@ -59,6 +60,7 @@ public sealed partial class CodexThreadStore
         if (budgetSpecified) ValidateGoalBudget(budget, maximumBudget);
         var before = await CurrentAsync(id, revision, ct).ConfigureAwait(false);
         RequireGoalThread(before, true);
+        before = ObserveLocalGoalMutation(before);
         var previous = before.Goal;
         if (previous is null && objective is null) throw new ArgumentException("Cannot update goal: no goal exists.");
         var effectiveBudget = budgetSpecified ? budget ?? maximumBudget : previous is null ? maximumBudget : previous.TokenBudget;
@@ -71,7 +73,7 @@ public sealed partial class CodexThreadStore
         var now = time.GetUtcNow();
         var goal = new CodexStoredThreadGoal(previous?.Id ?? Guid.CreateVersion7(), objective ?? previous!.Objective,
             effectiveStatus, effectiveBudget, tokensUsed, previous?.TimeUsedSeconds ?? 0, previous?.CreatedAt ?? now,
-            now, previous?.UsageReceipts);
+            now, previous?.UsageReceipts) { ElapsedRemainderTicks = previous?.ElapsedRemainderTicks };
         return await WriteGoalAsync(before, goal, ct).ConfigureAwait(false);
     }
 
@@ -80,7 +82,7 @@ public sealed partial class CodexThreadStore
         var before = await CurrentAsync(id, revision, ct).ConfigureAwait(false);
         RequireGoalThread(before, true);
         if (before.Goal is null) return (before, false);
-        return (await WriteGoalAsync(before, null, ct).ConfigureAwait(false), true);
+        return (await WriteGoalAsync(ObserveLocalGoalMutation(before), null, ct).ConfigureAwait(false), true);
     }
 
     /// <summary>Accounts one trusted, observed usage delta for the exact goal generation. Duplicate
@@ -97,7 +99,11 @@ public sealed partial class CodexThreadStore
         var before = await CurrentAsync(threadId, expectedRevision, cancellationToken).ConfigureAwait(false);
         if (before.Goal is not { } goal || goal.Id != expectedGoalId) return before;
         var updated = ApplyGoalUsage(goal, usageId, tokenDelta, elapsedSeconds, mode);
-        return ReferenceEquals(goal, updated) ? before : await WriteGoalAsync(before, updated, cancellationToken).ConfigureAwait(false);
+        if (ReferenceEquals(goal, updated)) return before;
+        var observed = ObserveLocalGoalMutation(before);
+        if (!ReferenceEquals(goal, observed.Goal))
+            updated = ApplyGoalUsage(observed.Goal!, usageId, tokenDelta, elapsedSeconds, mode);
+        return await WriteGoalAsync(observed, updated, cancellationToken).ConfigureAwait(false);
     }
 
     private CodexStoredThreadGoal ApplyGoalUsage(CodexStoredThreadGoal goal, Guid usageId, long tokenDelta,
@@ -132,10 +138,10 @@ public sealed partial class CodexThreadStore
     }
 
     private Task<CodexThreadDocument> WriteGoalAsync(CodexThreadDocument before, CodexStoredThreadGoal? goal, CancellationToken ct)
-        => PublishAsync(before.Revision, before with { Revision = checked(before.Revision + 1), Goal = goal,
-            DeferredGoalId = goal?.Id == before.DeferredGoalId ? before.DeferredGoalId : null }, ct);
+        => PublishAsync(before.Revision, RebindGoalClock(before with { Revision = checked(before.Revision + 1), Goal = goal,
+            DeferredGoalId = goal?.Id == before.DeferredGoalId ? before.DeferredGoalId : null }), ct);
 
     private static CodexStoredThreadGoal? ForkGoal(CodexThreadDocument source, System.Text.Json.JsonElement settings)
         => settings.TryGetProperty("ephemeral", out var ephemeral) && ephemeral.ValueKind == System.Text.Json.JsonValueKind.True
-            ? null : source.Goal is { } goal ? goal with { EmptyContinuationCount = null } : null;
+            ? null : source.Goal is { } goal ? goal with { EmptyContinuationCount = null, ElapsedRemainderTicks = null } : null;
 }

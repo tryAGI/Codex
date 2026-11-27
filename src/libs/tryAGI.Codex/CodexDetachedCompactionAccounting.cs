@@ -218,7 +218,7 @@ public sealed partial class CodexThreadStore
                     ? item with { State = "succeeded", Result = terminal.Clone(), CompactionAccounting = binding } : item).ToArray(),
             };
             CodexDetachedCompactionAccounting.ValidateInline(updated);
-            return PromoteRealtimeArtifacts(AccountGoalInference(Replace(document, updated), receipt, terminal), turn, updated);
+            return PromoteRealtimeArtifacts(AccountGoalInference(Replace(document, updated), receipt, turnId, terminal), turn, updated);
         }, ct);
 
     /// <summary>Reconcile one original detached compaction reservation, including discarded checkpoints.

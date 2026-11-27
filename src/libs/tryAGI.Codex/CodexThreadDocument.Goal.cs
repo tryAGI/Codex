@@ -7,6 +7,9 @@ public sealed partial record CodexThreadDocument
 
     /// <summary>Forked goal generation whose continuation waits for the next explicit turn.</summary>
     public Guid? DeferredGoalId { get; init; }
+
+    /// <summary>Monotonic active-turn goal accounting checkpoint. Never inherited by a fork.</summary>
+    public CodexGoalExecutionClock? GoalExecutionClock { get; init; }
 }
 
 /// <summary>Versioned thread goal. Editing an objective preserves its identity and accrued usage.</summary>
@@ -25,6 +28,9 @@ public sealed record CodexStoredThreadGoal(Guid Id, string Objective, string Sta
 {
     /// <summary>Consecutive empty automatic continuations; reset by explicit goal changes or turns.</summary>
     public int? EmptyContinuationCount { get; init; }
+
+    /// <summary>Unreported fractional seconds retained across live accounting boundaries.</summary>
+    public long? ElapsedRemainderTicks { get; init; }
 }
 
 /// <summary>Trusted accounting lane for one observed goal usage event.</summary>
