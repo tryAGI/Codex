@@ -22,6 +22,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
     private string? responseId;
     private const int MaximumCompletedResponses = 1024;
     private readonly HashSet<string> completedResponses = new(StringComparer.Ordinal);
+    private readonly HashSet<string> pendingDrainAcknowledgements = new(StringComparer.Ordinal);
 
     /// <summary>Create an optional WebSocket transport, with SSE fallback before dispatch only.</summary>
     public CodexResponsesWebSocketSession() : this(ConnectNativeAsync) { }
@@ -199,6 +200,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
         previousOutput = null;
         responseId = null;
         completedResponses.Clear();
+        pendingDrainAcknowledgements.Clear();
     }
 
     /// <summary>Release the native connection and all cached request/output continuation state.</summary>
@@ -222,8 +224,26 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
         internal async Task SendAsync(JsonObject body, bool prewarm, CancellationToken ct)
         {
             var frame = owner.CreateFrame(body, routing.GetState(generation), prewarm);
+            await SendFrameAsync(frame, ct).ConfigureAwait(false);
+        }
+
+        internal async Task SendFrameAsync(JsonObject frame, CancellationToken ct)
+        {
             var bytes = Encoding.UTF8.GetBytes(frame.ToJsonString());
             await owner.socket!.SendAsync(bytes.AsMemory(), WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
+        }
+
+        // Only a proven unused lease or a fully consumed terminal handshake is reusable.
+        internal void KeepUnused() => completed = true;
+
+        internal void CompleteInterrupted(string id, bool keepConnection)
+        {
+            if (!keepConnection) return;
+            owner.completedResponses.Add(id);
+            owner.previous = null;
+            owner.previousOutput = null;
+            owner.responseId = null;
+            completed = true;
         }
 
         internal async IAsyncEnumerable<string> ReadAsync([EnumeratorCancellation] CancellationToken ct)
@@ -284,9 +304,13 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
             _ => false,
         };
 
-        internal void Complete(JsonObject body, string id, IReadOnlyList<JsonElement> output)
+        internal bool ConsumeLateDrainAcknowledgement(string id) => owner.pendingDrainAcknowledgements.Remove(id);
+
+        internal void Complete(JsonObject body, string id, IReadOnlyList<JsonElement> output,
+            bool pendingDrainAcknowledgement = false)
         {
             owner.completedResponses.Add(id);
+            if (pendingDrainAcknowledgement) owner.pendingDrainAcknowledgements.Add(id);
             owner.Remember(body, id, output, maximumBytes);
             completed = true;
         }

@@ -132,8 +132,9 @@ public sealed class CodexAgent(CodexClient client)
             {
                 observe?.Invoke(item);
                 if (observeAsync is not null) await observeAsync(item, cancellationToken).ConfigureAwait(false);
-                if (item.Type == "response.completed") completedOutput = item.CompletedOutput;
+                if (item.CompletedOutput is not null) completedOutput = item.CompletedOutput;
             }
+            cancellationToken.ThrowIfCancellationRequested();
             var items = completedOutput ?? throw new CodexProtocolException("Completed response has no validated output.");
             var functions = items.Where(x => CodexRealtimeProtocol.Text(x, "type") is "function_call" or "custom_tool_call").ToArray();
             if (requestOptions.RequiredFirstFunction is { } required &&

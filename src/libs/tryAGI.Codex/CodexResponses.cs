@@ -44,6 +44,9 @@ public sealed record CodexResponseOptions(string Model, string Instructions)
     public CodexResponsesWebSocketSession? WebSocketSession { get; init; }
     /// <summary>Prime a new WebSocket using a non-generating response.create before inference.</summary>
     public bool PrewarmWebSocket { get; init; }
+    /// <summary>Per-request signal to interrupt generation and drain completed items on Responses WebSocket.
+    /// Unlike caller cancellation, a drain can return validated output. Not used by SSE.</summary>
+    public CancellationToken WebSocketDrain { get; init; }
     /// <summary>Opt-in automatic compaction at a native thread's closed-turn boundary.</summary>
     public CodexThreadCompactionOptions? AutomaticCompaction { get; init; }
 }
@@ -65,6 +68,8 @@ public sealed record CodexResponseEvent(string Type, JsonElement Payload, double
     /// <summary>Validated output in provider order, available only for a successful completion.
     /// A sparse provider terminal remains unchanged in <see cref="Payload"/>.</summary>
     public IReadOnlyList<JsonElement>? CompletedOutput { get; init; }
+    /// <summary>The provider explicitly completed an interrupted generation; a new turn may be needed.</summary>
+    public bool Interrupted { get; init; }
     /// <summary>Local receipt time.</summary>
     public DateTimeOffset ObservedAt { get; init; } = DateTimeOffset.UtcNow;
 }
@@ -93,7 +98,9 @@ public sealed partial class CodexClient
         var reservedIdentity = usageObserver is null ? null :
             await usageObserver.ReserveWithIdentityAsync(accountingId, settings.Model, cancellationToken).ConfigureAwait(false);
         var accountingComplete = false;
+        var accountingAttempted = false;
         var dispatchStarted = false;
+        CodexResponsesInterruption? interruption = null;
         CodexObservedUsage? incompleteUsage = null;
         CancellationToken requestCancellation = default;
         try
@@ -141,8 +148,8 @@ public sealed partial class CodexClient
             body["text"] = text;
         }
         if (settings.PromptCacheKey is not null) body["prompt_cache_key"] = settings.PromptCacheKey;
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(options.RequestTimeout);
+        using var transportDeadline = new CancellationTokenSource(options.RequestTimeout);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, transportDeadline.Token);
         requestCancellation = deadline.Token;
         using var request = await RequestAsync("responses", body, deadline.Token).ConfigureAwait(false);
         identity?.ApplyHeaders(request, settings.RequestKind);
@@ -162,14 +169,26 @@ public sealed partial class CodexClient
             : null;
         diagnostics.ObserveQuotas(ws?.Quotas);
         if (settings.WebSocketSession is not null && ws is null) diagnostics.Mark("transport.websocket_fallback_sse");
+        if (deadline.IsCancellationRequested)
+        {
+            ws?.KeepUnused();
+            deadline.Token.ThrowIfCancellationRequested();
+        }
         // Entering SendAsync is the conservative boundary: no replay after ambiguous dispatch.
         // Even unexpected generation during a prewarm must not be replayed automatically.
-        dispatchStarted = true;
         if (ws is not null && settings.PrewarmWebSocket && ws.NeedsPrewarm)
         {
+            dispatchStarted = true;
             diagnostics.Mark("transport.websocket_prewarm");
             await ws.PrewarmAsync(body, deadline.Token).ConfigureAwait(false);
+            dispatchStarted = false;
         }
+        if (deadline.IsCancellationRequested)
+        {
+            ws?.KeepUnused();
+            deadline.Token.ThrowIfCancellationRequested();
+        }
+        dispatchStarted = true;
         using var response = ws is null
             ? await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false)
             : null;
@@ -187,10 +206,14 @@ public sealed partial class CodexClient
         }
         await using var stream = response is not null
             ? await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false) : null;
-        var events = ws is not null ? ws.ReadAsync(deadline.Token) : ReadSseAsync(stream!, options.MaximumMessageBytes, deadline.Token);
         var completed = false;
         var outputValidation = new CodexResponseOutputValidation(options.MaximumMessageBytes);
         var correlation = ws?.NewCorrelation() ?? new CodexResponsesCorrelation();
+        if (ws is not null)
+            interruption = new(correlation, cancellationToken, settings.WebSocketDrain, diagnostics.Mark);
+        var events = interruption is not null
+            ? interruption.ReadAsync(ws!.ReadAsync, ws!.SendFrameAsync, ws!.ConsumeLateDrainAcknowledgement, transportDeadline.Token)
+            : ReadSseAsync(stream!, options.MaximumMessageBytes, deadline.Token);
         await foreach (var data in events.ConfigureAwait(false))
         {
             if (data == "[DONE]") break;
@@ -204,7 +227,10 @@ public sealed partial class CodexClient
             }
             diagnostics.BindResponseId(correlation.ResponseId);
             responsesRouting.CaptureEvent(payload, type, routingGeneration);
-            if (type is "error" or "response.failed" or "response.incomplete")
+            var interruptedTerminal = interruption?.InterruptSent == true &&
+                CodexResponsesInterruption.IsInterruptedTerminal(type, payload);
+            var terminal = type == "response.completed" || interruptedTerminal;
+            if (type is "error" or "response.failed" || type == "response.incomplete" && !interruptedTerminal)
             {
                 incompleteUsage = CodexObservedUsage.Read(payload, identity, accountingId) is { } observed
                     ? observed with { ResponseId = observed.ResponseId ?? correlation.ResponseId } : null;
@@ -216,26 +242,39 @@ public sealed partial class CodexClient
                     throw quota;
                 throw new CodexProtocolException($"Codex response terminated ({type}; {category}); usage is unknown and output must not execute.");
             }
-            diagnostics.Event(type, payload);
-            if (type == "response.completed" && usageObserver is not null &&
+            diagnostics.Event(interruptedTerminal ? "response.completed" : type, payload);
+            if (terminal && usageObserver is not null &&
                 payload.TryGetProperty("response", out var accountingResponse) && accountingResponse.ValueKind == JsonValueKind.Object)
             {
-                await usageObserver.CompleteAsync(accountingId, settings.Model, accountingResponse, deadline.Token).ConfigureAwait(false);
+                accountingAttempted = true;
+                // A confirmed terminal receipt must survive cancellation of the caller.
+                using var save = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await usageObserver.CompleteAsync(accountingId, settings.Model, accountingResponse, save.Token).ConfigureAwait(false);
                 accountingComplete = true;
                 diagnostics.Mark("usage.persisted");
             }
-            if (outputValidation.Event(type, payload) is { } outputFailure)
+            if (terminal && interruption is not null && cancellationToken.IsCancellationRequested)
+            {
+                ws!.CompleteInterrupted(correlation.ResponseId!, interruption.HandshakeComplete &&
+                    (!interruption.InterruptSent || interruption.Acknowledged));
+                diagnostics.Mark("transport.websocket_cancelled");
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            if (outputValidation.Event(type, payload, interruptedTerminal) is { } outputFailure)
             {
                 diagnostics.Mark("response.protocol_rejected." + outputFailure);
                 throw new CodexProtocolException("Codex completed output rejected (" + outputFailure + "); not a silent success.");
             }
-            completed |= type == "response.completed";
+            completed |= terminal;
             if (completed && ws is not null)
-                ws.Complete(body, correlation.ResponseId!, outputValidation.CompletedOutput!);
+            {
+                ws.Complete(body, correlation.ResponseId!, outputValidation.CompletedOutput!,
+                    interruption!.InterruptSent && !interruption.Acknowledged);
+            }
             yield return new(type, payload, Stopwatch.GetElapsedTime(started).TotalMilliseconds)
             {
                 Identity = identity, RequestId = accountingId, ResponseId = correlation.ResponseId,
-                CompletedOutput = completed ? outputValidation.CompletedOutput : null,
+                CompletedOutput = completed ? outputValidation.CompletedOutput : null, Interrupted = interruptedTerminal,
             };
             if (completed) yield break;
         }
@@ -250,7 +289,15 @@ public sealed partial class CodexClient
             if (!accountingComplete && usageObserver is not null)
             {
                 using var save = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                if (dispatchStarted)
+                if (!accountingAttempted && interruption?.TerminalReceipt is { } receipt &&
+                    receipt.TryGetProperty("response", out var terminalResponse) && terminalResponse.ValueKind == JsonValueKind.Object)
+                {
+                    // The terminal may have arrived before a rejected or lost interrupt acknowledgement.
+                    // Do not regenerate or discard its provider usage when retiring the socket.
+                    await usageObserver.CompleteAsync(accountingId, settings.Model, terminalResponse, save.Token).ConfigureAwait(false);
+                    diagnostics.Mark("usage.persisted_after_interrupt");
+                }
+                else if (dispatchStarted)
                 {
                     try { diagnostics.Interrupted(cancellationToken.IsCancellationRequested, requestCancellation.IsCancellationRequested); }
                     finally

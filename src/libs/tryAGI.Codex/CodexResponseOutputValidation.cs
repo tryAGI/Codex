@@ -19,7 +19,7 @@ internal sealed class CodexResponseOutputValidation(int maximumMessageBytes = 4 
     private bool sawPreview;
     internal IReadOnlyList<JsonElement>? CompletedOutput { get; private set; }
 
-    internal string? Event(string type, JsonElement payload)
+    internal string? Event(string type, JsonElement payload, bool interrupted = false)
     {
         if (type == "response.output_item.done")
         {
@@ -32,11 +32,11 @@ internal sealed class CodexResponseOutputValidation(int maximumMessageBytes = 4 
             streamedFailure ??= RecordPreview(type, payload);
             return null;
         }
-        if (type != "response.completed") return null;
+        if (type != "response.completed" && !interrupted) return null;
         if (!payload.TryGetProperty("response", out var response) || response.ValueKind != JsonValueKind.Object)
             return "missing_response";
         if (response.TryGetProperty("status", out var status) &&
-            (status.ValueKind != JsonValueKind.String || status.GetString() != "completed")) return "invalid_terminal_status";
+            (status.ValueKind != JsonValueKind.String || status.GetString() != (interrupted ? "incomplete" : "completed"))) return "invalid_terminal_status";
         var hasTerminalOutput = response.TryGetProperty("output", out var output);
         if (hasTerminalOutput && output.ValueKind != JsonValueKind.Array) return "invalid_output_array";
         // A Rust Responses completion may contain only a response ID. The separately
@@ -54,19 +54,26 @@ internal sealed class CodexResponseOutputValidation(int maximumMessageBytes = 4 
         }
         else
         {
-            if (!streamed.Keys.SequenceEqual(Enumerable.Range(0, streamed.Count))) return "missing_output_items";
+            if (!interrupted && !streamed.Keys.SequenceEqual(Enumerable.Range(0, streamed.Count))) return "missing_output_items";
             items = streamed.Values.ToArray();
         }
+        // Interrupted receipts and streamed items can contain explicitly partial tool calls.
+        // They are neither continuation nor authorizations; only completed items survive.
+        if (interrupted)
+            items = items.Where(item => CodexRealtimeProtocol.Text(item, "status") != "incomplete").ToArray();
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in items)
         {
+            if (interrupted && item.ValueKind == JsonValueKind.Object && item.TryGetProperty("status", out var itemStatus) &&
+                itemStatus.ValueKind != JsonValueKind.Null && CodexRealtimeProtocol.Text(item, "status") != "completed")
+                return "unfinished_item";
             if (Item(item) is { } failure) return failure;
             if (CodexRealtimeProtocol.Text(item, "id") is { } id && !ids.Add(id)) return "repeated_output_item_id";
         }
-        if (sawPreview && items.Length == 0 || anonymousAdded > items.Length ||
-            previewIndices.Any(index => index >= items.Length) || previewIds.Any(id => !ids.Contains(id)))
+        if (!interrupted && (sawPreview && items.Length == 0 || anonymousAdded > items.Length ||
+            previewIndices.Any(index => index >= items.Length) || previewIds.Any(id => !ids.Contains(id))))
             return "unfinished_streamed_output";
-        if (previewPositions.Any(pair => pair.Value >= items.Length || CodexRealtimeProtocol.Text(items[pair.Value], "id") != pair.Key))
+        if (!interrupted && previewPositions.Any(pair => pair.Value >= items.Length || CodexRealtimeProtocol.Text(items[pair.Value], "id") != pair.Key))
             return "terminal_output_conflict";
         CompletedOutput = Array.AsReadOnly(items);
         return null;
