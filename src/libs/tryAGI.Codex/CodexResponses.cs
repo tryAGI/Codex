@@ -45,6 +45,8 @@ public sealed record CodexResponseEvent(string Type, JsonElement Payload, double
 
 public sealed partial class CodexClient
 {
+    private readonly CodexResponsesRouting responsesRouting = new();
+
     /// <summary>Native Codex Responses SSE stream, using ChatGPT OAuth. No hosted connector or CLI agent.</summary>
     public async IAsyncEnumerable<CodexResponseEvent> StreamResponseAsync(CodexResponseOptions settings,
         IReadOnlyList<JsonElement> input, [EnumeratorCancellation] CancellationToken cancellationToken = default,
@@ -113,6 +115,7 @@ public sealed partial class CodexClient
         requestCancellation = deadline.Token;
         using var request = await RequestAsync("responses", body, deadline.Token).ConfigureAwait(false);
         identity?.ApplyHeaders(request);
+        var routingGeneration = responsesRouting.Prepare(request, identity);
         request.Headers.Accept.ParseAdd("text/event-stream");
         diagnostics.RequestBytes = request.Content?.Headers.ContentLength;
         diagnostics.Mark("request.prepared");
@@ -129,6 +132,7 @@ public sealed partial class CodexClient
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
         diagnostics.Mark("response.headers");
         await EnsureCallSuccessAsync(response, deadline.Token).ConfigureAwait(false);
+        responsesRouting.Capture(response, routingGeneration);
         await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
         var completed = false;
         var outputValidation = new CodexResponseOutputValidation();
