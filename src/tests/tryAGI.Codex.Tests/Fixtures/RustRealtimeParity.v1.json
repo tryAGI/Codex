@@ -229,7 +229,8 @@
       "protocol": "v2",
       "route": "direct-mock",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L127-L189",
-      "description": "Synthetic function-call items exercise the exact upstream distinction between background_agent, remain_silent and ordinary completed items.",
+      "additionalSource": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/src/realtime_conversation.rs#L3652-L3668",
+      "description": "Synthetic function-call items exercise the upstream distinction between background_agent, remain_silent and ordinary completed items; only remain_silent receives an empty function receipt without creating a response.",
       "incoming": [
         {
           "type": "conversation.item.done",
@@ -262,7 +263,16 @@
           }
         }
       ],
-      "outgoing": [],
+      "outgoing": [
+        {
+          "type": "conversation.item.create",
+          "item": {
+            "type": "function_call_output",
+            "call_id": "call-quiet",
+            "output": ""
+          }
+        }
+      ],
       "projections": {
         "0": {
           "handoff": {

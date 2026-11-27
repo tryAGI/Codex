@@ -189,7 +189,10 @@ public sealed class RustParityFixtureTests
             await connection.CloseTransportAsync(ct);
             Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.ClosedOutput);
         }
-        Assert.Equal(fixture.GetProperty("outgoing").GetArrayLength(), socket.Sent.Count);
+        var expectedOutgoing = fixture.GetProperty("outgoing").EnumerateArray().ToArray();
+        Assert.Equal(expectedOutgoing.Length, socket.Sent.Count);
+        for (var i = 0; i < expectedOutgoing.Length; i++)
+            Assert.True(Equal(expectedOutgoing[i], socket.Sent[i]), $"Automatic outbound frame {i} differs: {socket.Sent[i]}");
     }
 
     [Theory]
