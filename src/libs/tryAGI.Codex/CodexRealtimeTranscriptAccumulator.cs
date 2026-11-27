@@ -50,6 +50,8 @@ public sealed class CodexRealtimeTranscriptAccumulator
     private readonly object gate = new();
     private readonly string protocol;
     private readonly int maximumActiveBytes;
+    private readonly bool canonicalLegacySegments;
+    private bool IndependentSegments => protocol == "v3" || canonicalLegacySegments;
     private readonly List<Entry> entries = [];
     private readonly Dictionary<string, string> receipts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CodexRealtimeHandoffSnapshot> handoffs = new(StringComparer.Ordinal);
@@ -78,11 +80,15 @@ public sealed class CodexRealtimeTranscriptAccumulator
     /// <param name="protocol">V1, V2 or V3 (lowercase).</param>
     /// <param name="maximumActiveBytes">Hard bound for active text plus raw event payloads.</param>
     public CodexRealtimeTranscriptAccumulator(string protocol, int maximumActiveBytes = 4_194_304)
+        : this(protocol, maximumActiveBytes, canonicalLegacySegments: false) { }
+
+    internal CodexRealtimeTranscriptAccumulator(string protocol, int maximumActiveBytes, bool canonicalLegacySegments)
     {
         if (protocol is not ("v1" or "v2" or "v3")) throw new ArgumentException("Unsupported realtime protocol.", nameof(protocol));
         if (maximumActiveBytes is <= 0 or > MaximumHandoffBytes) throw new ArgumentOutOfRangeException(nameof(maximumActiveBytes));
         this.protocol = protocol;
         this.maximumActiveBytes = maximumActiveBytes;
+        this.canonicalLegacySegments = canonicalLegacySegments;
     }
 
     /// <summary>Observes a typed or raw wire event. Returns a handoff snapshot only for a
@@ -121,9 +127,15 @@ public sealed class CodexRealtimeTranscriptAccumulator
             else if (delegation is not null) captured = CaptureHandoff(source, delegation, identities);
             else
             {
-                if (inputBoundary) { ForgetPresentationPrefix("user"); newInput = true; }
-                if (outputBoundary) { ForgetPresentationPrefix("assistant"); newOutput = true; }
-                lastFinalRole = null;
+                // Rust's public legacy transcript reducer observes normalized deltas and
+                // finals, not raw GA response/speech boundary receipts. Those receipts must
+                // not replace an unfinished public segment before its actual final.
+                if (!canonicalLegacySegments)
+                {
+                    if (inputBoundary) { ForgetPresentationPrefix("user"); newInput = true; }
+                    if (outputBoundary) { ForgetPresentationPrefix("assistant"); newOutput = true; }
+                    lastFinalRole = null;
+                }
             }
             RecordReceipts(identities);
             return captured;
@@ -222,7 +234,7 @@ public sealed class CodexRealtimeTranscriptAccumulator
         var forceNew = fragment.Role == "user" ? newInput : newOutput;
         Entry? entry = null;
         if (!forceNew)
-            entry = protocol == "v3" ? entries.FindLast(e => e.Role == fragment.Role) :
+            entry = IndependentSegments ? entries.FindLast(e => e.Role == fragment.Role) :
                 entries.LastOrDefault() is { } last && last.Role == fragment.Role ? last : null;
 
         var text = fragment.Text;
@@ -245,7 +257,7 @@ public sealed class CodexRealtimeTranscriptAccumulator
         var oldText = entry?.Text ?? "";
         var nextText = !fragment.Final ? oldText + text :
             text.Length == 0 ? oldText :
-            entry is null || protocol != "v3" || text.StartsWith(oldText, StringComparison.Ordinal) ? text : oldText;
+            entry is null || !IndependentSegments || text.StartsWith(oldText, StringComparison.Ordinal) ? text : oldText;
         // Count raw payload and reconciled text independently; never truncate Unicode or mutate on overflow.
         var rawBytes = Utf8(source.Payload.GetRawText());
         var increase = checked(rawBytes + Utf8(nextText) - Utf8(oldText) + (entry is null ? Utf8(fragment.Role) + 64 : 0));
@@ -269,8 +281,8 @@ public sealed class CodexRealtimeTranscriptAccumulator
 
     private void SetBoundary(string role, bool final)
     {
-        if (role == "user") newInput = final && protocol == "v3";
-        else newOutput = final && protocol == "v3";
+        if (role == "user") newInput = final && IndependentSegments;
+        else newOutput = final && IndependentSegments;
         lastFinalRole = final ? role : null;
     }
 

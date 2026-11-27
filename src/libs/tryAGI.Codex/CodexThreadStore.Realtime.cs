@@ -58,6 +58,11 @@ public sealed record CodexStoredRealtimeSession(
 
     /// <summary>Latest public previews for promoted items, separate from the immutable timeline.</summary>
     public CodexStoredRealtimeArtifactUpdate[]? ArtifactPreviewUpdates { get; init; }
+
+    /// <summary>New V1/V2 enrollments retain independent append-only presentation segments.
+    /// Absent on earlier journals to preserve their exact materialized history and positions.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool CanonicalLegacySegments { get; init; }
 }
 
 public sealed partial class CodexThreadStore
@@ -91,7 +96,10 @@ public sealed partial class CodexThreadStore
                 throw new InvalidOperationException("Realtime session identity is already registered or another session is open.");
             return document with { RealtimeSessions = [.. sessions,
                 new CodexStoredRealtimeSession(1, sessionId, callId, protocol, ownerId, "detached")
-                { TransportKind = kind, StartedRevision = checked(document.Revision + 1) }] };
+                {
+                    TransportKind = kind, StartedRevision = checked(document.Revision + 1),
+                    CanonicalLegacySegments = protocol is "v1" or "v2",
+                }] };
         }, ct);
 
     /// <summary>Atomically claims a detached call for one transport. A new attachment ID must
@@ -286,6 +294,7 @@ public sealed partial class CodexThreadStore
             if (session is null || open || session.Version != 1 ||
                 !ValidToken(session.SessionId) || !ValidToken(session.OwnerId) || !ids.Add(session.SessionId) ||
                 !Enum.IsDefined(session.TransportKind) ||
+                session.CanonicalLegacySegments && session.Protocol is not ("v1" or "v2") ||
                 session.StartedRevision is < 1 || session.ClosedRevision is < 1 ||
                 session.ClosedRevision is not null && (session.State != "ended" || session.ClosedRevision < session.StartedRevision) ||
                 (session.TransportKind == CodexRealtimeTransportKind.ExistingCall

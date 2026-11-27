@@ -143,7 +143,8 @@ public sealed partial class CodexThreadStore
             NextRealtimeObservationTime(history), before.Turns.Length, attachmentId,
             source.Type, source.Payload.Clone(), source.ReceivedAfterConnectMs,
             CommitRevision: checked(before.Revision + 1),
-            PublishFinalTranscript: session.Protocol == "v3" && source.Transcript?.Final == true ? true : null);
+            PublishFinalTranscript: (session.Protocol == "v3" || session.CanonicalLegacySegments) &&
+                source.Transcript?.Final == true ? true : null);
         var next = ReplaceRealtimeSession(before, session with
         {
             History = AppendRealtimeHistory(session, history, item),
@@ -318,7 +319,7 @@ public sealed partial class CodexThreadStore
     {
         if (!Enum.IsDefined(mode) || events is null || events.Length > MaximumItems)
             throw new InvalidDataException("Invalid realtime history enrollment or event count.");
-        var accumulator = new CodexRealtimeTranscriptAccumulator(session.Protocol);
+        var accumulator = new CodexRealtimeTranscriptAccumulator(session.Protocol, 4_194_304, session.CanonicalLegacySegments);
         var frames = new Dictionary<string, CodexStoredRealtimeFrame>(StringComparer.Ordinal);
         var handoffs = new Dictionary<string, CodexStoredRealtimeHandoffCapture>(StringComparer.Ordinal);
         var carryover = new List<CodexStoredRealtimeCarryover>();
@@ -405,7 +406,7 @@ public sealed partial class CodexThreadStore
                     // retain their existing commit positions across an SDK upgrade.
                     if (item.PublishFinalTranscript is not null)
                     {
-                        if (item.PublishFinalTranscript != true || session.Protocol != "v3" ||
+                        if (item.PublishFinalTranscript != true || session.Protocol != "v3" && !session.CanonicalLegacySegments ||
                             source.Transcript?.Final != true || item.CommitRevision is null)
                             throw new InvalidDataException("Invalid realtime final presentation receipt.");
                         if (frameCommitted is not null)

@@ -13,7 +13,8 @@ public sealed partial class CodexThreadStore
             : new JsonObject { ["type"] = "frame", ["channels"] = new JsonObject { ["voice_transcript"] = transcript } };
         item["id"] = frame.Id;
         item["realtimeSessionId"] = session.SessionId;
-        item["observedAtMs"] = frame.ObservedAtMs;
+        item["observedAtMs"] = session.CanonicalLegacySegments && session.History?.Mode != CodexRealtimeHistoryMode.Canonical
+            ? null : JsonValue.Create(frame.ObservedAtMs);
         return item;
     }
 
@@ -42,7 +43,9 @@ public sealed partial class CodexThreadStore
                 _ = ReplayRealtimeHistory(session, history.Mode, history.Events,
                     (frame, boundary) =>
                     {
-                        Add(ProjectRealtimeFrame(session, frame), frame.Id, frame.ObservedAtMs, boundary.CommitRevision);
+                        Add(ProjectRealtimeFrame(session, frame), frame.Id,
+                            session.CanonicalLegacySegments && history.Mode != CodexRealtimeHistoryMode.Canonical
+                                ? null : frame.ObservedAtMs, boundary.CommitRevision);
                     },
                     (saved, boundary) => Add(new JsonObject
                     {
