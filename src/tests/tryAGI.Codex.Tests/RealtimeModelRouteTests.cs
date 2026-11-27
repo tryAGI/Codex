@@ -38,6 +38,41 @@ public sealed class RealtimeModelRouteTests
         using var client = new CodexClient(new Credentials());
         await Assert.ThrowsAsync<ArgumentException>(() => client.ConnectRealtimeWebSocketAsync(new("silent") { Protocol = "v1" }, TestContext.Current.CancellationToken));
     }
+    // Rust v0.172.0: core/realtime_conversation.rs model selection, RealtimeSessionConfig::voice_or_default,
+    // and realtime_call.rs ChatGPT call override.
+    [Theory]
+    [InlineData("v1", true, "gpt-realtime-1.5", "cove")]
+    [InlineData("v1", false, "gpt-realtime-1.5", "cove")]
+    [InlineData("v2", false, "gpt-realtime-1.5", "marin")]
+    [InlineData("v3", true, "gpt-live-1.1-codex", "cove")]
+    [InlineData("v3", false, "gpt-live-1.1-codex", "marin")]
+    public void RustDefaultsFollowVersionAndDestination(string protocol, bool chatGptCall, string model, string voice)
+    {
+        var options = new CodexRealtimeSessionOptions("instructions") { Protocol = protocol };
+        var wire = protocol == "v2" ? CodexRealtimeGaProtocol.Session(options) : CodexRealtimeProtocol.Session(options, chatGptCall);
+        Assert.Equal(model, wire["model"]?.GetValue<string>());
+        Assert.Equal(voice, wire["audio"]?["output"]?["voice"]?.GetValue<string>());
+        Assert.Equal(model, options.Model);
+        Assert.Equal(voice, options.ResolveVoice(chatGptCall));
+        var explicitVoice = protocol == "v2" ? "cedar" : "juniper";
+        var explicitOptions = options with { Model = "explicit-model", Voice = explicitVoice };
+        var explicitWire = protocol == "v2" ? CodexRealtimeGaProtocol.Session(explicitOptions) : CodexRealtimeProtocol.Session(explicitOptions, chatGptCall);
+        Assert.Equal("explicit-model", explicitWire["model"]?.GetValue<string>());
+        Assert.Equal(explicitVoice, explicitWire["audio"]?["output"]?["voice"]?.GetValue<string>());
+        var reset = explicitOptions with { Model = null, Voice = null };
+        Assert.Equal(model, reset.Model);
+        Assert.Equal(voice, reset.ResolveVoice(chatGptCall));
+    }
+
+    [Fact]
+    public void VoiceCatalogsMatchRust()
+    {
+        Assert.Equal(new[] { "juniper", "maple", "spruce", "ember", "vale", "breeze", "arbor", "sol", "cove" }, CodexProtocolCatalog.V1Voices);
+        Assert.Equal(new[] { "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar" }, CodexProtocolCatalog.V2Voices);
+        Assert.Equal(new[] { "juniper", "maple", "spruce", "ember", "vale", "breeze", "arbor", "sol", "cove", "marin", "aube", "bubbie", "haetsal", "hanul", "himari", "leher", "miko", "neer", "porto", "rindo", "rio", "rivage", "selva", "sonna", "tinta", "viola" }, CodexProtocolCatalog.Voices);
+        Assert.Throws<ArgumentException>(() => CodexRealtimeGaProtocol.Session(new("instructions") { Protocol = "v2", Voice = "cove" }));
+    }
+
     [Fact]
     public async Task RejectionRetainsMachineCodeWithoutProviderTextOrRetry()
     {

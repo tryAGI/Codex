@@ -6,7 +6,7 @@ namespace tryAGI.Codex;
 /// <summary>Public GA Realtime wire protocol. Raw events and session fields remain available alongside typed helpers.</summary>
 internal static class CodexRealtimeGaProtocol
 {
-    public static IReadOnlyList<string> Voices { get; } = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"];
+    public static IReadOnlyList<string> Voices => CodexProtocolCatalog.V2Voices;
     public static JsonObject Session(CodexRealtimeSessionOptions options)
     {
         if (options.Protocol != "v2") throw new ArgumentException("GA Realtime requires protocol v2.");
@@ -25,7 +25,9 @@ internal static class CodexRealtimeGaProtocol
         if (!input.ContainsKey("turn_detection")) input["turn_detection"] = new JsonObject { ["type"] = "semantic_vad" };
         if (!output.ContainsKey("format")) output["format"] = Pcm();
         if (output.ContainsKey("voice")) throw new ArgumentException("Use the dedicated voice setting.");
-        output["voice"] = options.Voice;
+        var voice = options.ResolveVoice(chatGptCall: false);
+        if (!Voices.Contains(voice, StringComparer.Ordinal)) throw new ArgumentException("Voice is not supported by V2.", nameof(options));
+        output["voice"] = voice;
         return session;
     }
     private static JsonObject Pcm() => new() { ["type"] = "audio/pcm", ["rate"] = 24000 };

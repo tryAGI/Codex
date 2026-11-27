@@ -17,6 +17,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     private readonly CancellationTokenSource lifetime = new();
     private readonly Queue<CodexRealtimeEvent> initialEvents = new();
     private readonly string protocol;
+    private readonly bool chatGptCall;
     private bool responseActive;
     private bool responsePending;
     private string? pendingResponseRequestId;
@@ -44,9 +45,10 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     private int reading;
     private int disposed;
 
-    internal CodexRealtimeConnection(WebSocket socket, int maximumBytes, string protocol = "v3") => (this.socket, this.maximumBytes, this.protocol) = (socket, maximumBytes, protocol);
+    internal CodexRealtimeConnection(WebSocket socket, int maximumBytes, string protocol = "v3", bool chatGptCall = true) =>
+        (this.socket, this.maximumBytes, this.protocol, this.chatGptCall) = (socket, maximumBytes, protocol, chatGptCall);
 
-    internal static async Task<CodexRealtimeConnection> ConnectAsync(Uri uri, CodexCredentials auth, CodexEndpointOptions options, CancellationToken ct, string protocol = "v3")
+    internal static async Task<CodexRealtimeConnection> ConnectAsync(Uri uri, CodexCredentials auth, CodexEndpointOptions options, CancellationToken ct, string protocol = "v3", bool chatGptCall = true)
     {
         var socket = new ClientWebSocket();
         socket.Options.CollectHttpResponseDetails = true;
@@ -62,7 +64,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
             using var activity = CodexClient.ActivitySource.StartActivity("codex.realtime.sideband.connect");
             await socket.ConnectAsync(uri, deadline.Token).ConfigureAwait(false);
             // V3 session configuration is already in the HTTP call creation. Do not reset it here.
-            return new(socket, options.MaximumMessageBytes, protocol);
+            return new(socket, options.MaximumMessageBytes, protocol, chatGptCall);
         }
         catch (WebSocketException failure)
         {
@@ -272,7 +274,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     }
     /// <summary>Sends new session settings. Keep reading events to see whether they were accepted.</summary>
     public Task UpdateSessionAsync(CodexRealtimeSessionOptions options, CancellationToken cancellationToken = default) =>
-        SendAsync(protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(options) : CodexRealtimeProtocol.SessionUpdate(options), cancellationToken);
+        SendAsync(protocol == "v2" ? CodexRealtimeGaProtocol.SessionUpdate(options) : CodexRealtimeProtocol.SessionUpdate(options, chatGptCall), cancellationToken);
     /// <summary>Native V3 PCM audio transport for direct WebSocket sessions. Do not duplicate
     /// audio already sent over WebRTC. Server capability/transport admission belongs to the caller.</summary>
     public Task AppendAudioAsync(ReadOnlyMemory<byte> pcm16, CancellationToken cancellationToken = default) =>

@@ -16,11 +16,19 @@ public sealed record CodexRealtimeSessionOptions(string Instructions)
     /// <summary><c>v3</c> (Codex frameless bidi, default), <c>v2</c> (GA realtime) or <c>v1</c> (existing-call sideband).</summary>
     public string Protocol { get; init; } = "v3";
 
-    /// <summary>Realtime model. Defaults to <see cref="CodexProtocolCatalog.DefaultRealtimeModel"/>.</summary>
-    public string Model { get; init; } = CodexProtocolCatalog.DefaultRealtimeModel;
+    private string? model;
+    private string? voice;
 
-    /// <summary>Built-in voice. Defaults to <see cref="CodexProtocolCatalog.DefaultVoice"/>.</summary>
-    public string Voice { get; init; } = CodexProtocolCatalog.DefaultVoice;
+    /// <summary>Realtime model. Unset or null selects the Rust default for <see cref="Protocol"/>.</summary>
+    [System.Diagnostics.CodeAnalysis.AllowNull]
+    public string Model { get => model ?? CodexProtocolCatalog.GetDefaultRealtimeModel(Protocol); init => model = value; }
+
+    /// <summary>Built-in voice. Unset or null selects the destination default; the getter preserves the ChatGPT V3 call default.</summary>
+    [System.Diagnostics.CodeAnalysis.AllowNull]
+    public string Voice { get => ResolveVoice(chatGptCall: Protocol != "v2"); init => voice = value; }
+
+    /// <summary>Resolves the explicit voice or the default for the actual transport destination.</summary>
+    public string ResolveVoice(bool chatGptCall) => voice ?? CodexProtocolCatalog.GetDefaultVoice(Protocol, chatGptCall);
 
     /// <summary>Let the voice model speak a short acknowledgement while a client delegation runs.</summary>
     public bool DelegationAckFiller { get; init; }
@@ -111,9 +119,9 @@ internal static class CodexRealtimeProtocol
 {
     /// <summary>V3 update intentionally omits model, matching upstream methods_frameless_bidi.
     /// Sending this command does not prove acceptance: retain session.updated/error receipts.</summary>
-    public static JsonObject SessionUpdate(CodexRealtimeSessionOptions options)
+    public static JsonObject SessionUpdate(CodexRealtimeSessionOptions options, bool chatGptCall = true)
     {
-        var session = Session(options); session.Remove("model");
+        var session = Session(options, chatGptCall); session.Remove("model");
         session.Remove("triggers"); // Startup configuration; sleep/wake updates must not recreate triggers.
         if (options.LiveDecisionDelegationQuestions.Count > 0) session.Remove("delegation"); // Delegation type is fixed at creation.
         if (options.LiveCustomVoiceId is not null) session.Remove("audio"); // Never reset a saved custom voice on sleep/wake.
@@ -162,13 +170,14 @@ internal static class CodexRealtimeProtocol
             text.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '.') ? text : null;
         return new(Safe(error, "event_id") ?? Safe(payload, "event_id"), Safe(error, "code"), Safe(error, "type"), Safe(error, "param"));
     }
-    public static JsonObject Session(CodexRealtimeSessionOptions options)
+    public static JsonObject Session(CodexRealtimeSessionOptions options, bool chatGptCall = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Instructions);
         CodexRealtimeStartupContext.ValidateInitialItems(options.InitialItems);
-        // Upstream 0.163 separates V1 and V3; a newly added V3 voice is not valid on V1.
+        // Rust v0.172 keeps separate voice catalogs; select the destination before validating.
+        var voice = options.ResolveVoice(chatGptCall);
         var voices = options.Protocol == "v1" ? CodexProtocolCatalog.V1Voices : CodexProtocolCatalog.Voices;
-        if (!voices.Contains(options.Voice, StringComparer.Ordinal))
+        if (!voices.Contains(voice, StringComparer.Ordinal))
             throw new ArgumentException("Voice is not supported by the selected Codex realtime protocol.", nameof(options));
         if (options.Protocol != "v3" && (options.LiveDecisionTriggers.Count != 0 || options.LiveDecisionDelegationQuestions.Count != 0 || options.LiveCustomVoiceId is not null || options.LiveVoiceDescription is not null))
             throw new ArgumentException("Live features require explicit V3 capability verification.");
@@ -180,13 +189,13 @@ internal static class CodexRealtimeProtocol
             if (options.InitialItems.Count != 0) throw new ArgumentException("Initial items require V3.", nameof(options));
             return new JsonObject { ["type"] = "quicksilver", ["model"] = options.Model, ["instructions"] = options.Instructions,
                 ["audio"] = new JsonObject { ["input"] = new JsonObject { ["format"] = new JsonObject
-                { ["type"] = "audio/pcm", ["rate"] = 24000 } }, ["output"] = new JsonObject { ["voice"] = options.Voice } } };
+                { ["type"] = "audio/pcm", ["rate"] = 24000 } }, ["output"] = new JsonObject { ["voice"] = voice } } };
         }
         if (options.Protocol != "v3") throw new ArgumentException("AVAS calls support V1/V3; V2 requires a different route.", nameof(options));
         var session = new JsonObject
         {
             ["model"] = options.Model, ["instructions"] = options.Instructions,
-            ["audio"] = new JsonObject { ["output"] = new JsonObject { ["voice"] = options.Voice } },
+            ["audio"] = new JsonObject { ["output"] = new JsonObject { ["voice"] = voice } },
             ["delegation"] = new JsonObject { ["type"] = "client", ["ack_filler"] = options.DelegationAckFiller },
         };
         if (options.LiveDecisionTriggers.Count > 0) session["triggers"] = CodexLiveFeatures.Triggers(options.LiveDecisionTriggers);

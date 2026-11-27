@@ -87,12 +87,12 @@ public sealed partial class CodexClient : IDisposable
     {
         if (session.Protocol == "v2") return await ConnectGaRealtimeAsync(session, cancellationToken).ConfigureAwait(false);
         if (session.Protocol != "v3") throw new ArgumentException("The direct audio WebSocket host supports V3 only; use the reviewed existing-call V1 sideband diagnostic.", nameof(session));
-        _ = CodexRealtimeProtocol.SessionUpdate(session);
+        _ = CodexRealtimeProtocol.SessionUpdate(session, chatGptCall: false);
         var auth = await credentials.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
         // ChatGPT OAuth credentials belong to the ChatGPT backend. The API Live URI is a
         // different authorization surface and can accept the socket before rejecting session setup.
         var uri = DirectRealtimeUri(options.BackendBaseUri, session.Model);
-        var connection = await CodexRealtimeConnection.ConnectAsync(uri, auth, options, cancellationToken).ConfigureAwait(false);
+        var connection = await CodexRealtimeConnection.ConnectAsync(uri, auth, options, cancellationToken, chatGptCall: false).ConfigureAwait(false);
         try
         {
             await connection.UpdateSessionAsync(session, cancellationToken).ConfigureAwait(false);

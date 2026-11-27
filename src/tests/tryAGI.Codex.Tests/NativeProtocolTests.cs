@@ -48,7 +48,7 @@ public sealed class NativeProtocolTests
     }
 
     [Theory]
-    [InlineData("marin")]
+    [InlineData("alloy")]
     [InlineData("cedar")]
     [InlineData("verse")]
     [InlineData("unknown")]
@@ -63,7 +63,7 @@ public sealed class NativeProtocolTests
     [Fact]
     public void V3AcceptsThePinnedUpstreamChatGptVoiceCatalog()
     {
-        Assert.Equal(25, CodexProtocolCatalog.Voices.Count);
+        Assert.Equal(26, CodexProtocolCatalog.Voices.Count);
         Assert.Equal(9, CodexProtocolCatalog.V1Voices.Count);
         foreach (var voice in CodexProtocolCatalog.Voices)
         {
