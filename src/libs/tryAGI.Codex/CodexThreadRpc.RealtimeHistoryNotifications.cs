@@ -112,7 +112,7 @@ public sealed partial class CodexThreadRpc
             this.journal = journal;
             threadId = baseline.Id;
             offered = baseline.Revision;
-            position = CodexThreadStore.ProjectRealtimeItems(baseline).Count;
+            position = CodexThreadStore.ProjectRealtimeItems(baseline, journal).Count;
         }
 
         internal bool Needs(long revision) { lock (gate) return !stopped && revision > offered; }
@@ -164,7 +164,7 @@ public sealed partial class CodexThreadRpc
 
         private async Task PublishAsync(CodexThreadDocument document)
         {
-            var items = CodexThreadStore.ProjectRealtimeItems(document);
+            var items = CodexThreadStore.ProjectRealtimeItems(document, journal);
             if (items.Count < position) throw new InvalidDataException("Realtime timeline prefix was truncated.");
             foreach (var item in items.Skip(position))
             {

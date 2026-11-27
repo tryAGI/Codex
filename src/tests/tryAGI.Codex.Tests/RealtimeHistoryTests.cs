@@ -11,7 +11,9 @@ public sealed class RealtimeHistoryTests
         private readonly object gate = new();
         private readonly Dictionary<Guid, JsonElement> rows = [];
         private int reads;
+        private int writes;
         public int Reads => Volatile.Read(ref reads);
+        public int Writes => Volatile.Read(ref writes);
         public bool ThrowAfterCommit { get; set; }
         public bool ThrowBeforeCommit { get; set; }
         public Func<JsonElement, JsonElement, JsonElement>? CompetingWriteOnce { get; set; }
@@ -39,6 +41,7 @@ public sealed class RealtimeHistoryTests
                 }
                 if (ThrowBeforeCommit) { ThrowBeforeCommit = false; throw new IOException("Write failed before commit."); }
                 rows[id] = body.Clone();
+                Interlocked.Increment(ref writes);
                 if (ThrowAfterCommit) { ThrowAfterCommit = false; throw new IOException("Commit receipt lost."); }
                 return Task.FromResult(true);
             }

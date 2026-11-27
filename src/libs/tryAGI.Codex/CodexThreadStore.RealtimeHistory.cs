@@ -114,13 +114,65 @@ public sealed partial class CodexThreadStore
         string sessionId, string ownerId, Guid attachmentId, string observationId, CodexRealtimeEvent source,
         bool recovery, CancellationToken cancellationToken)
     {
-        Token(observationId);
-        ArgumentNullException.ThrowIfNull(source);
-        if (!IsRealtimeHistoryEvent(source) || source.Payload.ValueKind != JsonValueKind.Object ||
-            CodexRealtimeProtocol.Text(source.Payload, "type") != source.Type ||
-            !double.IsFinite(source.ReceivedAfterConnectMs) || source.ReceivedAfterConnectMs < 0)
-            throw new ArgumentException("Invalid or unrelated realtime history observation.", nameof(source));
+        var observation = new CodexRealtimePendingObservation(attachmentId, observationId, source);
+        ValidateRealtimeObservationBatch(attachmentId, [observation]);
         var before = await CurrentAsync(threadId, expectedRevision, cancellationToken).ConfigureAwait(false);
+        var batch = await RecordRealtimeObservationsFromSnapshotAsync(before, sessionId, ownerId,
+            attachmentId, [observation], recovery, cancellationToken).ConfigureAwait(false);
+        return new(batch.Admitted[0], batch.Thread);
+    }
+
+    /// <summary>Atomically records a bounded ordered batch of exact observations for one
+    /// attachment. Each result flag corresponds to its input position; false denotes an
+    /// already persisted identity, not permission to repeat an external action.</summary>
+    public async Task<CodexRealtimeObservationBatchAdmission> RecordRealtimeObservationsAsync(Guid threadId, long expectedRevision,
+        string sessionId, string ownerId, Guid attachmentId, IReadOnlyList<CodexRealtimePendingObservation> observations,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(observations);
+        if (observations.Count is < 1 or > MaximumRealtimeObservationBatch)
+            throw new ArgumentException("Invalid realtime observation batch count.", nameof(observations));
+        var batch = observations.ToArray();
+        ValidateRealtimeObservationBatch(attachmentId, batch);
+        var before = await CurrentAsync(threadId, expectedRevision, cancellationToken).ConfigureAwait(false);
+        return await RecordRealtimeObservationsFromSnapshotAsync(before, sessionId, ownerId,
+            attachmentId, batch, false, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal const int MaximumRealtimeObservationBatch = 16;
+
+    private static void ValidateRealtimeObservationBatch(Guid attachmentId, IReadOnlyList<CodexRealtimePendingObservation> observations)
+    {
+        ArgumentNullException.ThrowIfNull(observations);
+        if (observations.Count is < 1 or > MaximumRealtimeObservationBatch)
+            throw new ArgumentException("Invalid realtime observation batch count.", nameof(observations));
+        long bytes = 0;
+        foreach (var observation in observations)
+        {
+            ArgumentNullException.ThrowIfNull(observation);
+            Token(observation.Id);
+            var source = observation.Event;
+            ArgumentNullException.ThrowIfNull(source);
+            if (observation.AttachmentId != attachmentId ||
+                !IsRealtimeHistoryEvent(source) || source.Payload.ValueKind != JsonValueKind.Object ||
+                CodexRealtimeProtocol.Text(source.Payload, "type") != source.Type ||
+                !double.IsFinite(source.ReceivedAfterConnectMs) || source.ReceivedAfterConnectMs < 0)
+                throw new ArgumentException("Invalid or unrelated realtime history observation.", nameof(observations));
+            bytes += Encoding.UTF8.GetByteCount(source.Payload.GetRawText());
+            if (bytes > MaximumDocumentBytes)
+                throw new InvalidOperationException("Realtime observation batch exceeds the journal byte bound.");
+        }
+    }
+
+    // A controller has already read and validated this snapshot. The same atomic CAS
+    // fences every newly admitted event; a conflict never publishes a partial batch.
+    internal async Task<CodexRealtimeObservationBatchAdmission> RecordRealtimeObservationsFromSnapshotAsync(
+        CodexThreadDocument before, string sessionId, string ownerId, Guid attachmentId,
+        IReadOnlyList<CodexRealtimePendingObservation> observations, bool recovery, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (before.AccountId != accountId) throw new InvalidOperationException("Realtime observation account changed.");
+        ValidateRealtimeObservationBatch(attachmentId, observations);
         var session = FindRealtimeSession(before, sessionId, ownerId);
         if (recovery)
         {
@@ -131,34 +183,54 @@ public sealed partial class CodexThreadStore
         }
         else RequireRealtimeAttachment(session, attachmentId);
         var history = session.History ?? EmptyRealtimeHistory();
-        if (history.Events.FirstOrDefault(e => e.Id == observationId) is { } prior)
+        var known = history.Events.ToDictionary(e => e.Id, StringComparer.Ordinal);
+        var added = new List<CodexStoredRealtimeHistoryEvent>();
+        var admitted = new bool[observations.Count];
+        var observedAt = history.Events.LastOrDefault()?.ObservedAtMs ?? 0;
+        for (var i = 0; i < observations.Count; i++)
         {
-            if (prior.Kind != "observation" || prior.EventType != source.Type ||
-                prior.Payload is not { } payload || payload.GetRawText() != source.Payload.GetRawText())
-                throw new InvalidOperationException("Realtime observation ID was reused for different content.");
-            NotifyReconciledRealtimeSnapshot(before);
-            return new(false, before);
+            var observation = observations[i];
+            var source = observation.Event;
+            if (known.TryGetValue(observation.Id, out var prior))
+            {
+                if (prior.Kind != "observation" || prior.EventType != source.Type ||
+                    prior.Payload is not { } payload || payload.GetRawText() != source.Payload.GetRawText())
+                    throw new InvalidOperationException("Realtime observation ID was reused for different content.");
+                continue;
+            }
+            // A sealed end permits receipt reconciliation but no new speech.
+            if (recovery && session.EndOperationId is not null && !session.DirectCloseDraining)
+                throw new InvalidOperationException("Realtime end history has already been sealed or its drain state is unknown.");
+            if (added.Count >= MaximumItems - history.Events.Length)
+                throw new InvalidOperationException("Realtime journal capacity exhausted.");
+            observedAt = Math.Max(observedAt, observation.ObservedAtMs ?? CaptureRealtimeObservationTime());
+            var item = new CodexStoredRealtimeHistoryEvent(observation.Id, "observation",
+                observedAt, before.Turns.Length, attachmentId,
+                source.Type, source.Payload.Clone(), source.ReceivedAfterConnectMs,
+                CommitRevision: checked(before.Revision + 1),
+                PublishFinalTranscript: (session.Protocol == "v3" || session.CanonicalLegacySegments) &&
+                    source.Transcript?.Final == true ? true : null);
+            known.Add(item.Id, item);
+            added.Add(item);
+            admitted[i] = true;
         }
-        // A sealed end permits receipt reconciliation but no new speech. An admitted
-        // direct close still draining its final events is different: retain its exact
-        // last-generation observations without authorizing another provider operation.
-        if (recovery && session.EndOperationId is not null && !session.DirectCloseDraining)
-            throw new InvalidOperationException("Realtime end history has already been sealed or its drain state is unknown.");
-        var item = new CodexStoredRealtimeHistoryEvent(observationId, "observation",
-            NextRealtimeObservationTime(history), before.Turns.Length, attachmentId,
-            source.Type, source.Payload.Clone(), source.ReceivedAfterConnectMs,
-            CommitRevision: checked(before.Revision + 1),
-            PublishFinalTranscript: (session.Protocol == "v3" || session.CanonicalLegacySegments) &&
-                source.Transcript?.Final == true ? true : null);
+        if (added.Count == 0)
+        {
+            NotifyReconciledRealtimeSnapshot(before);
+            return new(before, admitted);
+        }
+
+        var reduced = ReplayRealtimeHistoryIncremental(session, history.Mode, [.. history.Events, .. added]);
+        EnsureRealtimeClosureCapacity(reduced);
         var next = ReplaceRealtimeSession(before, session with
         {
-            History = AppendRealtimeHistory(session, history, item),
+            History = reduced,
             ClosureByteReserve = session.ClosureByteReserve || !recovery,
         });
-        return new(true, await PublishAsync(before.Revision, next with
+        return new(await PublishAsync(before.Revision, next with
         {
             Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
-        }, cancellationToken).ConfigureAwait(false));
+        }, cancellationToken).ConfigureAwait(false), admitted);
     }
 
     /// <summary>Seal the pending tail before a new reasoning input or end. A lost receipt can be
@@ -234,7 +306,7 @@ public sealed partial class CodexThreadStore
             Reason: "attachmentRetired", HandoffId: h.HandoffId, CommitRevision: checked(document.Revision + 1)));
         return ReplaceRealtimeSession(document, session with
         {
-            History = ReplayRealtimeHistory(session, history.Mode, [.. history.Events, .. rejected]),
+            History = ReplayRealtimeHistoryIncremental(session, history.Mode, [.. history.Events, .. rejected]),
         });
     }
 
@@ -285,12 +357,17 @@ public sealed partial class CodexThreadStore
         return history.Length == 0 ? null : history;
     }
 
-    private static void ValidateRealtimeHistoryProjection(CodexThreadDocument document)
+    private void ValidateRealtimeHistoryProjection(CodexThreadDocument document)
     {
         foreach (var session in document.RealtimeSessions ?? [])
         {
             if (session.History is null) continue;
-            var history = RecoverRealtimeHistory(session);
+            var stored = session.History;
+            var history = ReplayRealtimeHistoryIncremental(session, stored.Mode, stored.Events);
+            // The reduction has checked the exact event prefix. Compare every derived field,
+            // without serializing the same raw journal twice merely to compare projections.
+            if (!SameRealtimeHistory(stored with { Events = [] }, history with { Events = [] }))
+                throw new InvalidDataException("Realtime frame projection does not match its durable journal.");
             if (history.Events.Any(e => e.BeforeTurnCount > document.Turns.Length) ||
                 history.Events.Any(e => e.CommitRevision is { } revision && (revision < 1 || revision > document.Revision)) ||
                 history.Handoffs.Any(h => h.TurnId is { } turn && !document.Turns.Any(t => t.Id == turn)) ||
@@ -305,15 +382,17 @@ public sealed partial class CodexThreadStore
             throw new InvalidDataException("Invalid inherited realtime carryover.");
     }
 
-    private long NextRealtimeObservationTime(CodexStoredRealtimeHistory history)
-        => Math.Max(time.GetUtcNow().ToUnixTimeMilliseconds(), history.Events.LastOrDefault()?.ObservedAtMs ?? 0);
+    internal long CaptureRealtimeObservationTime() => time.GetUtcNow().ToUnixTimeMilliseconds();
 
-    private static CodexStoredRealtimeHistory AppendRealtimeHistory(CodexStoredRealtimeSession session,
+    private long NextRealtimeObservationTime(CodexStoredRealtimeHistory history)
+        => Math.Max(CaptureRealtimeObservationTime(), history.Events.LastOrDefault()?.ObservedAtMs ?? 0);
+
+    private CodexStoredRealtimeHistory AppendRealtimeHistory(CodexStoredRealtimeSession session,
         CodexStoredRealtimeHistory history, CodexStoredRealtimeHistoryEvent item)
     {
         if (history.Events.Length >= MaximumItems || history.Events.Any(e => e.Id == item.Id))
             throw new InvalidOperationException("Realtime journal capacity or identity conflict.");
-        var next = ReplayRealtimeHistory(session, history.Mode, [.. history.Events, item]);
+        var next = ReplayRealtimeHistoryIncremental(session, history.Mode, [.. history.Events, item]);
         if (item.Kind is "observation" or "promotion") EnsureRealtimeClosureCapacity(next);
         return next;
     }
@@ -403,9 +482,24 @@ public sealed partial class CodexThreadStore
         Action<CodexStoredRealtimeHandoffCapture, CodexStoredRealtimeHistoryEvent>? inputAccepted = null,
         Action<CodexStoredRealtimePromotion, CodexStoredRealtimeHistoryEvent>? promoted = null)
     {
-        if (!Enum.IsDefined(mode) || events is null || events.Length > MaximumItems)
-            throw new InvalidDataException("Invalid realtime history enrollment or event count.");
-        var accumulator = new CodexRealtimeTranscriptAccumulator(session.Protocol, 4_194_304, session.CanonicalLegacySegments);
+        CheckRealtimeReplayInput(mode, events);
+        var reducer = CreateRealtimeHistoryReduction(session, mode);
+        foreach (var item in events) reducer.Append(item);
+        reducer.Emit(frameCommitted, inputSaved, inputAccepted, promoted);
+        return reducer.Snapshot();
+    }
+
+    private static RealtimeHistoryReduction CreateRealtimeHistoryReduction(CodexStoredRealtimeSession session,
+        CodexRealtimeHistoryMode mode)
+    {
+        // Retain only the fields that influence reduction; never hold an entire thread or
+        // a previously materialized history through a cached closure.
+        var sessionId = session.SessionId;
+        var protocol = session.Protocol;
+        var canonicalLegacySegments = session.CanonicalLegacySegments;
+        var usedAttachments = (session.UsedAttachmentIds ?? []).ToHashSet();
+        var accumulator = new CodexRealtimeTranscriptAccumulator(protocol, 4_194_304, canonicalLegacySegments);
+        var emissions = new List<RealtimeHistoryEmission>();
         var frames = new Dictionary<string, CodexStoredRealtimeFrame>(StringComparer.Ordinal);
         var handoffs = new Dictionary<string, CodexStoredRealtimeHandoffCapture>(StringComparer.Ordinal);
         var carryover = new List<CodexStoredRealtimeCarryover>();
@@ -438,7 +532,7 @@ public sealed partial class CodexThreadStore
                 var frame = Frame(entry, true, boundary, handoffId);
                 if (!frames.TryAdd(frame.Id, frame))
                     throw new InvalidDataException("Realtime transcript frame identity collided.");
-                if (publishedFrames.Add(frame.Id)) frameCommitted?.Invoke(frame, boundary);
+                if (publishedFrames.Add(frame.Id)) emissions.Add(new(boundary, Frame: frame));
             }
         }
 
@@ -450,15 +544,15 @@ public sealed partial class CodexThreadStore
             var save = mode != CodexRealtimeHistoryMode.LegacyNoFlush;
             if (save)
             {
-                var saved = new CodexStoredRealtimeCarryover(boundary.Id, session.SessionId, boundary.BeforeTurnCount, reason,
-                    selected.Select(f => f.Id).ToArray(), CarryoverInput(selected, reason, mode == CodexRealtimeHistoryMode.Canonical || session.Protocol == "v3"));
+                var saved = new CodexStoredRealtimeCarryover(boundary.Id, sessionId, boundary.BeforeTurnCount, reason,
+                    selected.Select(f => f.Id).ToArray(), CarryoverInput(selected, reason, mode == CodexRealtimeHistoryMode.Canonical || protocol == "v3"));
                 carryover.Add(saved);
-                inputSaved?.Invoke(saved, boundary);
+                emissions.Add(new(boundary, Saved: saved));
             }
             foreach (var frame in selected) frames[frame.Id] = frame with { Disposition = save ? "carried" : "legacyOnly" };
         }
 
-        foreach (var item in events)
+        void Apply(CodexStoredRealtimeHistoryEvent item)
         {
             sequence++;
             if (item is null || !ValidToken(item.Id) || !ids.Add(item.Id) || item.ObservedAtMs < previousTimestamp ||
@@ -478,7 +572,7 @@ public sealed partial class CodexThreadStore
             {
                 case "observation":
                 {
-                    if (item.AttachmentId is not { } attachment || !(session.UsedAttachmentIds ?? []).Contains(attachment) ||
+                    if (item.AttachmentId is not { } attachment || !usedAttachments.Contains(attachment) ||
                         item.EventType is not { } type || item.Payload is not { ValueKind: JsonValueKind.Object } payload ||
                         CodexRealtimeProtocol.Text(payload, "type") != type ||
                         item.ReceivedAfterConnectMs is not { } elapsed || !double.IsFinite(elapsed) || elapsed < 0)
@@ -492,16 +586,15 @@ public sealed partial class CodexThreadStore
                     // retain their existing commit positions across an SDK upgrade.
                     if (item.PublishFinalTranscript is not null)
                     {
-                        if (item.PublishFinalTranscript != true || session.Protocol != "v3" && !session.CanonicalLegacySegments ||
+                        if (item.PublishFinalTranscript != true || protocol != "v3" && !canonicalLegacySegments ||
                             source.Transcript?.Final != true || item.CommitRevision is null)
                             throw new InvalidDataException("Invalid realtime final presentation receipt.");
-                        if (frameCommitted is not null)
-                            foreach (var entry in accumulator.Snapshot().Where(e => e.Final &&
-                                e.Fragments.Any(f => f.ObservationId == item.Id)))
-                            {
-                                var frame = Frame(entry, true, item);
-                                if (publishedFrames.Add(frame.Id)) frameCommitted(frame, item);
-                            }
+                        foreach (var entry in accumulator.Snapshot().Where(e => e.Final &&
+                            e.Fragments.Any(f => f.ObservationId == item.Id)))
+                        {
+                            var frame = Frame(entry, true, item);
+                            if (publishedFrames.Add(frame.Id)) emissions.Add(new(item, Frame: frame));
+                        }
                     }
                     if (handoff is { IsNew: true })
                     {
@@ -532,7 +625,7 @@ public sealed partial class CodexThreadStore
                     var split = accumulator.TakePresentationBoundary();
                     AddFrames(split, item);
                     splitFrames.AddRange(split.Select(e => e.Id));
-                    promoted?.Invoke(promotion, item);
+                    emissions.Add(new(item, Promotion: promotion));
                     break;
                 }
                 case "seal":
@@ -553,21 +646,34 @@ public sealed partial class CodexThreadStore
                     {
                         foreach (var frameId in capture.FrameIds)
                             frames[frameId] = frames[frameId] with { Disposition = "accepted" };
-                        inputAccepted?.Invoke(capture, item);
+                        emissions.Add(new(item, Accepted: capture));
                     }
                     break;
                 }
                 default: throw new InvalidDataException("Unknown realtime history event kind.");
             }
         }
-        if (events.LastOrDefault() is { } last)
-            foreach (var entry in accumulator.Snapshot())
-            {
-                var frame = Frame(entry, entry.Final, last);
-                if (!frames.TryAdd(frame.Id, frame))
-                    throw new InvalidDataException("Active realtime transcript frame identity collided.");
-            }
-        return new(mode, events, frames.Values.OrderBy(f => f.Sequence).ToArray(), handoffs.Values.ToArray(), carryover.ToArray());
+        CodexStoredRealtimeHistory Snapshot(CodexStoredRealtimeHistoryEvent[] events)
+        {
+            var active = new List<CodexStoredRealtimeFrame>();
+            var activeIds = new HashSet<string>(StringComparer.Ordinal);
+            if (events.LastOrDefault() is { } last)
+                foreach (var entry in accumulator.Snapshot())
+                {
+                    var frame = Frame(entry, entry.Final, last);
+                    if (frames.ContainsKey(frame.Id) || !activeIds.Add(frame.Id))
+                        throw new InvalidDataException("Active realtime transcript frame identity collided.");
+                    active.Add(frame);
+                }
+            // Returned snapshots own every mutable array. A caller editing a public history
+            // object cannot corrupt the process-local reducer or its canonical receipts.
+            return new(mode, events, frames.Values.Concat(active).OrderBy(f => f.Sequence)
+                .Select(f => f with { SourceObservationIds = f.SourceObservationIds.ToArray() }).ToArray(),
+                handoffs.Values.Select(h => h with { FrameIds = h.FrameIds.ToArray() }).ToArray(),
+                carryover.Select(c => c with { SourceFrameIds = c.SourceFrameIds.ToArray() }).ToArray());
+        }
+
+        return new(Apply, Snapshot, emissions);
     }
 
     private const string RealtimeEndInstruction = "The user just ended their realtime session. Here is the remaining handoff/transcript tail. You probably do not have to do anything; acknowledge the handoff unless the transcript itself asks for something.";

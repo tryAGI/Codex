@@ -21,7 +21,7 @@ public sealed partial class CodexThreadStore
     // Replay in commit order rather than sorting current frames by their first observation.
     // A late sealed frame can have an earlier observation time but must never move a
     // previously returned position in an immutable snapshot.
-    internal static IReadOnlyList<JsonObject> ProjectRealtimeItems(CodexThreadDocument thread)
+    internal static IReadOnlyList<JsonObject> ProjectRealtimeItems(CodexThreadDocument thread, CodexThreadStore? journal = null)
     {
         var result = new List<(long Revision, JsonObject Item)>();
         foreach (var session in thread.RealtimeSessions ?? [])
@@ -40,7 +40,16 @@ public sealed partial class CodexThreadStore
             if (session.History is { } history)
             {
                 var admissions = (session.HandoffAdmissions ?? []).ToDictionary(x => x.HandoffId, StringComparer.Ordinal);
-                _ = ReplayRealtimeHistory(session, history.Mode, history.Events,
+                void Replay(Action<CodexStoredRealtimeFrame, CodexStoredRealtimeHistoryEvent> frame,
+                    Action<CodexStoredRealtimeCarryover, CodexStoredRealtimeHistoryEvent> saved,
+                    Action<CodexStoredRealtimeHandoffCapture, CodexStoredRealtimeHistoryEvent> accepted,
+                    Action<CodexStoredRealtimePromotion, CodexStoredRealtimeHistoryEvent> promoted)
+                {
+                    _ = journal is null
+                        ? ReplayRealtimeHistory(session, history.Mode, history.Events, frame, saved, accepted, promoted)
+                        : journal.ReplayRealtimeHistoryIncremental(session, history.Mode, history.Events, frame, saved, accepted, promoted);
+                }
+                Replay(
                     (frame, boundary) =>
                     {
                         Add(ProjectRealtimeFrame(session, frame), frame.Id,

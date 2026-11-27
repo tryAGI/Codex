@@ -342,7 +342,7 @@ public sealed partial class CodexThreadRpc
         var after = Number(p, "afterPosition", true);
         var required = Number(p, "requiredThroughPosition", true);
         var requestedSnapshot = Number(p, "snapshotEnd", true);
-        var items = CodexThreadStore.ProjectRealtimeItems(thread);
+        var items = CodexThreadStore.ProjectRealtimeItems(thread, store);
         var snapshot = requestedSnapshot ?? items.Count;
         var cursor = Text(p, "cursor");
         var filterKey = new JsonArray(JsonValue.Create(thread.Id.ToString()), JsonValue.Create(session), JsonValue.Create(eventId),

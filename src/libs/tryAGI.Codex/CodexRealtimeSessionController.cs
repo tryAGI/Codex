@@ -71,7 +71,11 @@ public sealed record CodexRealtimeDirectConnectRequest(Guid ThreadId, string Ses
     string AccountId, Guid AttachmentId, DateTimeOffset StartBefore);
 
 /// <summary>Exact undelivered observation retained while the host reconciles an interrupted journal write.</summary>
-public sealed record CodexRealtimePendingObservation(Guid AttachmentId, string Id, CodexRealtimeEvent Event);
+public sealed record CodexRealtimePendingObservation(Guid AttachmentId, string Id, CodexRealtimeEvent Event)
+{
+    // Capture local observation time before batching; retries retain the same timestamp.
+    internal long? ObservedAtMs { get; init; }
+}
 
 /// <summary>Authoritative recovery input, with the local journal already verified. Reconcile
 /// any provider-side event gap before returning Open or Ended.</summary>
@@ -94,7 +98,11 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
     private readonly object sync = new();
     private CancellationTokenSource? activeAttempt;
     private Live? current;
-    private CodexRealtimePendingObservation? pending;
+    // All parsed but not yet confirmed observations are retained together. Recovery
+    // reconciles the same IDs; it never replays provider operations or user callbacks.
+    private CodexRealtimePendingObservation[]? pending;
+    private static readonly TimeSpan ObservationBatchWindow = TimeSpan.FromMilliseconds(10);
+    private const int ObservationBatchBytes = 128 * 1024;
     private bool disposed;
 
     private sealed class Live(Guid id, CodexRealtimeConnection connection, CodexRealtimeAttachedCall? sideband)
@@ -254,7 +262,7 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                 for (var number = 0; number < policy.MaximumAttempts; number++)
                 {
                     ct.ThrowIfCancellationRequested();
-                    var decision = await reconcile(new(thread, session, Volatile.Read(ref pending)), ct).ConfigureAwait(false);
+                    var decision = await reconcile(new(thread, session, Volatile.Read(ref pending)?.FirstOrDefault()), ct).ConfigureAwait(false);
                     if (decision == CodexRealtimeRecoveryDecision.Retryable && number + 1 < policy.MaximumAttempts)
                     {
                         await RetryDelayAsync(number, ct).ConfigureAwait(false);
@@ -566,32 +574,112 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         using var read = CancellationTokenSource.CreateLinkedTokenSource(live.Stop.Token, cancellationToken);
         using var notify = CancellationTokenSource.CreateLinkedTokenSource(read.Token, live.ObserverStop.Token);
         var result = CodexRealtimeLifecycleStatus.Retryable;
+        var batch = new List<CodexRealtimePendingObservation>();
+        Task? batchDeadline = null;
+        long batchBytes = 0;
+
+        void Retain(CodexRealtimeEvent item)
+        {
+            var eventId = CodexRealtimeProtocol.Text(item.Payload, "event_id");
+            var identity = eventId is { Length: > 0 and <= 500 } && !eventId.Any(char.IsControl)
+                ? "provider:" + eventId : Guid.NewGuid().ToString("N");
+            batch.Add(new(live.Id, identity, item) { ObservedAtMs = store.CaptureRealtimeObservationTime() });
+            Volatile.Write(ref pending, batch.ToArray());
+            batchBytes += System.Text.Encoding.UTF8.GetByteCount(item.Payload.GetRawText());
+            batchDeadline ??= Task.Delay(ObservationBatchWindow, read.Token);
+        }
+
+        async Task DeliverAsync(CodexRealtimeEvent item)
+        {
+            if (observer is null || notify.IsCancellationRequested) return;
+            try { await observer(item, notify.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (live.ObserverStop.IsCancellationRequested && !read.IsCancellationRequested)
+            {
+                // Stop dispatching callbacks while still persisting queued input.
+            }
+        }
+
+        async Task FlushAsync()
+        {
+            if (batch.Count == 0) return;
+            var retained = Volatile.Read(ref pending) ?? throw new InvalidOperationException("Missing retained realtime batch.");
+            // Already parsed events are accepted input. A detach or caller cancellation
+            // must not cancel their local journal write.
+            using var commit = new CancellationTokenSource(policy.DrainTimeout);
+            var delivered = await PersistAsync(retained, false, commit.Token).ConfigureAwait(false);
+            Interlocked.CompareExchange(ref pending, null, retained);
+            batch.Clear();
+            batchDeadline = null;
+            batchBytes = 0;
+            for (var i = 0; i < retained.Length; i++)
+                if (delivered[i]) await DeliverAsync(retained[i].Event).ConfigureAwait(false);
+        }
+
         try
         {
-            await foreach (var item in live.Connection.ReadEventsAsync(read.Token).ConfigureAwait(false))
+            await using var events = live.Connection.ReadEventsAsync(read.Token).GetAsyncEnumerator();
+            Task<bool>? nextRead = null;
+            try
             {
-                var deliver = true;
-                if (CodexThreadStore.IsRealtimeHistoryEvent(item))
+                while (true)
                 {
-                    var eventId = CodexRealtimeProtocol.Text(item.Payload, "event_id");
-                    var identity = eventId is { Length: > 0 and <= 500 } && !eventId.Any(char.IsControl)
-                        ? "provider:" + eventId : Guid.NewGuid().ToString("N");
-                    var observation = new CodexRealtimePendingObservation(live.Id, identity, item);
-                    Volatile.Write(ref pending, observation);
-                    // A parsed event is already accepted from the transport. Do not cancel its
-                    // local CAS just because detach/cancellation arrived during the write.
-                    using var commit = new CancellationTokenSource(policy.DrainTimeout);
-                    deliver = await PersistAsync(observation, false, commit.Token).ConfigureAwait(false);
-                    Interlocked.CompareExchange(ref pending, null, observation);
-                }
-                if (deliver && observer is not null && !notify.IsCancellationRequested)
-                {
-                    try { await observer(item, notify.Token).ConfigureAwait(false); }
-                    catch (OperationCanceledException) when (live.ObserverStop.IsCancellationRequested && !read.IsCancellationRequested)
+                    nextRead ??= events.MoveNextAsync().AsTask();
+                    // At most one read is in flight. A quiet provider cannot delay a
+                    // durable delta indefinitely, and final/handoff/control boundaries
+                    // never wait out the batching window.
+                    if (batchDeadline is not null && !nextRead.IsCompleted &&
+                        await Task.WhenAny(nextRead, batchDeadline).ConfigureAwait(false) != nextRead)
                     {
-                        // Stop dispatching callbacks while still persisting queued input.
+                        await FlushAsync().ConfigureAwait(false);
+                        continue;
+                    }
+
+                    bool more;
+                    try { more = await nextRead.ConfigureAwait(false); }
+                    catch (Exception error) when (error is not OutOfMemoryException)
+                    {
+                        nextRead = null;
+                        await FlushAsync().ConfigureAwait(false);
+                        throw;
+                    }
+                    nextRead = null;
+                    if (!more)
+                    {
+                        await FlushAsync().ConfigureAwait(false);
+                        break;
+                    }
+                    var item = events.Current;
+                    if (CodexThreadStore.IsRealtimeHistoryEvent(item))
+                    {
+                        Retain(item);
+                        if (item.Transcript is not { Final: false } || item.Delegation is not null ||
+                            batch.Count >= CodexThreadStore.MaximumRealtimeObservationBatch ||
+                            batchBytes >= ObservationBatchBytes || batchDeadline!.IsCompleted)
+                            await FlushAsync().ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await FlushAsync().ConfigureAwait(false);
+                        await DeliverAsync(item).ConfigureAwait(false);
                     }
                 }
+            }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                // A timer-triggered flush can fail while the next receive is pending.
+                // Settle that receive before disposing the enumerator and retain any
+                // already parsed history event for recovery alongside the failed batch.
+                if (nextRead is not null)
+                {
+                    await read.CancelAsync().ConfigureAwait(false);
+                    try
+                    {
+                        if (await nextRead.ConfigureAwait(false) && CodexThreadStore.IsRealtimeHistoryEvent(events.Current))
+                            Retain(events.Current);
+                    }
+                    catch (Exception receiveError) when (receiveError is not OutOfMemoryException) { }
+                }
+                throw;
             }
         }
         catch (Exception error) when (error is not OutOfMemoryException)
@@ -606,30 +694,35 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
         return !fenced || Volatile.Read(ref pending) is not null ? CodexRealtimeLifecycleStatus.HistoryRecoveryRequired : result;
     }
 
-    private async Task<bool> PersistAsync(CodexRealtimePendingObservation observation, bool recovering, CancellationToken ct)
+    private async Task<bool[]> PersistAsync(CodexRealtimePendingObservation[] observations, bool recovering, CancellationToken ct)
     {
-        var attempted = false;
+        var uncertain = new HashSet<string>(StringComparer.Ordinal);
         for (var number = 0; number < policy.MaximumAttempts; number++)
         {
             var thread = await store.ReadAsync(threadId, ct).ConfigureAwait(false);
             try
             {
-                var receipt = recovering
-                    ? await store.RecoverRealtimeObservationAsync(threadId, thread.Revision, sessionId, ownerId,
-                        observation.AttachmentId, observation.Id, observation.Event, ct).ConfigureAwait(false)
-                    : await store.RecordRealtimeObservationAsync(threadId, thread.Revision, sessionId, ownerId,
-                        observation.AttachmentId, observation.Id, observation.Event, ct).ConfigureAwait(false);
-                return receipt.Admitted || attempted;
+                var receipt = await store.RecordRealtimeObservationsFromSnapshotAsync(thread, sessionId, ownerId,
+                    observations[0].AttachmentId, observations, recovering, ct).ConfigureAwait(false);
+                // Only an identity absent before an ambiguous write may be delivered on
+                // reconciliation. Pre-existing duplicates in a mixed batch stay suppressed.
+                for (var i = 0; i < observations.Length; i++)
+                {
+                    var attempted = uncertain.Remove(observations[i].Id);
+                    receipt.Admitted[i] |= attempted;
+                }
+                return receipt.Admitted;
             }
             catch (CodexThreadConflictException) when (number + 1 < policy.MaximumAttempts) { }
             catch (IOException) when (number + 1 < policy.MaximumAttempts)
             {
-                // Re-read and retry only the same local observation identity. Never replay a
-                // remote command. A lost commit receipt is deduplicated by the durable journal.
-                attempted = true;
+                var known = (Session(thread).History?.Events ?? []).Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
+                foreach (var observation in observations)
+                    if (!known.Contains(observation.Id)) uncertain.Add(observation.Id);
+                // Retry only the exact local observation IDs, never a remote command.
             }
         }
-        throw new IOException("Realtime history observation could not be confirmed.");
+        throw new IOException("Realtime history observation batch could not be confirmed.");
     }
 
     private async Task<CodexRealtimeLifecycleStatus> DetachCoreAsync(CancellationToken ct)

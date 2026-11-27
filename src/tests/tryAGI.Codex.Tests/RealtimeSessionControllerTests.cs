@@ -46,6 +46,44 @@ public sealed class RealtimeSessionControllerTests
     }
 
     [Fact]
+    public async Task BufferedObservationsCommitInBatchesAndReconcileLostReceiptWithoutRedeliveringOldDuplicates()
+    {
+        var (storage, store, thread) = await Detached();
+        using var factory = new Factory();
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await controller.AttachAsync(Ct));
+        var attachment = Assert.Single(factory.Requests).AttachmentId;
+        const string old = """{"type":"input_transcript.added","event_id":"old","item":{"text":"start "}}""";
+        thread = await store.ReadAsync(thread.Id, Ct);
+        thread = (await store.RecordRealtimeObservationAsync(thread.Id, thread.Revision, "session", "owner", attachment,
+            "provider:old", RealtimeHistoryTests.Event(old), Ct)).Thread;
+        var initialWrites = storage.Writes;
+        storage.ThrowAfterCommit = true;
+        Assert.True(factory.Incoming.Writer.TryWrite(old));
+        for (var i = 0; i < 32; i++)
+            Assert.True(factory.Incoming.Writer.TryWrite($$"""{"type":"input_transcript.added","event_id":"new-{{i}}","item":{"text":"x"}}"""));
+        Assert.True(factory.Incoming.Writer.TryWrite("""{"type":"turn.done","event_id":"final","turn":{"role":"user","transcript":"start xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!"}}"""));
+        var seen = new List<string>();
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pump = controller.PumpAsync((item, _) =>
+        {
+            seen.Add(CodexRealtimeProtocol.Text(item.Payload, "event_id")!);
+            if (seen[^1] == "final") done.TrySetResult();
+            return Task.CompletedTask;
+        }, Ct);
+        await done.Task.WaitAsync(TimeSpan.FromSeconds(5), Ct);
+        Assert.Equal(Enumerable.Range(0, 32).Select(i => "new-" + i).Append("final"), seen);
+        var committed = await store.ReadAsync(thread.Id, Ct);
+        var history = RealtimeHistoryTests.Session(committed).History!;
+        Assert.Equal(34, history.Events.Length);
+        Assert.Equal("start " + new string('x', 32) + "!", Assert.Single(history.Frames).Text);
+        Assert.InRange(storage.Writes - initialWrites, 1, 32);
+        Assert.Contains(history.Events.GroupBy(e => e.CommitRevision), group => group.Count() > 1);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Detached, await controller.DetachAsync(Ct));
+        Assert.Equal(CodexRealtimeLifecycleStatus.Cancelled, await pump);
+    }
+
+    [Fact]
     public async Task ReconnectSameCallAfterTransportLossAndPreserveVoiceOnlyHistory()
     {
         var (_, store, thread) = await Detached();
