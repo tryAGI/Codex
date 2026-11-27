@@ -18,10 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Validate pinned inventory and checker
-        run: python3 scripts/realtime-parity.py self-test
+        run: |
+          python3 -B scripts/realtime-parity.py self-test
+          python3 -B scripts/realtime_parity_evidence.py self-test
       - name: Generate deterministic report
-        run: python3 scripts/realtime-parity.py report > realtime-parity-report.json
+        run: python3 -B scripts/realtime-parity.py report > realtime-parity-report.json
       - name: Store machine-readable report
         uses: actions/upload-artifact@v4
         with:
@@ -29,4 +33,21 @@ jobs:
           path: realtime-parity-report.json
       - name: Require complete acceptance
         if: github.event_name == 'workflow_dispatch' && inputs.require_release_ready
-        run: python3 scripts/realtime-parity.py gate
+        run: python3 -B scripts/realtime-parity.py gate
+
+  offline-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Run credential-free conformance tests and generate revision-bound receipt
+        run: python3 -B scripts/realtime_parity_evidence.py run --output realtime-parity-offline-receipt.json
+      - name: Store sanitized per-case evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: realtime-parity-offline-receipt
+          path: realtime-parity-offline-receipt.json
+          if-no-files-found: warn

@@ -7,48 +7,54 @@
       "applicability": "applicable",
       "status": "divergent",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
       "evidence": {
         "lane": "offline",
         "outcome": "failed",
         "receipt": "codex-rust-parity-tests-49-r2-20261127",
         "detail": "xUnit Assert.IsType: CodexRealtimeTranscript was null; 6 passed, 1 failed, 0 skipped in fixture suite. Tested shared working tree, not a revision-bound acceptance receipt."
-      }
+      },
+      "rationale": "The earlier failed independent case is retained until rerun against the new #31 event projection."
     },
     "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_text.delta": {
       "ownerIssue": 31,
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)"
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:input_transcript.added": {
       "ownerIssue": 31,
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)"
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:turn.done": {
       "ownerIssue": 31,
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)"
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:output_audio.delta": {
       "ownerIssue": 31,
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadAudio",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)"
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:delegation.created": {
       "ownerIssue": 31,
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadDelegation",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-sideband-delegation)"
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")",
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     "rust-test:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs:frameless_transcript_and_audio_events_reuse_existing_internal_events": {
       "ownerIssue": 31,
@@ -63,6 +69,692 @@
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient.CreateRealtimeCallAsync",
       "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions"
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:session.updated": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"session.updated\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.output_audio.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_audio.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.input_transcript.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.item.input_audio_transcription.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.input_transcript.turn_marked": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.turn_marked\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.item.input_audio_transcription.completed": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.completed\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.output_transcript.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_transcript.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:response.output_text.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_text.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:response.output_audio_transcript.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:response.output_audio_transcript.done": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.done\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.item.added": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.added\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.item.done": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.done\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.handoff.requested": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.handoff.requested\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:error": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"error\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:session.updated": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"session.updated\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_audio.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.audio.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.audio.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.input_audio_transcription.completed": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.input_audio_transcription.completed\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_audio_transcript.delta": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.delta\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_text.done": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_text.done\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_audio_transcript.done": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.done\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:input_audio_buffer.speech_started": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"input_audio_buffer.speech_started\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.added": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.added\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.created": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.created\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.done": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.done\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.created": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.created\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.cancelled": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.cancelled\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.done": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.done\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:error": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"error\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:session.started": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.started\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:session.updated": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.updated\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:output_transcript.added": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"output_transcript.added\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:error": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"error\")",
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:input_audio_buffer.append": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendAudioAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+      ],
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:input_audio.append": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendAudioAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+      ],
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:conversation.item.create": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendUserTextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+      ],
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:conversation.handoff.append": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")"
+      ],
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:delegation.context.append": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+      ],
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:session.context.append": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+      ],
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:response.create": {
+      "ownerIssue": 40,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+      ],
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:session.close": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.CloseSessionAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+      ],
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
+    },
+    "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:session.update": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.UpdateSessionAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSocketParityTests.cs::RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents",
+      "rationale": "Session update compared at the adapter level; mode-specific fields remain separate."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.delegation_ack_filler": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.DelegationAckFillerSetting",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.event_parser": {
+      "ownerIssue": 28,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Protocol",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSocketParityTests.cs::RealtimeSocketParityTests.RustDirectAndSidebandUris",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.initial_items": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.InitialItems",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.instructions": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Instructions",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.UnsupportedCombinationsAndInstructionLimitsAreChecked",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.model": {
+      "ownerIssue": 26,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Model",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeModelRouteTests.cs::RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.output_modality": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.OutputModality",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.V2ConversationalWireMatchesRust",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.session_id": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.SessionId",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.session_mode": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Mode",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.V2TranscriptionUpdateContainsOnlyInputConfiguration",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.voice": {
+      "ownerIssue": 26,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Voice",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeModelRouteTests.cs::RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_audio_delta_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeEvent.Audio",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_handoff_requested_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_input_transcript_delta_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_output_transcript_delta_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_handoff_tool_call_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-tool-handoff-noop\")",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_noop_tool_call_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Noop",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-tool-handoff-noop\")",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_input_audio_transcription_delta_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_output_audio_delta_defaults_audio_shape": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadAudio",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_response_audio_delta_with_item_id": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadAudio",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_output_audio_transcript_done_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_input_audio_transcription_completed_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_input_audio_transcription_delta_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_input_transcript_turn_marked_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_output_audio_transcript_delta_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_output_audio_transcript_done_event": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:realtime_v2_session_update_includes_background_agent_tool_and_handoff_output_item": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.Session",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.V2ConversationalWireMatchesRust",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:transcription_mode_session_update_omits_output_audio_and_instructions": {
+      "ownerIssue": 29,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.Session",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.V2TranscriptionUpdateContainsOnlyInputConfiguration",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:takes_only_transcript_after_last_handoff_once": {
+      "ownerIssue": 30,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeTranscriptAccumulator.cs::CodexRealtimeTranscriptAccumulator",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeTranscriptAccumulatorTests.cs::RealtimeTranscriptAccumulatorTests.HandoffBetweenDeltasCapturesOnlyOnceAndRetainsNextUtterance",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:transcript_state_survives_reconnect_and_reconciles_done": {
+      "ownerIssue": 42,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.ReconnectRebuildsPendingSpeechAndReplayIsIdempotentAfterLostCommit",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_call.rs:sends_api_session_call_as_multipart_body": {
+      "ownerIssue": 27,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeApiCallTests.cs::RealtimeApiCallTests.ApiSessionCallUsesRustMultipart",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_call.rs:sends_frameless_session_call_to_live_without_legacy_query_params": {
+      "ownerIssue": 27,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeApiCallTests.cs::RealtimeApiCallTests.ApiSessionCallUsesRustMultipart",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_call.rs:rejects_v2_session_call_before_sending_request": {
+      "ownerIssue": 27,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeApiCallTests.cs::RealtimeApiCallTests.WrongCredentialDomainAndV2CallsAreRejectedBeforeDispatch",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi_tests.rs:context_append_chunks_preserve_text_within_wire_limit": {
+      "ownerIssue": 37,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.Utf8Chunks",
+      "test": "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs::NativeProtocolTests.RussianAndEmojiContextChunksRetainTextWithinUpstreamByteLimit",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi_tests.rs:session_json_encodes_role_bearing_initial_items": {
+      "ownerIssue": 36,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.Session",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/methods_common_tests.rs:standalone_handoff_uses_session_context_for_frameless": {
+      "ownerIssue": 38,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:core/src/realtime_history_tests.rs:final_transcript_after_handoff_seals_only_the_added_suffix": {
+      "ownerIssue": 41,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.PendingHandoffBlocksTailUntilAdmissionSettles",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_request_prewarm_reuses_connection": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_uses_incremental_create_on_prefix": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_uses_previous_response_id_when_prefix_after_completed": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_creates_without_previous_response_id_when_non_input_fields_change": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.ChangedPropertiesOrTurnDoNotUsePriorResponseId",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:core/tests/suite/websocket_fallback.rs:websocket_fallback_switches_to_http_on_upgrade_required_connect": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.FailedHandshakeFallsBackBeforeGenerationOnly",
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
+    },
+    "rust-test:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs:legacy_and_frameless_delegations_decode_to_the_same_handoff": {
+      "ownerIssue": 31,
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")"
+      ],
+      "rationale": "The same upstream synthetic handoff is replayed in both adapters; exact handoff identity and transcript are compared."
     }
   },
   "scenarios": [
@@ -72,7 +764,7 @@
       "ownerIssue": 31,
       "status": "divergent",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
       "evidence": {
         "lane": "offline",
         "outcome": "failed",
@@ -103,12 +795,21 @@
     {
       "id": "flush-transcript-tail-once",
       "anchor": "rust-test:core/tests/suite/realtime_conversation.rs:conversation_close_routes_only_remaining_transcript_tail_once",
-      "ownerIssue": 41
+      "ownerIssue": 41,
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.NextTurnAtomicallySealsTailAndForkRetainsSavedInputWithoutCallOwnership",
+        "src/tests/tryAGI.Codex.Tests/RealtimeTranscriptAccumulatorTests.cs::RealtimeTranscriptAccumulatorTests.HandoffBetweenDeltasCapturesOnlyOnceAndRetainsNextUtterance"
+      ],
+      "rationale": "Store and accumulator candidates; full end-to-end lifecycle assertion not yet ported."
     },
     {
       "id": "observer-only-detach",
       "anchor": "rust-test:core/tests/suite/realtime_conversation.rs:conversation_existing_call_stop_closes_only_observer_transport",
-      "ownerIssue": 32
+      "ownerIssue": 32,
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.CloseTransportAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeAttachmentTests.cs::RealtimeAttachmentTests.CallerStreamUsesSameParserAndDetachLeavesMediaChannelsOpen",
+      "rationale": "Caller-owned stream primitive; real sideband reconnect and coordinator lifecycle remain pending."
     },
     {
       "id": "sideband-reconnect",
@@ -118,17 +819,31 @@
     {
       "id": "sticky-auth-owner-routing",
       "anchor": "rust-function:core/src/client.rs:turn_state_with_auth_owner",
-      "ownerIssue": 43
+      "ownerIssue": 43,
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesRoutingTests.cs::CodexResponsesRoutingTests.FirstStateIsImmutableAndMetadataCorrelatesTheBackingTurn",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesRoutingTests.cs::CodexResponsesRoutingTests.TurnRouteAndCredentialChangesCannotReplayState",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesRoutingTests.cs::CodexResponsesRoutingTests.LateHeadersFromAnOldTurnCannotPoisonTheCurrentTurn"
+      ]
     },
     {
       "id": "responses-prewarm",
       "anchor": "rust-function:core/src/client.rs:prewarm_websocket",
-      "ownerIssue": 44
+      "ownerIssue": 44,
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput"
     },
     {
       "id": "retained-context-policy",
       "anchor": "rust-function:core/src/compact_remote_v2.rs:is_retained_for_remote_compaction_v2",
-      "ownerIssue": 45
+      "ownerIssue": 45,
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice",
+        "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ExplicitToolExchangeIsAtomicAndRawReceiptsSurvive",
+        "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation"
+      ]
     },
     {
       "id": "atomic-compaction-install",
@@ -148,7 +863,85 @@
     {
       "id": "no-observer-history",
       "anchor": "rust-test:core/tests/suite/realtime_conversation.rs:conversation_records_history_without_an_event_observer",
-      "ownerIssue": 41
+      "ownerIssue": 41,
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.VoiceOnlySessionSealsTailBeforeEndAndPreservesInterleavedOrder",
+      "rationale": "Persistence primitive is mapped; the complete native coordinator no-observer case is still required."
+    },
+    {
+      "id": "v1-v3-legacy-handoff-equivalence",
+      "anchor": "rust-test:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs:legacy_and_frameless_delegations_decode_to_the_same_handoff",
+      "ownerIssue": 31,
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")"
+      ],
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "v2-function-handoff-noop-distinction",
+      "anchor": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_handoff_tool_call_event",
+      "ownerIssue": 31,
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-tool-handoff-noop\")",
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "native-outbound-v1",
+      "anchor": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:conversation.handoff.append",
+      "ownerIssue": 28,
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "native-outbound-v2",
+      "anchor": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:response.create",
+      "ownerIssue": 40,
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")",
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "native-outbound-v3",
+      "anchor": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:delegation.context.append",
+      "ownerIssue": 37,
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")",
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "standalone-voice-context-wire",
+      "anchor": "rust-test:codex-api/src/endpoint/realtime_websocket/methods_common_tests.rs:standalone_handoff_uses_session_context_for_frameless",
+      "ownerIssue": 38,
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")",
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "safe-sse-fallback-before-dispatch",
+      "anchor": "rust-test:core/tests/suite/websocket_fallback.rs:websocket_fallback_switches_to_http_on_upgrade_required_connect",
+      "ownerIssue": 44,
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.FailedHandshakeFallsBackBeforeGenerationOnly",
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "ambiguous-dispatch-never-replays",
+      "anchor": "rust-test:core/tests/suite/websocket_fallback.rs:websocket_fallback_switches_to_http_after_retries_exhausted",
+      "ownerIssue": 44,
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.DisconnectAfterDispatchNeverFallsBack",
+      "rationale": "Offline mapping only; no live provider or playback evidence."
     }
   ]
 }

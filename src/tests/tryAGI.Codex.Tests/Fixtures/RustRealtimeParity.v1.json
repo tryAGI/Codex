@@ -154,6 +154,334 @@
         }
       },
       "detach": true
+    },
+    {
+      "id": "v1-typed-and-legacy-handoff",
+      "protocol": "v1",
+      "route": "direct-mock",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v1.rs#L15-L83",
+      "additionalSource": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs#L7-L32",
+      "description": "Synthetic valid PCM16 audio adapted to Rust V1 parser; the legacy delegation is the upstream equivalence-test input.",
+      "incoming": [
+        {
+          "type": "session.updated",
+          "session": {
+            "id": "fixture-session"
+          }
+        },
+        {
+          "type": "conversation.output_audio.delta",
+          "delta": "AAE=",
+          "sample_rate": 24000,
+          "channels": 1,
+          "samples_per_channel": 1
+        },
+        {
+          "type": "conversation.input_transcript.delta",
+          "delta": "hello"
+        },
+        {
+          "type": "conversation.input_transcript.turn_marked",
+          "transcript": "hello"
+        },
+        {
+          "type": "conversation.handoff.requested",
+          "handoff_id": "handoff-123",
+          "item_id": "handoff-123",
+          "input_transcript": "check the weather"
+        }
+      ],
+      "outgoing": [],
+      "projections": {
+        "0": {
+          "session": {
+            "id": "fixture-session"
+          }
+        },
+        "1": {
+          "pcm": "AAE=",
+          "sampleRate": 24000,
+          "channels": 1,
+          "samplesPerChannel": 1
+        },
+        "2": {
+          "role": "user",
+          "text": "hello",
+          "final": false
+        },
+        "3": {
+          "role": "user",
+          "text": "hello",
+          "final": true,
+          "replaceFinalText": true
+        },
+        "4": {
+          "handoff": {
+            "id": "handoff-123",
+            "itemId": "handoff-123",
+            "transcript": "check the weather"
+          }
+        }
+      }
+    },
+    {
+      "id": "v2-tool-handoff-noop",
+      "protocol": "v2",
+      "route": "direct-mock",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_v2.rs#L127-L189",
+      "description": "Synthetic function-call items exercise the exact upstream distinction between background_agent, remain_silent and ordinary completed items.",
+      "incoming": [
+        {
+          "type": "conversation.item.done",
+          "item": {
+            "type": "function_call",
+            "name": "background_agent",
+            "id": "item-fixture",
+            "call_id": "call-fixture",
+            "arguments": "{\"prompt\":\"check the weather\"}"
+          }
+        },
+        {
+          "type": "conversation.item.done",
+          "item": {
+            "type": "function_call",
+            "name": "remain_silent",
+            "id": "item-quiet",
+            "call_id": "call-quiet",
+            "arguments": "{}"
+          }
+        },
+        {
+          "type": "conversation.item.done",
+          "item": {
+            "type": "function_call",
+            "name": "other_tool",
+            "id": "item-other",
+            "call_id": "call-other",
+            "arguments": "{}"
+          }
+        }
+      ],
+      "outgoing": [],
+      "projections": {
+        "0": {
+          "handoff": {
+            "id": "call-fixture",
+            "itemId": "item-fixture",
+            "transcript": "check the weather"
+          }
+        },
+        "1": {
+          "noop": {
+            "callId": "call-quiet",
+            "itemId": "item-quiet"
+          }
+        },
+        "2": {
+          "ordinaryItem": {
+            "id": "item-other",
+            "done": true
+          }
+        }
+      }
+    }
+  ],
+  "outbound": [
+    {
+      "id": "v1-wire",
+      "protocol": "v1",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods_v1.rs#L18-L49",
+      "additionalSource": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L64-L96",
+      "actions": [
+        {
+          "op": "audio",
+          "pcm": "AAE="
+        },
+        {
+          "op": "user",
+          "text": "hello"
+        },
+        {
+          "op": "context",
+          "text": "done",
+          "delegationId": "fixture-handoff",
+          "channel": "speakable"
+        },
+        {
+          "op": "close"
+        }
+      ],
+      "expected": [
+        {
+          "type": "input_audio_buffer.append",
+          "audio": "AAE="
+        },
+        {
+          "type": "conversation.item.create",
+          "item": {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "hello"
+              }
+            ]
+          }
+        },
+        {
+          "type": "conversation.handoff.append",
+          "handoff_id": "fixture-handoff",
+          "output_text": "done"
+        },
+        {
+          "type": "session.close"
+        }
+      ],
+      "transportClosed": false
+    },
+    {
+      "id": "v2-wire",
+      "protocol": "v2",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods_v2.rs#L39-L72",
+      "additionalSource": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L416-L486",
+      "actions": [
+        {
+          "op": "audio",
+          "pcm": "AAE="
+        },
+        {
+          "op": "context",
+          "text": "done",
+          "delegationId": "fixture-call",
+          "channel": "speakable"
+        },
+        {
+          "op": "close"
+        }
+      ],
+      "expected": [
+        {
+          "type": "input_audio_buffer.append",
+          "audio": "AAE="
+        },
+        {
+          "type": "conversation.item.create",
+          "item": {
+            "type": "function_call_output",
+            "call_id": "fixture-call",
+            "output": "done"
+          }
+        },
+        {
+          "type": "response.create"
+        }
+      ],
+      "transportClosed": true
+    },
+    {
+      "id": "v3-wire",
+      "protocol": "v3",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi.rs#L13-L49",
+      "additionalSource": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L72-L96",
+      "actions": [
+        {
+          "op": "audio",
+          "pcm": "AAE="
+        },
+        {
+          "op": "user",
+          "text": "hello"
+        },
+        {
+          "op": "context",
+          "text": "progress",
+          "delegationId": "fixture-delegation",
+          "channel": "commentary"
+        },
+        {
+          "op": "context",
+          "text": "done",
+          "delegationId": "fixture-delegation",
+          "channel": "speakable"
+        },
+        {
+          "op": "context",
+          "text": "optional",
+          "delegationId": "fixture-delegation",
+          "channel": null
+        },
+        {
+          "op": "context",
+          "text": "standalone",
+          "channel": "speakable"
+        },
+        {
+          "op": "close"
+        }
+      ],
+      "expected": [
+        {
+          "type": "input_audio.append",
+          "audio": "AAE="
+        },
+        {
+          "type": "session.context.append",
+          "channel": "speakable",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "hello"
+            }
+          ]
+        },
+        {
+          "type": "delegation.context.append",
+          "delegation_item_id": "fixture-delegation",
+          "channel": "commentary",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "progress"
+            }
+          ]
+        },
+        {
+          "type": "delegation.context.append",
+          "delegation_item_id": "fixture-delegation",
+          "channel": "speakable",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "done"
+            }
+          ]
+        },
+        {
+          "type": "delegation.context.append",
+          "delegation_item_id": "fixture-delegation",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "optional"
+            }
+          ]
+        },
+        {
+          "type": "session.context.append",
+          "channel": "speakable",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "standalone"
+            }
+          ]
+        },
+        {
+          "type": "session.close"
+        }
+      ],
+      "transportClosed": false
     }
   ],
   "http": {

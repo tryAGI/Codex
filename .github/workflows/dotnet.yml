@@ -11,15 +11,29 @@ permissions:
   contents: read
 
 jobs:
+  parity-release-readiness:
+    name: Check GPT Live Rust parity release readiness
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.parity.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: parity
+        run: |
+          python3 -B scripts/realtime-parity.py report > parity-report.json
+          python3 -B -c 'import json; print("ready=" + str(json.load(open("parity-report.json"))["releaseReady"]).lower())' >> "$GITHUB_OUTPUT"
+
   build-test-publish:
     name: Build, test and publish
+    needs: parity-release-readiness
     uses: tryAGI/workflows/.github/workflows/dotnet-sdk-build-test-publish.yml@main
     with:
       project-path: Codex.slnx
       dotnet-version: 10.0.x
-      # Releases stay off until the repository variable NUGET_RELEASES is set to true.
-      # Then every push to main publishes a prerelease and a classified stable release.
-      publish: ${{ vars.NUGET_RELEASES == 'true' }}
+      # Publication requires both the owner's switch and the independent acceptance gate.
+      publish: ${{ vars.NUGET_RELEASES == 'true' && needs.parity-release-readiness.outputs.ready == 'true' }}
       additional-test-arguments: '--logger GitHubActions'
 
   # Fails in seconds when the nuget.org trusted-publishing policy is missing or no longer matches, rather
@@ -42,8 +56,8 @@ jobs:
   # workflow file, so both pushes run here rather than inside the reusable workflow.
   nuget-trusted-publish:
     name: NuGet trusted publishing
-    needs: build-test-publish
-    if: github.event_name == 'push' && vars.NUGET_RELEASES == 'true'
+    needs: [build-test-publish, parity-release-readiness]
+    if: github.event_name == 'push' && vars.NUGET_RELEASES == 'true' && needs.parity-release-readiness.outputs.ready == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,8 +69,8 @@ jobs:
 
   auto-stable-release:
     name: Automatic stable release
-    needs: nuget-trusted-publish
-    if: github.ref == 'refs/heads/main' && vars.NUGET_RELEASES == 'true'
+    needs: [nuget-trusted-publish, parity-release-readiness]
+    if: github.ref == 'refs/heads/main' && vars.NUGET_RELEASES == 'true' && needs.parity-release-readiness.outputs.ready == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

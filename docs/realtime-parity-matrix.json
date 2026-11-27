@@ -4407,18 +4407,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.delegation_ack_filler",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L41",
-      "ownerIssue": 31,
+      "ownerIssue": 29,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.DelegationAckFillerSetting",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.event_parser",
@@ -4426,18 +4427,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.event_parser",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L44",
-      "ownerIssue": 31,
+      "ownerIssue": 28,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Protocol",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSocketParityTests.cs::RealtimeSocketParityTests.RustDirectAndSidebandUris",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.initial_items",
@@ -4445,18 +4447,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.initial_items",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L40",
-      "ownerIssue": 31,
+      "ownerIssue": 36,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.InitialItems",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.instructions",
@@ -4464,18 +4467,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.instructions",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L39",
-      "ownerIssue": 31,
+      "ownerIssue": 29,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Instructions",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.UnsupportedCombinationsAndInstructionLimitsAreChecked",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.model",
@@ -4483,18 +4487,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.model",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L42",
-      "ownerIssue": 31,
+      "ownerIssue": 26,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Model",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeModelRouteTests.cs::RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.output_modality",
@@ -4502,18 +4507,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.output_modality",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L46",
-      "ownerIssue": 31,
+      "ownerIssue": 29,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.OutputModality",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.V2ConversationalWireMatchesRust",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.session_id",
@@ -4521,18 +4527,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.session_id",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L43",
-      "ownerIssue": 31,
+      "ownerIssue": 29,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.SessionId",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.session_mode",
@@ -4540,18 +4547,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.session_mode",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L45",
-      "ownerIssue": 31,
+      "ownerIssue": 29,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Mode",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.V2TranscriptionUpdateContainsOnlyInputConfiguration",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:codex-api/src/endpoint/realtime_websocket/protocol.rs:RealtimeSessionConfig.voice",
@@ -4559,18 +4567,19 @@
       "kind": "rust-field",
       "symbol": "RealtimeSessionConfig.voice",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L48",
-      "ownerIssue": 31,
+      "ownerIssue": 26,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeSessionOptions.Voice",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeModelRouteTests.cs::RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "evidence": null,
+      "rationale": "Exact field mapping and candidate test; full protocol-specific behavior remains pending until receipt."
     },
     {
       "id": "rust-field:protocol/src/realtime.rs:RealtimeFrameChannels.voice_transcript",
@@ -13660,18 +13669,19 @@
       "kind": "rust-test",
       "symbol": "rejects_v2_session_call_before_sending_request",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_call.rs#L636",
-      "ownerIssue": 50,
+      "ownerIssue": 27,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexClient.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeApiCallTests.cs::RealtimeApiCallTests.WrongCredentialDomainAndV2CallsAreRejectedBeforeDispatch",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_call.rs:sends_api_session_call_as_multipart_body",
@@ -13679,18 +13689,19 @@
       "kind": "rust-test",
       "symbol": "sends_api_session_call_as_multipart_body",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_call.rs#L501",
-      "ownerIssue": 50,
+      "ownerIssue": 27,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexClient.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeApiCallTests.cs::RealtimeApiCallTests.ApiSessionCallUsesRustMultipart",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_call.rs:sends_backend_frameless_session_call_to_realtime_calls",
@@ -13736,18 +13747,19 @@
       "kind": "rust-test",
       "symbol": "sends_frameless_session_call_to_live_without_legacy_query_params",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_call.rs#L566",
-      "ownerIssue": 50,
+      "ownerIssue": 27,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexClient.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeApiCallTests.cs::RealtimeApiCallTests.ApiSessionCallUsesRustMultipart",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_call.rs:sends_sdp_offer_as_raw_body",
@@ -13888,18 +13900,19 @@
       "kind": "rust-test",
       "symbol": "parse_audio_delta_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1421",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeEvent.Audio",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_conversation_item_added_event",
@@ -13945,18 +13958,19 @@
       "kind": "rust-test",
       "symbol": "parse_handoff_requested_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1473",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_input_transcript_delta_event",
@@ -13964,18 +13978,19 @@
       "kind": "rust-test",
       "symbol": "parse_input_transcript_delta_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1727",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_output_transcript_delta_event",
@@ -13983,18 +13998,19 @@
       "kind": "rust-test",
       "symbol": "parse_output_transcript_delta_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1799",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_conversation_item_created_event",
@@ -14021,18 +14037,19 @@
       "kind": "rust-test",
       "symbol": "parse_realtime_v2_handoff_tool_call_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1877",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-tool-handoff-noop\")",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_input_audio_transcription_delta_event",
@@ -14040,18 +14057,19 @@
       "kind": "rust-test",
       "symbol": "parse_realtime_v2_input_audio_transcription_delta_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1925",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_item_done_output_text_event",
@@ -14078,18 +14096,19 @@
       "kind": "rust-test",
       "symbol": "parse_realtime_v2_noop_tool_call_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1902",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Noop",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-tool-handoff-noop\")",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_output_audio_delta_defaults_audio_shape",
@@ -14097,18 +14116,19 @@
       "kind": "rust-test",
       "symbol": "parse_realtime_v2_output_audio_delta_defaults_audio_shape",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L2021",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadAudio",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_output_audio_transcript_done_event",
@@ -14116,18 +14136,19 @@
       "kind": "rust-test",
       "symbol": "parse_realtime_v2_output_audio_transcript_done_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1945",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_output_text_done_event",
@@ -14154,18 +14175,19 @@
       "kind": "rust-test",
       "symbol": "parse_realtime_v2_response_audio_delta_with_item_id",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L2041",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadAudio",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_realtime_v2_response_cancelled_event",
@@ -14268,18 +14290,19 @@
       "kind": "rust-test",
       "symbol": "parse_v1_input_audio_transcription_completed_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1765",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_input_audio_transcription_delta_event",
@@ -14287,18 +14310,19 @@
       "kind": "rust-test",
       "symbol": "parse_v1_input_audio_transcription_delta_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1745",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_input_transcript_turn_marked_event",
@@ -14306,18 +14330,19 @@
       "kind": "rust-test",
       "symbol": "parse_v1_input_transcript_turn_marked_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1783",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_item_done_output_text_event",
@@ -14344,18 +14369,19 @@
       "kind": "rust-test",
       "symbol": "parse_v1_output_audio_transcript_delta_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1817",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:parse_v1_output_audio_transcript_done_event",
@@ -14363,18 +14389,19 @@
       "kind": "rust-test",
       "symbol": "parse_v1_output_audio_transcript_done_event",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1835",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:realtime_v2_session_update_includes_background_agent_tool_and_handoff_output_item",
@@ -14382,18 +14409,19 @@
       "kind": "rust-test",
       "symbol": "realtime_v2_session_update_includes_background_agent_tool_and_handoff_output_item",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L2728",
-      "ownerIssue": 50,
+      "ownerIssue": 29,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.Session",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.V2ConversationalWireMatchesRust",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:send_does_not_block_while_next_event_waits_for_inbound_data",
@@ -14420,18 +14448,19 @@
       "kind": "rust-test",
       "symbol": "takes_only_transcript_after_last_handoff_once",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1494",
-      "ownerIssue": 50,
+      "ownerIssue": 30,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeTranscriptAccumulator.cs::CodexRealtimeTranscriptAccumulator",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeTranscriptAccumulatorTests.cs::RealtimeTranscriptAccumulatorTests.HandoffBetweenDeltasCapturesOnlyOnceAndRetainsNextUtterance",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:terminal_sideband_handshake_statuses_are_not_retryable",
@@ -14458,18 +14487,19 @@
       "kind": "rust-test",
       "symbol": "transcript_state_survives_reconnect_and_reconciles_done",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1545",
-      "ownerIssue": 50,
+      "ownerIssue": 42,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.ReconnectRebuildsPendingSpeechAndReplayIsIdempotentAfterLostCommit",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:transcription_mode_session_update_omits_output_audio_and_instructions",
@@ -14477,18 +14507,19 @@
       "kind": "rust-test",
       "symbol": "transcription_mode_session_update_omits_output_audio_and_instructions",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L2968",
-      "ownerIssue": 50,
+      "ownerIssue": 29,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.Session",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSessionParityTests.cs::RealtimeSessionParityTests.V2TranscriptionUpdateContainsOnlyInputConfiguration",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:v1_transcription_mode_is_treated_as_conversational",
@@ -14971,18 +15002,19 @@
       "kind": "rust-test",
       "symbol": "standalone_handoff_uses_session_context_for_frameless",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods_common_tests.rs#L84",
-      "ownerIssue": 50,
+      "ownerIssue": 38,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi_tests.rs:context_append_chunks_preserve_text_within_wire_limit",
@@ -14990,18 +15022,19 @@
       "kind": "rust-test",
       "symbol": "context_append_chunks_preserve_text_within_wire_limit",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi_tests.rs#L11",
-      "ownerIssue": 50,
+      "ownerIssue": 37,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.Utf8Chunks",
+      "test": "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs::NativeProtocolTests.RussianAndEmojiContextChunksRetainTextWithinUpstreamByteLimit",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi_tests.rs:session_json_encodes_role_bearing_initial_items",
@@ -15009,18 +15042,19 @@
       "kind": "rust-test",
       "symbol": "session_json_encodes_role_bearing_initial_items",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi_tests.rs#L51",
-      "ownerIssue": 50,
+      "ownerIssue": 36,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.Session",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods_frameless_bidi_tests.rs:session_json_omits_initial_items_when_empty",
@@ -15066,18 +15100,22 @@
       "kind": "rust-test",
       "symbol": "legacy_and_frameless_delegations_decode_to_the_same_handoff",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs#L7",
-      "ownerIssue": 50,
+      "ownerIssue": 31,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")"
+      ],
+      "evidence": null,
+      "rationale": "The same upstream synthetic handoff is replayed in both adapters; exact handoff identity and transcript are compared."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/transcript_tests.rs:completed_utterances_keep_repeated_speech_and_final_only_turns_distinct",
@@ -18106,18 +18144,19 @@
       "kind": "rust-test",
       "symbol": "final_transcript_after_handoff_seals_only_the_added_suffix",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/src/realtime_history_tests.rs#L1020",
-      "ownerIssue": 50,
+      "ownerIssue": 41,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexThreadStore.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/ThreadAgentTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.PendingHandoffBlocksTailUntilAdmissionSettles",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:core/src/realtime_history_tests.rs:final_transcript_extends_unsealed_event_without_replacing_its_identity",
@@ -19892,18 +19931,19 @@
       "kind": "rust-test",
       "symbol": "responses_websocket_request_prewarm_reuses_connection",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client_websockets.rs#L734",
-      "ownerIssue": 50,
+      "ownerIssue": 44,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexResponses.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_request_prewarm_traces_logical_request",
@@ -20139,18 +20179,19 @@
       "kind": "rust-test",
       "symbol": "responses_websocket_uses_incremental_create_on_prefix",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client_websockets.rs#L2084",
-      "ownerIssue": 50,
+      "ownerIssue": 44,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexResponses.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_uses_previous_response_id_when_prefix_after_completed",
@@ -20158,18 +20199,19 @@
       "kind": "rust-test",
       "symbol": "responses_websocket_uses_previous_response_id_when_prefix_after_completed",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client_websockets.rs#L2337",
-      "ownerIssue": 50,
+      "ownerIssue": 44,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexResponses.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_after_error_uses_full_create_without_previous_response_id",
@@ -20215,18 +20257,19 @@
       "kind": "rust-test",
       "symbol": "responses_websocket_v2_creates_without_previous_response_id_when_non_input_fields_change",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/client_websockets.rs#L2550",
-      "ownerIssue": 50,
+      "ownerIssue": 44,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexResponses.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.ChangedPropertiesOrTurnDoNotUsePriorResponseId",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_incremental_requests_are_reused_across_turns",
@@ -23357,18 +23400,19 @@
       "kind": "rust-test",
       "symbol": "websocket_fallback_switches_to_http_on_upgrade_required_connect",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/websocket_fallback.rs#L37",
-      "ownerIssue": 50,
+      "ownerIssue": 44,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexResponses.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
       ],
-      "applicability": "pending",
+      "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.FailedHandshakeFallsBackBeforeGenerationOnly",
+      "evidence": null,
+      "rationale": "Applicable upstream test; mapped to a concrete C# candidate. Independent comparison of all assertions and clean-revision evidence still required."
     },
     {
       "id": "rust-test:core/tests/suite/websocket_fallback_close.rs:retry_transport",
@@ -28273,6 +28317,26 @@
       "evidence": null
     },
     {
+      "id": "scenario:ambiguous-dispatch-never-replays",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "ambiguous-dispatch-never-replays",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/websocket_fallback.rs#L84",
+      "ownerIssue": 44,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexResponses.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.DisconnectAfterDispatchNeverFallsBack",
+      "evidence": null,
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
       "id": "scenario:atomic-compaction-install",
       "lane": "behavior",
       "kind": "scenario",
@@ -28363,9 +28427,13 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.NextTurnAtomicallySealsTailAndForkRetainsSavedInputWithoutCallOwnership",
+        "src/tests/tryAGI.Codex.Tests/RealtimeTranscriptAccumulatorTests.cs::RealtimeTranscriptAccumulatorTests.HandoffBetweenDeltasCapturesOnlyOnceAndRetainsNextUtterance"
+      ],
+      "evidence": null,
+      "rationale": "Store and accumulator candidates; full end-to-end lifecycle assertion not yet ported."
     },
     {
       "id": "scenario:handoff-start-or-steer",
@@ -28406,6 +28474,66 @@
       "evidence": null
     },
     {
+      "id": "scenario:native-outbound-v1",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "native-outbound-v1",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L67",
+      "ownerIssue": 28,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+      "evidence": null,
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "scenario:native-outbound-v2",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "native-outbound-v2",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L89",
+      "ownerIssue": 40,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")",
+      "evidence": null,
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "scenario:native-outbound-v3",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "native-outbound-v3",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L74",
+      "ownerIssue": 37,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")",
+      "evidence": null,
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
       "id": "scenario:no-observer-history",
       "lane": "behavior",
       "kind": "scenario",
@@ -28420,9 +28548,10 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadStore.RealtimeHistory.cs::CodexThreadStore",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeHistoryTests.cs::RealtimeHistoryTests.VoiceOnlySessionSealsTailBeforeEndAndPreservesInterleavedOrder",
+      "evidence": null,
+      "rationale": "Persistence primitive is mapped; the complete native coordinator no-observer case is still required."
     },
     {
       "id": "scenario:observer-only-detach",
@@ -28439,9 +28568,10 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.CloseTransportAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeAttachmentTests.cs::RealtimeAttachmentTests.CallerStreamUsesSameParserAndDetachLeavesMediaChannelsOpen",
+      "evidence": null,
+      "rationale": "Caller-owned stream primitive; real sideband reconnect and coordinator lifecycle remain pending."
     },
     {
       "id": "scenario:responses-prewarm",
@@ -28458,8 +28588,8 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput",
       "evidence": null
     },
     {
@@ -28477,9 +28607,33 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice",
+        "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ExplicitToolExchangeIsAtomicAndRawReceiptsSurvive",
+        "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation"
+      ],
       "evidence": null
+    },
+    {
+      "id": "scenario:safe-sse-fallback-before-dispatch",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "safe-sse-fallback-before-dispatch",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/tests/suite/websocket_fallback.rs#L37",
+      "ownerIssue": 44,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexResponses.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.FailedHandshakeFallsBackBeforeGenerationOnly",
+      "evidence": null,
+      "rationale": "Offline mapping only; no live provider or playback evidence."
     },
     {
       "id": "scenario:sideband-reconnect",
@@ -28501,6 +28655,26 @@
       "evidence": null
     },
     {
+      "id": "scenario:standalone-voice-context-wire",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "standalone-voice-context-wire",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods_common_tests.rs#L84",
+      "ownerIssue": 38,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")",
+      "evidence": null,
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
       "id": "scenario:sticky-auth-owner-routing",
       "lane": "behavior",
       "kind": "scenario",
@@ -28515,8 +28689,12 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesRoutingTests.cs::CodexResponsesRoutingTests.FirstStateIsImmutableAndMetadataCorrelatesTheBackingTurn",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesRoutingTests.cs::CodexResponsesRoutingTests.TurnRouteAndCredentialChangesCannotReplayState",
+        "src/tests/tryAGI.Codex.Tests/CodexResponsesRoutingTests.cs::CodexResponsesRoutingTests.LateHeadersFromAnOldTurnCannotPoisonTheCurrentTurn"
+      ],
       "evidence": null
     },
     {
@@ -28539,6 +28717,49 @@
       "evidence": null
     },
     {
+      "id": "scenario:v1-v3-legacy-handoff-equivalence",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "v1-v3-legacy-handoff-equivalence",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi_tests.rs#L7",
+      "ownerIssue": 31,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")"
+      ],
+      "evidence": null,
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
+      "id": "scenario:v2-function-handoff-noop-distinction",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "v2-function-handoff-noop-distinction",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/methods.rs#L1877",
+      "ownerIssue": 31,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Handoff",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-tool-handoff-noop\")",
+      "evidence": null,
+      "rationale": "Offline mapping only; no live provider or playback evidence."
+    },
+    {
       "id": "scenario:v2-user-transcript-delta-projection",
       "lane": "behavior",
       "kind": "scenario",
@@ -28554,13 +28775,14 @@
       "applicability": "applicable",
       "status": "divergent",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
       "evidence": {
         "lane": "offline",
         "outcome": "failed",
         "receipt": "codex-rust-parity-tests-49-r2-20261127",
         "detail": "xUnit Assert.IsType: CodexRealtimeTranscript was null; 6 passed, 1 failed, 0 skipped in fixture suite. Tested shared working tree, not a revision-bound acceptance receipt."
-      }
+      },
+      "rationale": "The earlier failed independent case is retained until rerun against the new #31 event projection."
     },
     {
       "id": "wire-symbol:app-server-protocol/src/protocol/common.rs:error",
@@ -28986,18 +29208,21 @@
       "kind": "wire-symbol",
       "symbol": "conversation.handoff.append",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L67",
-      "ownerIssue": 31,
+      "ownerIssue": 28,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")"
+      ],
+      "evidence": null,
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:conversation.item.create",
@@ -29005,18 +29230,22 @@
       "kind": "wire-symbol",
       "symbol": "conversation.item.create",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L95",
-      "ownerIssue": 31,
+      "ownerIssue": 28,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendUserTextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+      ],
+      "evidence": null,
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:delegation.context.append",
@@ -29024,18 +29253,21 @@
       "kind": "wire-symbol",
       "symbol": "delegation.context.append",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L74",
-      "ownerIssue": 31,
+      "ownerIssue": 28,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+      ],
+      "evidence": null,
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:input_audio.append",
@@ -29043,18 +29275,21 @@
       "kind": "wire-symbol",
       "symbol": "input_audio.append",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L72",
-      "ownerIssue": 31,
+      "ownerIssue": 28,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendAudioAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+      ],
+      "evidence": null,
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:input_audio_buffer.append",
@@ -29062,18 +29297,22 @@
       "kind": "wire-symbol",
       "symbol": "input_audio_buffer.append",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L65",
-      "ownerIssue": 31,
+      "ownerIssue": 28,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendAudioAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+      ],
+      "evidence": null,
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:response.create",
@@ -29081,18 +29320,21 @@
       "kind": "wire-symbol",
       "symbol": "response.create",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L89",
-      "ownerIssue": 31,
+      "ownerIssue": 40,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")"
+      ],
+      "evidence": null,
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:session.close",
@@ -29100,18 +29342,22 @@
       "kind": "wire-symbol",
       "symbol": "session.close",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L87",
-      "ownerIssue": 31,
+      "ownerIssue": 28,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.CloseSessionAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")",
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+      ],
+      "evidence": null,
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:session.context.append",
@@ -29119,18 +29365,21 @@
       "kind": "wire-symbol",
       "symbol": "session.context.append",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L81",
-      "ownerIssue": 31,
+      "ownerIssue": 28,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.AppendContextAsync",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")"
+      ],
+      "evidence": null,
+      "rationale": "Exact JSON request sequence from the pinned outbound enum and Rust adapter constructors; awaiting a clean-revision execution."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol.rs:session.update",
@@ -29138,18 +29387,19 @@
       "kind": "wire-symbol",
       "symbol": "session.update",
       "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/codex-api/src/endpoint/realtime_websocket/protocol.rs#L91",
-      "ownerIssue": 31,
+      "ownerIssue": 29,
       "implementationCandidates": [
         "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs"
       ],
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeConnection.cs::CodexRealtimeConnection.UpdateSessionAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSocketParityTests.cs::RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents",
+      "evidence": null,
+      "rationale": "Session update compared at the adapter level; mode-specific fields remain separate."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_common.rs:error",
@@ -29186,8 +29436,9 @@
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadDelegation",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-sideband-delegation)",
-      "evidence": null
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")",
+      "evidence": null,
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:error",
@@ -29202,11 +29453,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"error\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:input_transcript.added",
@@ -29224,8 +29476,9 @@
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)",
-      "evidence": null
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
+      "evidence": null,
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:output_audio.delta",
@@ -29243,8 +29496,9 @@
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadAudio",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)",
-      "evidence": null
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
+      "evidence": null,
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:output_transcript.added",
@@ -29259,11 +29513,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"output_transcript.added\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:session.started",
@@ -29278,11 +29533,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.started\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:session.updated",
@@ -29297,11 +29553,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.updated\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_frameless_bidi.rs:turn.done",
@@ -29319,8 +29576,9 @@
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v3-direct-transcript-audio)",
-      "evidence": null
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")",
+      "evidence": null,
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.handoff.requested",
@@ -29335,11 +29593,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.handoff.requested\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.input_transcript.delta",
@@ -29354,11 +29613,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.input_transcript.turn_marked",
@@ -29373,11 +29633,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.turn_marked\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.item.added",
@@ -29392,11 +29653,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.added\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.item.done",
@@ -29411,11 +29673,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.done\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.item.input_audio_transcription.completed",
@@ -29430,11 +29693,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.completed\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.item.input_audio_transcription.delta",
@@ -29449,11 +29713,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.output_audio.delta",
@@ -29468,11 +29733,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_audio.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:conversation.output_transcript.delta",
@@ -29487,11 +29753,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_transcript.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:error",
@@ -29506,11 +29773,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"error\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:response.output_audio_transcript.delta",
@@ -29525,11 +29793,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:response.output_audio_transcript.done",
@@ -29544,11 +29813,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.done\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:response.output_text.delta",
@@ -29563,11 +29833,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_text.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v1.rs:session.updated",
@@ -29582,11 +29853,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"session.updated\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.added",
@@ -29601,11 +29873,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.added\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.created",
@@ -29620,11 +29893,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.created\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.done",
@@ -29639,11 +29913,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.done\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.input_audio_transcription.completed",
@@ -29658,11 +29933,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.input_audio_transcription.completed\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:conversation.item.input_audio_transcription.delta",
@@ -29680,13 +29956,14 @@
       "applicability": "applicable",
       "status": "divergent",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
       "evidence": {
         "lane": "offline",
         "outcome": "failed",
         "receipt": "codex-rust-parity-tests-49-r2-20261127",
         "detail": "xUnit Assert.IsType: CodexRealtimeTranscript was null; 6 passed, 1 failed, 0 skipped in fixture suite. Tested shared working tree, not a revision-bound acceptance receipt."
-      }
+      },
+      "rationale": "The earlier failed independent case is retained until rerun against the new #31 event projection."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:error",
@@ -29701,11 +29978,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"error\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:input_audio_buffer.speech_started",
@@ -29720,11 +29998,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"input_audio_buffer.speech_started\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.audio.delta",
@@ -29739,11 +30018,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.audio.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.cancelled",
@@ -29758,11 +30038,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.cancelled\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.created",
@@ -29777,11 +30058,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.created\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.done",
@@ -29796,11 +30078,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.done\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_audio.delta",
@@ -29815,11 +30098,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_audio_transcript.delta",
@@ -29834,11 +30118,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.delta\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_audio_transcript.done",
@@ -29853,11 +30138,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.done\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_text.delta",
@@ -29875,8 +30161,9 @@
       "applicability": "applicable",
       "status": "source-reviewed",
       "implementation": "src/libs/tryAGI.Codex/CodexRealtimeGaProtocol.cs::CodexRealtimeGaProtocol.ReadTranscript",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(v2-direct-transcript)",
-      "evidence": null
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityFixtureTests.cs::RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")",
+      "evidence": null,
+      "rationale": "Independent typed replay plus the adapter event source mapping; revision-bound evidence remains pending."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:response.output_text.done",
@@ -29891,11 +30178,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_text.done\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/realtime_websocket/protocol_v2.rs:session.updated",
@@ -29910,11 +30198,12 @@
       "testCandidates": [
         "src/tests/tryAGI.Codex.Tests/RealtimeGaProtocolTests.cs"
       ],
-      "applicability": "pending",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
-      "evidence": null
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeEventProjections.cs::CodexRealtimeEventProjections.Recognized",
+      "test": "src/tests/tryAGI.Codex.Tests/RealtimeEventParityTests.cs::RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"session.updated\")",
+      "evidence": null,
+      "rationale": "This row covers exact event-name recognition and raw JSON retention; typed field/behavior semantics are separate rows."
     },
     {
       "id": "wire-symbol:codex-api/src/endpoint/responses_websocket.rs:error",

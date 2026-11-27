@@ -13,6 +13,7 @@ import re
 import subprocess
 import urllib.request
 from pathlib import Path
+from realtime_parity_evidence import source_is_clean, source_revision, validate_receipt
 
 ROOT = Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "docs/realtime-parity-matrix.json"
@@ -274,6 +275,24 @@ def validate(data):
     if not EXACT <= files.keys() or any(not re.fullmatch(r"[a-f0-9]{64}", h) for h in files.values()):
         raise ValueError("Missing or invalid source fingerprint")
     ids = set()
+    source_cache = {}
+    def check_references(references, rid):
+        if references is None:
+            return
+        if isinstance(references, str):
+            references = [references]
+        if not isinstance(references, list) or not references:
+            raise ValueError(f"Invalid mapped references: {rid}")
+        for reference in references:
+            path, sep, symbol = reference.partition("::")
+            absolute = (ROOT / path).resolve()
+            if not sep or not symbol or not absolute.is_relative_to(ROOT / "src") or not absolute.is_file():
+                raise ValueError(f"Invalid mapped reference: {rid}: {reference}")
+            if absolute not in source_cache:
+                source_cache[absolute] = absolute.read_text(encoding="utf-8-sig")
+            name = symbol.split("(")[0].rsplit(".", 1)[-1]
+            if not name or not re.search(r"\b" + re.escape(name) + r"\b", source_cache[absolute]):
+                raise ValueError(f"Missing mapped symbol: {rid}: {reference}")
     for r in data["rows"]:
         rid = r["id"]
         if rid in ids:
@@ -289,6 +308,8 @@ def validate(data):
         for candidate_path in r["implementationCandidates"] + r["testCandidates"]:
             if not (ROOT / candidate_path).is_file():
                 raise ValueError(f"Missing C# candidate {candidate_path}: {rid}")
+        check_references(r.get("implementation"), rid)
+        check_references(r.get("test"), rid)
         if r["status"] == "not-applicable" or r["applicability"] == "not-applicable":
             if r["status"] != "not-applicable" or r["applicability"] != "not-applicable" or not r.get("rationale"):
                 raise ValueError(f"N/A requires explicit justification: {rid}")
@@ -301,15 +322,29 @@ def validate(data):
             expected = "live" if r["lane"] == "live" else "offline"
             if evidence.get("lane") != expected:
                 raise ValueError(f"Wrong evidence lane: {rid}")
-            if expected == "live" and evidence.get("media") not in {"not-required", "audio-received", "audio-played"}:
-                raise ValueError(f"Live media evidence missing: {rid}")
+            if expected == "live":
+                # Native live evidence validation must be implemented with #51/#52; fail closed meanwhile.
+                raise ValueError(f"Live receipt verifier is not implemented: {rid}")
+            tree = validate_receipt(r, evidence)
+            try:
+                _, claimed_tree = source_revision(evidence["csharpCommit"])
+            except subprocess.CalledProcessError as error:
+                raise ValueError(f"Unknown evidence revision: {rid}") from error
+            if tree != claimed_tree:
+                raise ValueError(f"Receipt source tree differs from its commit: {rid}")
     return data
 
 def report(data):
     result = {}
+    _, current_tree = source_revision()
+    stale = set()
+    for r in data["rows"]:
+        if r["status"] == "passed" and r["lane"] != "live":
+            if validate_receipt(r, r["evidence"]) != current_tree:
+                stale.add(r["id"])
     for lane in sorted(LANES):
         rows = [r for r in data["rows"] if r["lane"] == lane]
-        counts = collections.Counter(r["status"] for r in rows)
+        counts = collections.Counter("unverified" if r["id"] in stale else r["status"] for r in rows)
         pending = sum(r["applicability"] == "pending" for r in rows)
         denominator = sum(r["applicability"] == "applicable" for r in rows)
         passed = counts["passed"]
@@ -317,13 +352,15 @@ def report(data):
                         "percent": round(100 * passed / denominator, 2) if denominator else None,
                         "candidateDenominator": denominator + pending,
                         "pendingApplicability": pending,
+                        "staleEvidence": sum(r["id"] in stale for r in rows),
                         "statuses": {s: counts[s] for s in sorted(STATUSES)}}
-    ready = data["inventoryReviewed"] and all(
+    clean = source_is_clean()
+    ready = clean and data["inventoryReviewed"] and not stale and all(
         r["applicability"] != "pending" and r["status"] in {"passed", "not-applicable"} for r in data["rows"]
     ) and all(result[lane]["denominator"] > 0 for lane in LANES)
     return {"upstreamCommit": data["upstreamCommit"], "inventoryReviewed": data["inventoryReviewed"],
             "sourceFiles": len(data["sourceFiles"]), "rows": len(data["rows"]),
-            "lanes": result, "releaseReady": ready}
+            "sourceTree": current_tree, "sourceClean": clean, "lanes": result, "releaseReady": ready}
 
 def self_test(data):
     """Verify the checker cannot convert unsupported evidence into acceptance."""

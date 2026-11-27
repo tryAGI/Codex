@@ -17,6 +17,7 @@ public sealed class RustParityFixtureTests
             ?? throw new InvalidDataException("Rust fixture resource is missing.");
         using var document = JsonDocument.Parse(stream);
         Assert.Equal(1, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal("3d86e43b075adeba2193ec5c22ac92f55afd82e6", document.RootElement.GetProperty("upstreamCommit").GetString());
         return document.RootElement.Clone();
     }
 
@@ -105,6 +106,8 @@ public sealed class RustParityFixtureTests
     [InlineData("v2-direct-transcript")]
     [InlineData("v3-direct-transcript-audio")]
     [InlineData("v3-sideband-delegation")]
+    [InlineData("v1-typed-and-legacy-handoff")]
+    [InlineData("v2-tool-handoff-noop")]
     public async Task MockWebSocketReplaysPinnedRustEvents(string id)
     {
         var fixture = Fixture().GetProperty("websocket").EnumerateArray().Single(x => x.GetProperty("id").GetString() == id);
@@ -140,6 +143,39 @@ public sealed class RustParityFixtureTests
                 Assert.Equal(pcm.GetString(), Convert.ToBase64String(audio.Pcm16.Span));
                 Assert.Equal(expected.GetProperty("sampleRate").GetInt32(), audio.SampleRate);
                 Assert.Equal(expected.GetProperty("channels").GetInt32(), audio.Channels);
+                if (expected.TryGetProperty("samplesPerChannel", out var samples))
+                    Assert.Equal(samples.GetUInt32(), audio.SamplesPerChannel);
+            }
+            else if (expected.TryGetProperty("session", out var session))
+            {
+                var receipt = Assert.IsType<CodexRealtimeSessionReceipt>(item.Session);
+                Assert.Equal(session.GetProperty("id").GetString(), receipt.Id);
+                Assert.Null(receipt.Instructions);
+                Assert.Null(receipt.Model);
+            }
+            else if (expected.TryGetProperty("handoff", out var handoff))
+            {
+                var receipt = Assert.IsType<CodexRealtimeHandoff>(item.Handoff);
+                Assert.Equal(handoff.GetProperty("id").GetString(), receipt.HandoffId);
+                Assert.Equal(handoff.GetProperty("itemId").GetString(), receipt.ItemId);
+                Assert.Equal(handoff.GetProperty("transcript").GetString(), receipt.InputTranscript);
+                Assert.Null(item.Noop);
+            }
+            else if (expected.TryGetProperty("noop", out var noop))
+            {
+                var receipt = Assert.IsType<CodexRealtimeNoop>(item.Noop);
+                Assert.Equal(noop.GetProperty("callId").GetString(), receipt.CallId);
+                Assert.Equal(noop.GetProperty("itemId").GetString(), receipt.ItemId);
+                Assert.Null(item.Handoff);
+                Assert.Null(item.Delegation);
+            }
+            else if (expected.TryGetProperty("ordinaryItem", out var ordinary))
+            {
+                var receipt = Assert.IsType<CodexRealtimeConversationItem>(item.ConversationItem);
+                Assert.Equal(ordinary.GetProperty("id").GetString(), receipt.Id);
+                Assert.Equal(ordinary.GetProperty("done").GetBoolean(), receipt.Done);
+                Assert.Null(item.Handoff);
+                Assert.Null(item.Noop);
             }
             else
             {
@@ -154,6 +190,48 @@ public sealed class RustParityFixtureTests
             Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.ClosedOutput);
         }
         Assert.Equal(fixture.GetProperty("outgoing").GetArrayLength(), socket.Sent.Count);
+    }
+
+    [Theory]
+    [InlineData("v1-wire")]
+    [InlineData("v2-wire")]
+    [InlineData("v3-wire")]
+    public async Task MockOutboundFramesMatchRustWire(string id)
+    {
+        var fixture = Fixture().GetProperty("outbound").EnumerateArray()
+            .Single(x => x.GetProperty("id").GetString() == id);
+        var socket = new ReplaySocket([]);
+        var protocol = fixture.GetProperty("protocol").GetString() ?? throw new InvalidDataException("Missing protocol.");
+        await using var connection = new CodexRealtimeConnection(socket, 8192, protocol);
+        var ct = TestContext.Current.CancellationToken;
+        foreach (var action in fixture.GetProperty("actions").EnumerateArray())
+        {
+            switch (action.GetProperty("op").GetString())
+            {
+                case "audio":
+                    await connection.AppendAudioAsync(Convert.FromBase64String(action.GetProperty("pcm").GetString()!), ct);
+                    break;
+                case "user":
+                    await connection.AppendUserTextAsync(action.GetProperty("text").GetString()!, ct);
+                    break;
+                case "context":
+                    await connection.AppendContextAsync(action.GetProperty("text").GetString()!,
+                        action.TryGetProperty("delegationId", out var delegation) ? delegation.GetString() : null,
+                        action.GetProperty("channel").GetString(), ct);
+                    break;
+                case "close":
+                    await connection.CloseSessionAsync(ct);
+                    break;
+                default:
+                    throw new InvalidDataException("Unknown fixture operation.");
+            }
+        }
+        var expected = fixture.GetProperty("expected").EnumerateArray().ToArray();
+        Assert.Equal(expected.Length, socket.Sent.Count);
+        for (var i = 0; i < expected.Length; i++)
+            Assert.True(Equal(expected[i], socket.Sent[i]), $"Outbound frame {i} differs: {socket.Sent[i]}");
+        Assert.Equal(fixture.GetProperty("transportClosed").GetBoolean(),
+            socket.ClosedOutput == WebSocketCloseStatus.NormalClosure);
     }
 
     [Fact]
