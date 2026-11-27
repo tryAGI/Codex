@@ -12,6 +12,7 @@ public sealed class RealtimeHistoryTests
         private readonly Dictionary<Guid, JsonElement> rows = [];
         public bool ThrowAfterCommit { get; set; }
         public bool ThrowBeforeCommit { get; set; }
+        public Func<JsonElement, JsonElement, JsonElement>? CompetingWriteOnce { get; set; }
 
         public Task<JsonElement?> ReadAsync(Guid id, CancellationToken cancellationToken)
         {
@@ -27,6 +28,12 @@ public sealed class RealtimeHistoryTests
             {
                 long? prior = rows.TryGetValue(id, out var row) ? row.GetProperty("revision").GetInt64() : null;
                 if (prior != revision) return Task.FromResult(false);
+                if (CompetingWriteOnce is { } compete)
+                {
+                    CompetingWriteOnce = null;
+                    rows[id] = compete(row, body).Clone();
+                    return Task.FromResult(false);
+                }
                 if (ThrowBeforeCommit) { ThrowBeforeCommit = false; throw new IOException("Write failed before commit."); }
                 rows[id] = body.Clone();
                 if (ThrowAfterCommit) { ThrowAfterCommit = false; throw new IOException("Commit receipt lost."); }

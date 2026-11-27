@@ -266,6 +266,101 @@ public sealed class RealtimeSessionControllerTests
     }
 
     [Fact]
+    public async Task EndRetriesDefinitiveRevisionConflictAndExecutesProviderOnlyOnce()
+    {
+        var (storage, store, thread) = await Detached();
+        using var factory = new Factory();
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await controller.AttachAsync(Ct));
+        storage.CompetingWriteOnce = (old, proposed) =>
+        {
+            var previous = store.ValidateSnapshot(old);
+            var next = store.ValidateSnapshot(proposed);
+            return CodexThreadStore.Encode(previous with
+            {
+                Revision = next.Revision, UpdatedAt = next.UpdatedAt,
+                Settings = RealtimeHistoryTests.Json("""{"instructions":"concurrent reasoning update"}"""),
+            });
+        };
+        var effects = 0;
+        var operation = Guid.NewGuid();
+        Task Effect(CodexRealtimeConnection? connection, CancellationToken _)
+        {
+            Assert.NotNull(connection);
+            effects++;
+            return Task.CompletedTask;
+        }
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await controller.EndAsync(operation, Effect, Ct));
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await controller.EndAsync(operation, Effect, Ct));
+        Assert.Equal(1, effects);
+        var closed = await store.ReadAsync(thread.Id, Ct);
+        Assert.Equal(operation, RealtimeHistoryTests.Session(closed).EndOperationId);
+        Assert.Equal("concurrent reasoning update", closed.Settings.GetProperty("instructions").GetString());
+    }
+
+    [Fact]
+    public async Task EndDoesNotFenceCompetingEndIntentOrDispatchAnotherProviderEffect()
+    {
+        var (storage, store, thread) = await Detached();
+        using var factory = new Factory();
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await controller.AttachAsync(Ct));
+        var competingEnd = Guid.NewGuid();
+        storage.CompetingWriteOnce = (_, proposed) =>
+        {
+            var next = store.ValidateSnapshot(proposed);
+            return CodexThreadStore.Encode(next with
+            {
+                RealtimeSessions = [RealtimeHistoryTests.Session(next) with { EndOperationId = competingEnd }],
+            });
+        };
+        var effects = 0;
+        var status = await controller.EndAsync(Guid.NewGuid(), (_, _) =>
+        {
+            effects++;
+            return Task.CompletedTask;
+        }, Ct);
+        Assert.Equal(CodexRealtimeLifecycleStatus.HistoryRecoveryRequired, status);
+        Assert.Equal(0, effects);
+        Assert.Null(controller.Connection);
+        var session = RealtimeHistoryTests.Session(await store.ReadAsync(thread.Id, Ct));
+        Assert.Equal("ending", session.State);
+        Assert.Equal(competingEnd, session.EndOperationId);
+    }
+
+    [Fact]
+    public async Task EndOfDrainedAttachmentPreservesPendingHandoffAndReconcilesLostCompletionReceipt()
+    {
+        var (storage, store, thread) = await Detached();
+        using var factory = new Factory();
+        await using var controller = new CodexRealtimeSessionController(store, thread.Id, "session", "owner", factory.Join, Policy);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await controller.AttachAsync(Ct));
+        var attached = await store.ReadAsync(thread.Id, Ct);
+        var attachment = Assert.Single(factory.Requests).AttachmentId;
+        await RealtimeHistoryTests.Observe(store, attached, attachment, "handoff",
+            """{"type":"delegation.created","item":{"id":"pending","type":"delegation","target":"client","content":[{"type":"input_text","text":"save my speech"}]}}""");
+        var effects = 0;
+        var operation = Guid.NewGuid();
+        Task Effect(CodexRealtimeConnection? _, CancellationToken __)
+        {
+            effects++;
+            storage.ThrowAfterCommit = true;
+            return Task.CompletedTask;
+        }
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await controller.EndAsync(operation, Effect, Ct));
+        Assert.Equal(CodexRealtimeLifecycleStatus.Ended, await controller.EndAsync(operation, Effect, Ct));
+        Assert.Equal(1, effects);
+        var closed = await store.ReadAsync(thread.Id, Ct);
+        var session = RealtimeHistoryTests.Session(closed);
+        Assert.Equal(operation, session.EndOperationId);
+        Assert.Equal("ended", session.State);
+        Assert.Equal("rejected", Assert.Single(session.History!.Handoffs).State);
+        Assert.Single(session.History.Carryover);
+        Assert.Contains("save my speech", CodexThreadStore.RealtimeCarryoverBeforeTurn(closed, 0).Single().GetRawText());
+        Assert.Empty(closed.Turns);
+    }
+
+    [Fact]
     public async Task ReplacementDuringConnectionFencesOldTransportWithoutTouchingNewOwner()
     {
         var (_, store, thread) = await Detached();

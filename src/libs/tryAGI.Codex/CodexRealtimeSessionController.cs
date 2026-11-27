@@ -276,27 +276,55 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                 await LoseAsync(live).ConfigureAwait(false);
                 return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
             }
-            var thread = await store.ReadAsync(threadId, cancellationToken).ConfigureAwait(false);
-            var session = Session(thread);
-            if (session.State == "ended") return CodexRealtimeLifecycleStatus.Ended;
-            if (session.State is not ("detached" or "attached") || session.AttachmentId != live?.Id)
-                return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
-            CodexThreadAdmission admission;
+            CodexThreadAdmission? admission = null;
+            Guid? generation = null;
+            var observed = false;
             try
             {
-                admission = await store.BeginRealtimeEndAsync(threadId, thread.Revision, sessionId, ownerId,
-                    live?.Id, operationId, cancellationToken).ConfigureAwait(false);
+                for (var attempt = 0; attempt < policy.MaximumAttempts; attempt++)
+                {
+                    var thread = await store.ReadAsync(threadId, cancellationToken).ConfigureAwait(false);
+                    var session = Session(thread);
+                    if (session.State == "ended")
+                    {
+                        if (live is not null) await DisposeLiveAsync(live).ConfigureAwait(false);
+                        return CodexRealtimeLifecycleStatus.Ended;
+                    }
+                    var currentGeneration = session.UsedAttachmentIds?.LastOrDefault();
+                    if (session.State is not ("detached" or "attached") || session.AttachmentId != live?.Id ||
+                        (observed && generation != currentGeneration))
+                    {
+                        if (live is not null) await DisposeLiveAsync(live).ConfigureAwait(false);
+                        return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+                    }
+                    generation = currentGeneration;
+                    observed = true;
+                    try
+                    {
+                        admission = await store.BeginDrainedRealtimeEndAsync(threadId, thread.Revision, sessionId, ownerId,
+                            live?.Id, operationId, cancellationToken).ConfigureAwait(false);
+                        break;
+                    }
+                    catch (CodexThreadConflictException) when (attempt + 1 < policy.MaximumAttempts)
+                    {
+                        // A definitive CAS rejection has no external effect. Recheck the exact
+                        // transport generation, then retry against the latest reasoning revision.
+                    }
+                }
             }
             catch (Exception error) when (error is IOException or InvalidOperationException or OperationCanceledException)
             {
                 // Even a cancelled storage call may have committed. Never dispatch the end effect
-                // when admission did not return a durable receipt.
-                if (live is not null) await LoseAsync(live).ConfigureAwait(false);
-                await FenceBestEffortAsync(null).ConfigureAwait(false);
-                return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+                // without a durable admission receipt, and never fence another end operation.
+                if (live is not null) await DisposeLiveAsync(live).ConfigureAwait(false);
+                return await ConfirmOrFenceOwnEndAsync(operationId, live?.Id).ConfigureAwait(false);
             }
-            if (!admission.Admitted)
-                return Session(admission.Thread).State == "ended" ? CodexRealtimeLifecycleStatus.Ended : CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+            if (admission?.Admitted != true)
+            {
+                if (live is not null) await DisposeLiveAsync(live).ConfigureAwait(false);
+                return admission is not null && Session(admission.Thread).State == "ended"
+                    ? CodexRealtimeLifecycleStatus.Ended : CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+            }
             try
             {
                 if (endProvider is not null)
@@ -304,8 +332,8 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
                 if (live is not null) await DisposeLiveAsync(live).ConfigureAwait(false);
                 for (var attempt = 0; attempt < policy.MaximumAttempts; attempt++)
                 {
-                    thread = await store.ReadAsync(threadId, cancellationToken).ConfigureAwait(false);
-                    session = Session(thread);
+                    var thread = await store.ReadAsync(threadId, cancellationToken).ConfigureAwait(false);
+                    var session = Session(thread);
                     if (session.State == "ended" && session.EndOperationId == operationId) return CodexRealtimeLifecycleStatus.Ended;
                     try
                     {
@@ -318,10 +346,41 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
             }
             catch (Exception error) when (error is not OutOfMemoryException) { }
             if (live is not null) await DisposeLiveAsync(live).ConfigureAwait(false);
-            await FenceBestEffortAsync(null).ConfigureAwait(false);
-            return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
+            return await ConfirmOrFenceOwnEndAsync(operationId, null).ConfigureAwait(false);
         }
         finally { transitions.Release(); }
+    }
+
+    // A lost completion receipt can be reconciled by reading the exact durable end.
+    // An uncertain admission may only fence its own operation or original attachment.
+    private async Task<CodexRealtimeLifecycleStatus> ConfirmOrFenceOwnEndAsync(Guid operationId, Guid? originalAttachment)
+    {
+        using var cleanup = new CancellationTokenSource(policy.DrainTimeout);
+        var ct = cleanup.Token;
+        try
+        {
+            for (var attempt = 0; attempt < policy.MaximumAttempts; attempt++)
+            {
+                var thread = await store.ReadAsync(threadId, ct).ConfigureAwait(false);
+                var session = Session(thread);
+                if (session.State == "ended" && session.EndOperationId == operationId)
+                    return CodexRealtimeLifecycleStatus.Ended;
+                var ownEnd = session.State == "ending" && session.EndOperationId == operationId;
+                var ownAttachment = originalAttachment is not null && session.State == "attached" &&
+                    session.AttachmentId == originalAttachment;
+                if (!ownEnd && !ownAttachment) break;
+                try
+                {
+                    await store.RequireRealtimeHistoryRecoveryAsync(threadId, thread.Revision, sessionId, ownerId,
+                        ownEnd ? null : originalAttachment, ct).ConfigureAwait(false);
+                    break;
+                }
+                catch (CodexThreadConflictException) { }
+                catch (IOException) when (attempt + 1 < policy.MaximumAttempts) { }
+            }
+        }
+        catch (Exception error) when (error is not OutOfMemoryException) { }
+        return CodexRealtimeLifecycleStatus.HistoryRecoveryRequired;
     }
 
     private async Task<CodexRealtimeLifecycleStatus> AttachCoreAsync(CancellationToken ct)

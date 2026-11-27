@@ -118,8 +118,21 @@ public sealed partial class CodexThreadStore
 
     /// <summary>Records an end intent before any external effect, including after a clean detach.
     /// An existing or uncertain end intent never admits a second end attempt.</summary>
-    public async Task<CodexThreadAdmission> BeginRealtimeEndAsync(Guid threadId, long expectedRevision,
+    public Task<CodexThreadAdmission> BeginRealtimeEndAsync(Guid threadId, long expectedRevision,
         string sessionId, string ownerId, Guid? expectedAttachmentId, Guid endOperationId, CancellationToken cancellationToken = default)
+        => BeginRealtimeEndCoreAsync(threadId, expectedRevision, sessionId, ownerId, expectedAttachmentId,
+            endOperationId, false, cancellationToken);
+
+    // Only the lifecycle controller may retire an attached generation after its sole reader
+    // has drained. The general storage API continues to require handoff settlement.
+    internal Task<CodexThreadAdmission> BeginDrainedRealtimeEndAsync(Guid threadId, long expectedRevision,
+        string sessionId, string ownerId, Guid? expectedAttachmentId, Guid endOperationId, CancellationToken ct)
+        => BeginRealtimeEndCoreAsync(threadId, expectedRevision, sessionId, ownerId, expectedAttachmentId,
+            endOperationId, true, ct);
+
+    private async Task<CodexThreadAdmission> BeginRealtimeEndCoreAsync(Guid threadId, long expectedRevision,
+        string sessionId, string ownerId, Guid? expectedAttachmentId, Guid endOperationId,
+        bool attachmentDrained, CancellationToken cancellationToken)
     {
         Id(endOperationId);
         var before = await CurrentAsync(threadId, expectedRevision, cancellationToken).ConfigureAwait(false);
@@ -128,7 +141,7 @@ public sealed partial class CodexThreadStore
         if (session.State == "ending" && session.EndOperationId == endOperationId) return new(false, before);
         if (session.State is not ("attached" or "detached") || session.AttachmentId != expectedAttachmentId)
             throw new InvalidOperationException("Realtime end is fenced by another attachment, end intent or history recovery.");
-        if (session.State == "detached")
+        if (session.State == "detached" || attachmentDrained)
         {
             before = RetireLostRealtimeHandoffs(before, session);
             session = FindRealtimeSession(before, sessionId, ownerId);
