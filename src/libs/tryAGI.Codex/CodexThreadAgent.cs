@@ -114,6 +114,16 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 throw new InvalidOperationException("Native goal tools require an unredacted persistent user thread.");
             options = options with { Tools = CodexNativeGoalTools.Attach(options.Tools) };
         }
+        var descendantGoal = control?.CapturedDescendantGoal;
+        if (control?.DescendantGoalRootThreadId is { } goalRoot)
+        {
+            if (goalRoot == threadId) throw new ArgumentException("Descendant accounting cannot target the same thread.");
+            var directory = await store.ReadAgentIdentitiesAsync(goalRoot, cancellationToken).ConfigureAwait(false);
+            descendantGoal = await store.CaptureDescendantGoalAttributionAsync(directory, directory.GetActive(threadId), cancellationToken).ConfigureAwait(false);
+        }
+        if (descendantGoal is { } attribution && (journalProjection is not null || handoff is not null ||
+            attribution.OriginThreadId != threadId || !Guid.TryParse(identity.ParentThreadId, out var parent) || parent != attribution.ParentThreadId))
+            throw new ArgumentException("Descendant goal accounting requires the original unprojected child and exact parent identity.");
         var guard = new AccountCredentials(credentials, before.AccountId);
         var authOwner = CodexThreadCompactionScheduler.AuthOwner.From(
             await guard.GetCredentialsAsync(cancellationToken).ConfigureAwait(false));
@@ -176,9 +186,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         control?.InitializeInput(input, handoff?.SubmissionId.ToString(), handoff is null ? null : "realtime");
         CodexThreadDocument started;
         if (handoff is null)
-            started = await store.StartTurnAsync(threadId, expectedRevision, turnId, ownerId, persistedInput,
+            started = await store.StartTurnWithGoalAttributionAsync(threadId, expectedRevision, turnId, ownerId, persistedInput,
                 identity.RootTurnId is { } root ? Guid.Parse(root) : turnId, cancellationToken,
-                control?.ClientIds, control?.TurnTrigger, control?.GoalContinuationId).ConfigureAwait(false);
+                control?.ClientIds, control?.TurnTrigger, control?.GoalContinuationId, descendantGoal).ConfigureAwait(false);
         else
         {
             var accepted = await store.AdmitRealtimeHandoffAsync(threadId, expectedRevision, handoff.SessionId,
@@ -818,6 +828,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         }
         private async Task SettleAsync(string id, bool notDispatched, CancellationToken ct, bool reconcile = false)
         {
+            CodexThreadDocument? descendantReceipt = null;
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
@@ -842,8 +853,14 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                     await JournalAsync(doc => store.SettleAsync(doc.Id, doc.Revision, turnId, owner, id,
                         known ? "succeeded" : notDispatched ? "failed" : "unknown",
                         known ? result : notDispatched ? Json(new JsonObject { ["notDispatched"] = true }) : null, ct), ct).ConfigureAwait(false);
+                if (prior.GoalInference?.GoalThreadId is not null) descendantReceipt = Current;
             }
             finally { gate.Release(); }
+            // The child receipt is already durable. Root accounting uses its stable identity
+            // and never holds the child gate. If the root CAS is ambiguous, stop further child
+            // dispatch and let the host reconcile this exact receipt instead of replaying it.
+            if (descendantReceipt is not null)
+                _ = await store.AccountDescendantGoalAsync(descendantReceipt, turnId, id, ct).ConfigureAwait(false);
         }
 
         internal async Task<CodexToolOutput> ExecuteAsync(CodexToolCall call,

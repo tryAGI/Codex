@@ -44,6 +44,8 @@ public enum CodexGoalAccountingMode
     ActiveOrComplete,
     /// <summary>Also account in-flight usage after pause, block or usage limitation.</summary>
     ActiveOrStopped,
+    /// <summary>Account an original descendant receipt, including late usage of a stopped or completed goal.</summary>
+    AttributedDescendant,
 }
 
 /// <summary>Stable receipt for one observed goal usage delta.</summary>

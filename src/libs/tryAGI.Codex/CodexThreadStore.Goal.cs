@@ -122,13 +122,15 @@ public sealed partial class CodexThreadStore
             CodexGoalAccountingMode.ActiveOnly => goal.Status is "active" or "budgetLimited",
             CodexGoalAccountingMode.ActiveOrComplete => goal.Status is "active" or "budgetLimited" or "complete",
             CodexGoalAccountingMode.ActiveOrStopped => goal.Status is "active" or "paused" or "blocked" or "usageLimited" or "budgetLimited",
+            CodexGoalAccountingMode.AttributedDescendant => true,
             _ => false
         };
         if (!eligible || tokenDelta == 0 && elapsedSeconds == 0) return goal;
         if (receipts.Length >= MaximumGoalUsageReceipts) throw new InvalidOperationException("Goal accounting receipt capacity exhausted.");
         var tokens = checked(goal.TokensUsed + tokenDelta);
         var seconds = checked(goal.TimeUsedSeconds + elapsedSeconds);
-        var limited = (goal.Status == "active" || mode == CodexGoalAccountingMode.ActiveOrStopped)
+        var limited = (goal.Status == "active" || mode == CodexGoalAccountingMode.ActiveOrStopped
+            || mode == CodexGoalAccountingMode.AttributedDescendant && goal.Status != "complete")
             && goal.TokenBudget is { } budget && tokens >= budget;
         return goal with
         {

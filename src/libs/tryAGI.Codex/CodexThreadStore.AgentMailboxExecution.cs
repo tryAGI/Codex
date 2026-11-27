@@ -70,6 +70,7 @@ public sealed partial class CodexThreadStore
         if (thread.Turns.LastOrDefault()?.Status == "inProgress" || thread.Turns.Any(turn => turn.Id == turnId))
             throw new InvalidOperationException("Wake requires a fresh idle turn identity.");
 
+        var descendantGoal = await CaptureDescendantGoalAttributionAsync(directory, recipient, cancellationToken).ConfigureAwait(false);
         var input = prefix.Select(mail => CodexAgentMailWakeAdmission.Project(directory.GetRecorded(mail.SenderThreadId),
             recipient, mail)).ToArray();
         var binding = new CodexAgentMailWakeAdmission(directory.Graph.Revision, CodexAgentMailWakeAdmission.Fingerprint(input));
@@ -78,7 +79,7 @@ public sealed partial class CodexThreadStore
         await WriteAgentMailboxAsync(before, before with { Claim = claim }, CodexAgentMailboxOperation.Claim,
             cancellationToken).ConfigureAwait(false);
 
-        using var control = new CodexAgentControl();
+        using var control = new CodexAgentControl { CapturedDescendantGoal = descendantGoal };
         control.InitializeInput(input, turnTrigger: CodexAgentMailWakeAdmission.TurnTrigger(claimId));
         return await agent.RunAsync(recipientThreadId, thread.Revision, turnId, ownerId, options, input, execute,
             maximumRequests, turnStarted: async (admitted, ct) =>

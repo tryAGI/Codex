@@ -66,18 +66,27 @@ public sealed partial class CodexThreadStore
     public Task<CodexThreadDocument> StartTurnAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, IReadOnlyList<JsonElement> input, Guid? rootTurnId = null, CancellationToken cancellationToken = default,
         string?[]? clientUserMessageIds = null, string? turnTrigger = null, Guid? goalContinuationId = null)
+        => StartTurnWithGoalAttributionAsync(threadId, expectedRevision, turnId, ownerId, input, rootTurnId, cancellationToken,
+            clientUserMessageIds, turnTrigger, goalContinuationId, null);
+
+    internal Task<CodexThreadDocument> StartTurnWithGoalAttributionAsync(Guid threadId, long expectedRevision, Guid turnId,
+        string ownerId, IReadOnlyList<JsonElement> input, Guid? rootTurnId, CancellationToken cancellationToken,
+        string?[]? clientUserMessageIds, string? turnTrigger, Guid? goalContinuationId, CodexDescendantGoalAttribution? descendantGoal)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             Id(turnId); Token(ownerId);
             RequireUnarchived(document);
             if (document.Turns.Any(t => t.Id == turnId) || document.Turns.LastOrDefault()?.Status == "inProgress")
                 throw new InvalidOperationException("Thread already has this turn or another active turn.");
+            if (descendantGoal is not null && (descendantGoal.OriginThreadId != document.Id || goalContinuationId is not null))
+                throw new ArgumentException("Descendant goal attribution does not belong to the admitted child.");
+            if (descendantGoal is not null) RequireDurableThread(document);
             document = PrepareGoalTurn(document, turnTrigger, goalContinuationId);
             document = ConsumeQueuedSubmission(document, turnId, clientUserMessageIds, turnTrigger);
             document = SealRealtimeBeforeTurn(document, turnId);
             var turn = new CodexStoredTurn(turnId, rootTurnId ?? turnId, ownerId, "inProgress", time.GetUtcNow(),
                 Items(input), [], [], ClientUserMessageIds: clientUserMessageIds?.ToArray(), TurnTrigger: turnTrigger)
-            { GoalContinuation = goalContinuationId is { } goal ? new(document.Id, goal) : null };
+            { GoalContinuation = goalContinuationId is { } goal ? new(document.Id, goal) : null, DescendantGoal = descendantGoal };
             return BeginGoalExecutionClock(BindRealtimePresentation(document with { Turns = [.. document.Turns, turn] },
                 turnId, PresentationSession(document)?.SessionId), turnId);
         }, cancellationToken);
@@ -169,7 +178,7 @@ public sealed partial class CodexThreadStore
         RequireGoalContinuationDispatch(before, active, nativeGoalTool);
         before = ObserveGoalExecutionTime(before, turnId, true);
         var dispatch = new CodexStoredDispatch(callId, kind, hash, "dispatching")
-        { GoalInference = CaptureGoalInference(before, kind) };
+        { GoalInference = CaptureGoalInference(before, active, kind) };
         var turn = active with { Dispatches = [.. active.Dispatches, dispatch] };
         var next = Replace(before, turn) with { Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow() };
         return new(true, await PublishAsync(before.Revision, next, cancellationToken).ConfigureAwait(false));
@@ -377,6 +386,7 @@ public sealed partial class CodexThreadStore
             _ = Items(turn.Input); _ = Items(turn.Output);
             ValidateRealtimeModeTransitions(turn);
             ValidateGoalContinuation(turn);
+            ValidateDescendantGoalAttribution(turn);
             if (turn.ClientUserMessageIds is { } clients && (clients.Length > MaximumItems || clients.Any(c => c is not null && !ValidToken(c)))
                 || turn.TurnTrigger is { } trigger && !ValidToken(trigger))
                 throw new InvalidDataException("Invalid native user message correlation.");
@@ -388,7 +398,7 @@ public sealed partial class CodexThreadStore
                     receipt.Result is { ValueKind: JsonValueKind.Undefined } ||
                     !active && receipt.State == "dispatching" || turn.Status == "completed" && receipt.State == "unknown")
                     throw new InvalidDataException("Native dispatch history is invalid.");
-                ValidateGoalInference(receipt, goalInferenceIds);
+                ValidateGoalInference(turn, receipt, goalInferenceIds);
                 ValidateGoalToolResult(receipt);
             }
             ValidateNativeBackingArtifacts(turn);

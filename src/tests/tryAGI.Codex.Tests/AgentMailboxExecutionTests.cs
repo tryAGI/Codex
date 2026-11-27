@@ -32,6 +32,11 @@ public sealed class AgentMailboxExecutionTests
         internal bool ChangeGraphAfterClaim { get; set; }
         internal Guid? FencedClaim { get; set; }
         internal int Admitted { get; private set; }
+        internal bool LoseRootUsageReply { get; set; }
+        internal bool FailRootUsageCommit { get; set; }
+        internal int RootUsageCommits { get; private set; }
+        internal Func<CancellationToken, Task>? BeforeResponse { get; set; }
+        internal string Terminal { get; set; } = Success;
 
         private CodexThreadSpawnGraph Graph => new("account", Root, GraphRevision,
             [new(Root, Child, CodexThreadSpawnEdgeStatus.Open),
@@ -57,14 +62,33 @@ public sealed class AgentMailboxExecutionTests
                 var proposed = Decode(document);
                 var turn = proposed.Turns.LastOrDefault();
                 var newTurn = proposed.Turns.Length > (previous?.Turns.Length ?? 0);
-                if (newTurn && turn?.TurnTrigger?.StartsWith("native:agent-mail:", StringComparison.Ordinal) == true)
+                // A new fork copies historical turns; only a fresh execution admission consumes mail.
+                if (newTurn && (previous is not null || proposed.ForkedFromId is null) &&
+                    turn?.TurnTrigger?.StartsWith("native:agent-mail:", StringComparison.Ordinal) == true)
                 {
                     if (threadId != Child || Mailbox.Claim is not { WakeAdmission: { } binding } claim ||
                         binding.GraphRevision != GraphRevision || claim.Id == FencedClaim || !binding.Matches(claim, turn))
                         return Task.FromResult(false);
                     Admitted++;
                 }
+                var rootUsage = threadId == Root && (proposed.Goal?.UsageReceipts?.Length ?? 0) >
+                    (previous?.Goal?.UsageReceipts?.Length ?? 0) &&
+                    proposed.Goal!.UsageReceipts!.Any(receipt => receipt.Mode == CodexGoalAccountingMode.AttributedDescendant);
+                if (rootUsage && FailRootUsageCommit)
+                {
+                    FailRootUsageCommit = false;
+                    throw new IOException("Root usage commit failed before write.");
+                }
                 documents[threadId] = document.Clone();
+                if (rootUsage)
+                {
+                    RootUsageCommits++;
+                    if (LoseRootUsageReply)
+                    {
+                        LoseRootUsageReply = false;
+                        throw new IOException("Root usage acknowledgement lost.");
+                    }
+                }
                 if (newTurn && LoseTurnReply)
                 {
                     LoseTurnReply = false;
@@ -170,9 +194,10 @@ public sealed class AgentMailboxExecutionTests
             Assert.Null(storage.Mailbox.Claim);
             Assert.NotEmpty(storage.Mailbox.Receipts);
             requests.Add(Json(await request.Content!.ReadAsStringAsync(ct)));
+            if (storage.BeforeResponse is { } before) await before(ct);
             return new(HttpStatusCode.OK)
             {
-                Content = new StringContent("data: " + Success + "\n\n", Encoding.UTF8, "text/event-stream"),
+                Content = new StringContent("data: " + storage.Terminal + "\n\n", Encoding.UTF8, "text/event-stream"),
             };
         }
     }
@@ -185,6 +210,24 @@ public sealed class AgentMailboxExecutionTests
         internal Fixture() => Store = new CodexThreadStore(Storage, "account");
 
         internal Task<CodexThreadDocument> CreateAsync() => Store.CreateAsync(Child, Json("{}"), Ct);
+
+        internal CodexThreadRpc GoalHost()
+        {
+            var host = new CodexThreadRpc(Store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+                Json("{}"), (_, _, _) => throw new InvalidOperationException("No automatic goal execution."),
+                (_, _) => Task.CompletedTask);
+            host.EnableThreadGoals((_, _) => Task.FromResult(true));
+            return host;
+        }
+
+        internal async Task<CodexThreadDocument> CreateRootGoalAsync(long budget = 10)
+        {
+            await Store.CreateAsync(Root, Json("{}"), Ct);
+            var host = GoalHost();
+            await host.InvokeAsync("thread/goal/set", Json($$"""{"threadId":"{{Root}}","objective":"root task","tokenBudget":{{budget}}}"""), Ct);
+            Storage.Terminal = Success.Replace("\"output\":[", "\"usage\":{\"input_tokens\":100,\"input_tokens_details\":{\"cached_tokens\":95},\"output_tokens\":6,\"total_tokens\":106},\"output\":[", StringComparison.Ordinal);
+            return await Store.ReadAsync(Root, Ct);
+        }
 
         internal async Task SendAsync(int id, string content, CodexAgentMailMode mode = CodexAgentMailMode.QueueOnly,
             bool encrypted = false, Guid? sender = null)
@@ -209,6 +252,94 @@ public sealed class AgentMailboxExecutionTests
 
         internal Task<bool> ReconcileAsync(CodexThreadStore? reopened = null)
             => (reopened ?? Store).ReconcileAgentMailboxWakeAsync(Root, Child, Storage.Mailbox.Revision, Claim, Owner, Ct);
+    }
+
+    [Fact]
+    public async Task DescendantUsageChargesOriginalRootGoalExactlyOnceThroughMailboxRunner()
+    {
+        var f = new Fixture();
+        await f.CreateAsync();
+        var root = await f.CreateRootGoalAsync();
+        await f.SendAsync(10, "follow-up", CodexAgentMailMode.Followup);
+        var result = Assert.IsType<CodexThreadAgentResult>(await f.WakeAsync());
+        var child = result.Thread;
+        var turn = Assert.Single(child.Turns);
+        Assert.Equal(root.Goal!.Id, turn.DescendantGoal!.GoalId);
+        Assert.Equal(root.Revision, turn.DescendantGoal.RootRevision);
+        Assert.Equal(Root, turn.DescendantGoal.RootThreadId);
+        Assert.Equal(Child, turn.DescendantGoal.OriginThreadId);
+        var inference = Assert.Single(turn.Dispatches, item => item.Kind == "inference");
+        Assert.Equal(Root, inference.GoalInference!.GoalThreadId);
+        var charged = await f.Store.ReadAsync(Root, Ct);
+        Assert.Equal(11, charged.Goal!.TokensUsed);
+        Assert.Equal("budgetLimited", charged.Goal.Status);
+        Assert.Equal(inference.GoalInference.UsageId, Assert.Single(charged.Goal.UsageReceipts!).Id);
+        Assert.Null(child.Goal);
+        Assert.Equal(1, f.Storage.RootUsageCommits);
+        Assert.Equal(CodexDescendantGoalUsageOutcome.AlreadyApplied, await f.Store.ReconcileDescendantGoalUsageAsync(
+            Child, child.Revision, turn.Id, inference.CallId, Ct));
+        Assert.Equal(1, f.Storage.RootUsageCommits);
+        Assert.Single(f.Requests);
+    }
+
+    [Fact]
+    public async Task DescendantLateResponseNeverChargesReplacementRootGeneration()
+    {
+        var f = new Fixture();
+        await f.CreateAsync();
+        var root = await f.CreateRootGoalAsync();
+        f.Storage.BeforeResponse = async ct =>
+        {
+            var host = f.GoalHost();
+            await host.InvokeAsync("thread/goal/clear", Json($$"""{"threadId":"{{Root}}"}"""), ct);
+            await host.InvokeAsync("thread/goal/set", Json($$"""{"threadId":"{{Root}}","objective":"replacement"}"""), ct);
+        };
+        await f.SendAsync(10, "follow-up", CodexAgentMailMode.Followup);
+        var child = Assert.IsType<CodexThreadAgentResult>(await f.WakeAsync()).Thread;
+        var turn = Assert.Single(child.Turns);
+        Assert.Equal(root.Goal!.Id, turn.DescendantGoal!.GoalId);
+        var current = await f.Store.ReadAsync(Root, Ct);
+        Assert.NotEqual(root.Goal.Id, current.Goal!.Id);
+        Assert.Equal("replacement", current.Goal.Objective);
+        Assert.Equal(0, current.Goal.TokensUsed);
+        var receipt = Assert.Single(turn.Dispatches, item => item.Kind == "inference");
+        Assert.Equal(CodexDescendantGoalUsageOutcome.StaleGoal, await f.Store.ReconcileDescendantGoalUsageAsync(
+            Child, child.Revision, turn.Id, receipt.CallId, Ct));
+        Assert.Equal(0, f.Storage.RootUsageCommits);
+        Assert.Single(f.Requests);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DescendantRootWriteFailureRecoversSameReceiptWithoutAnotherInference(bool committed)
+    {
+        var f = new Fixture();
+        await f.CreateAsync();
+        var root = await f.CreateRootGoalAsync();
+        f.Storage.LoseRootUsageReply = committed;
+        f.Storage.FailRootUsageCommit = !committed;
+        await f.SendAsync(10, "follow-up", CodexAgentMailMode.Followup);
+        await Assert.ThrowsAsync<IOException>(() => f.WakeAsync());
+        var cold = new CodexThreadStore(f.Storage, "account");
+        var child = await cold.ReadAsync(Child, Ct);
+        var turn = Assert.Single(child.Turns);
+        Assert.Equal("failed", turn.Status);
+        var receipt = Assert.Single(turn.Dispatches, item => item.Kind == "inference");
+        Assert.NotNull(receipt.InferenceCompletion!.Accounting);
+        Assert.Equal(root.Goal!.Id, receipt.GoalInference!.GoalId);
+        Assert.Equal("succeeded", receipt.State);
+        Assert.Equal(committed ? 11 : 0, (await cold.ReadAsync(Root, Ct)).Goal!.TokensUsed);
+        Assert.Equal(committed ? CodexDescendantGoalUsageOutcome.AlreadyApplied : CodexDescendantGoalUsageOutcome.Applied,
+            await cold.ReconcileDescendantGoalUsageAsync(Child, child.Revision, turn.Id, receipt.CallId, Ct));
+        Assert.Equal(CodexDescendantGoalUsageOutcome.AlreadyApplied,
+            await cold.ReconcileDescendantGoalUsageAsync(Child, child.Revision, turn.Id, receipt.CallId, Ct));
+        var fork = await cold.ForkAsync(Child, child.Revision, Guid.NewGuid(), cancellationToken: Ct);
+        Assert.Equal(CodexDescendantGoalUsageOutcome.InheritedReceipt,
+            await cold.ReconcileDescendantGoalUsageAsync(fork.Id, fork.Revision, turn.Id, receipt.CallId, Ct));
+        Assert.Equal(11, (await cold.ReadAsync(Root, Ct)).Goal!.TokensUsed);
+        Assert.Equal(1, f.Storage.RootUsageCommits);
+        Assert.Single(f.Requests);
     }
 
     [Fact]

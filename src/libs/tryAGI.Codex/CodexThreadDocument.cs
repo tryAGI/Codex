@@ -86,6 +86,9 @@ public sealed record CodexStoredTurn(
     /// <summary>Host-authorized automatic goal continuation, not a user-originated message.</summary>
     public CodexGoalContinuationBinding? GoalContinuation { get; init; }
 
+    /// <summary>Immutable original root goal attribution for this descendant turn.</summary>
+    public CodexDescendantGoalAttribution? DescendantGoal { get; init; }
+
     /// <summary>Durable steering inputs subsequently interleaved with model output in the turn timeline.</summary>
     public int[]? RealtimeSteeringInputIndices { get; init; }
 

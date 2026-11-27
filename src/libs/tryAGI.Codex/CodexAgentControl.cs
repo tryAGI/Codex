@@ -29,6 +29,21 @@ public sealed class CodexAgentControl : IDisposable
     internal string? TurnTrigger { get; private set; }
     internal Guid? GoalContinuationId { get; private set; }
     internal CodexGoalToolPolicy? GoalTools { get; set; }
+    internal Guid? DescendantGoalRootThreadId { get; private set; }
+    internal CodexDescendantGoalAttribution? CapturedDescendantGoal { get; set; }
+
+    /// <summary>Opts this descendant turn into root goal accounting. The runner validates
+    /// the account, open named graph path and parent identity before capturing the root goal.</summary>
+    public void EnableDescendantGoalAccounting(Guid rootThreadId)
+    {
+        if (rootThreadId == Guid.Empty) throw new ArgumentException("Root thread identity is required.", nameof(rootThreadId));
+        lock (gate)
+        {
+            if (inputInitialized || closed || DescendantGoalRootThreadId is not null)
+                throw new InvalidOperationException("Configure descendant goal accounting before turn initialization.");
+            DescendantGoalRootThreadId = rootThreadId;
+        }
+    }
     internal string?[] ClientIds { get { lock (gate) return clientIds.ToArray(); } }
 
     internal void InitializeInput(IReadOnlyList<JsonElement> items, string? clientId = null, string? turnTrigger = null,
