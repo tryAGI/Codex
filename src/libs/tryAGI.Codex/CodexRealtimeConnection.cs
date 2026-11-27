@@ -315,6 +315,35 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         finally { writeGate.Release(); }
     }
 
+    internal async Task<bool> SendReasoningFeedbackAsync(FeedbackAdmission admission, CodexRealtimeFeedbackKind kind,
+        string text, string? id, string? channel, string? prefix, CancellationToken ct)
+    {
+        if (!IsFeedbackAdmissionCurrent(admission)) return false;
+        var requested = (ResponseAdmission)admission.Stamp;
+        var (messages, create, receipt) = CodexRealtimeFeedbackWire.Build(protocol, kind, text, id, channel, prefix);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetime.Token);
+        await writeGate.WaitAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            if (!IsFeedbackAdmissionCurrent(admission) || id is not null && retiredFunctions.Contains(id)) return false;
+            if (receipt && id is not null)
+            {
+                if (toolOutputs.Contains(id)) return false;
+                if (toolOutputs.Count >= 4096) throw new CodexProtocolException("GA tool receipt bound exceeded; rotate the connection.");
+                // Claim before transport I/O: an uncertain write must never be automatically repeated.
+                toolOutputs.Add(id);
+            }
+            foreach (var message in messages)
+            {
+                if (!IsFeedbackAdmissionCurrent(admission)) return false;
+                if (!await SendUnderGateAsync(message, linked.Token, requested).ConfigureAwait(false)) return false;
+            }
+            if (create) await RequestResponseUnderGateAsync(linked.Token, requested).ConfigureAwait(false);
+            return true;
+        }
+        finally { writeGate.Release(); }
+    }
+
     /// <summary>Send typed input through the pinned Rust V3 frameless adapter. It maps
     /// conversation text to speakable session context; the wire carries no user-item ID
     /// or preserved role. Completion means transport write only, not a provider reply.</summary>

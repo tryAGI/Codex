@@ -29,6 +29,10 @@ public sealed record CodexRealtimeCoordinatorOptions
     public CodexRealtimeReasoningChannelMode ChannelMode { get; init; }
     /// <summary>Emit only explicitly authored reasoning status, never hidden reasoning.</summary>
     public bool BackendReasoningStatus { get; init; }
+    /// <summary>Emit complete backend messages as conversation items rather than delegation updates.</summary>
+    public bool ResponsesAsItems { get; init; }
+    /// <summary>Optional prefix for complete backend conversation items.</summary>
+    public string? ResponseItemPrefix { get; init; }
     /// <summary>Optional host BEM prefix overrides.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? ChannelPrefixes { get; init; }
 }
@@ -62,8 +66,12 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
 
     private sealed record Handoff(CodexRealtimeEvent Event, Guid Attachment, CodexRealtimeConnection Connection);
     private sealed record Binding(CodexRealtimeFeedbackHandoff Handoff, Guid TurnId,
-        CodexRealtimeConnection Connection, CodexRealtimeConnection.FeedbackAdmission Admission, RunState Run);
-    private sealed record Feedback(Binding Binding, string Text, string? Channel);
+        CodexRealtimeConnection Connection, CodexRealtimeConnection.FeedbackAdmission Admission, RunState Run, string WireHandoffId)
+    {
+        internal bool HasOutput;
+        internal bool Completed;
+    }
+    private sealed record Feedback(Binding Binding, string Text, string? Channel, CodexRealtimeFeedbackKind Kind = CodexRealtimeFeedbackKind.Progress, string? WireId = null);
     private sealed record Control(string Text, bool Speech);
 
     private sealed class RunState
@@ -99,7 +107,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         if (this.options.MaximumReasoningRequests is < 1 or > 32 || !Enum.IsDefined(this.options.ChannelMode))
             throw new ArgumentOutOfRangeException(nameof(options));
         stream = new((CodexRealtimeFeedbackMode)this.options.ChannelMode,
-            clientManagedHandoffs: this.options.ClientManagedHandoffs,
+            clientManagedHandoffs: this.options.ClientManagedHandoffs, responsesAsItems: this.options.ResponsesAsItems,
             backendReasoningStatus: this.options.BackendReasoningStatus, channelPrefixes: this.options.ChannelPrefixes);
     }
 
@@ -141,7 +149,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         {
             if (activeFeedback is not { } binding || binding.Connection.Protocol != "v3" ||
                 stream.Status(binding.Handoff, text) is not { } chunk) return false;
-            return binding.Run.Feedback.TryWrite(new(binding, chunk.Text, chunk.Channel), Encoding.UTF8.GetByteCount(chunk.Text));
+            return binding.Run.Feedback.TryWrite(new(binding, chunk.Text, chunk.Channel, CodexRealtimeFeedbackKind.Status), Encoding.UTF8.GetByteCount(chunk.Text));
         }
     }
 
@@ -284,7 +292,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
             return result.Thread;
         }, lifetime.Token);
         lock (gate) ownedReasoning = task;
-        _ = ObserveCompletionAsync(task, started);
+        _ = ObserveCompletionAsync(task, submission, started);
         try { await started.Task.WaitAsync(ct).ConfigureAwait(false); }
         catch (CodexThreadConflictException)
         {
@@ -294,9 +302,22 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         }
     }
 
-    private async Task ObserveCompletionAsync(Task task, TaskCompletionSource started)
+    private async Task ObserveCompletionAsync(Task<CodexThreadDocument> task, Guid turnId, TaskCompletionSource started)
     {
-        try { await task.ConfigureAwait(false); started.TrySetResult(); }
+        try
+        {
+            var document = await task.ConfigureAwait(false);
+            lock (gate)
+            {
+                if (activeFeedback is { Completed: false } binding && binding.TurnId == turnId && document.Turns.Any(t => t.Id == binding.TurnId && t.Status == "completed"))
+                {
+                    if (binding.Connection.Protocol == "v2" && binding.HasOutput)
+                        Queue(binding, options.ResponsesAsItems ? "" : "complete", null, CodexRealtimeFeedbackKind.Complete);
+                    binding.Completed = true;
+                }
+            }
+            started.TrySetResult();
+        }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
             lock (gate) reasoningFailure = error;
@@ -311,8 +332,13 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
             if (current != run) return;
             if (responseFeedback?.TurnId != turn) { responseFeedback = null; feedbackRequestId = null; }
             var token = stream.Activate(handoff.Event.Delegation!.Id);
-            activeFeedback = new(token, turn, handoff.Connection,
-                handoff.Event.Admission ?? handoff.Connection.CaptureFeedbackAdmission(), run);
+            var prior = activeFeedback;
+            var steer = handoff.Connection.Protocol == "v2" && prior is { Completed: false } && prior.TurnId == turn && prior.Run == run;
+            var binding = new Binding(token, turn, handoff.Connection,
+                handoff.Event.Admission ?? handoff.Connection.CaptureFeedbackAdmission(), run,
+                steer ? prior!.WireHandoffId : token.Id);
+            activeFeedback = binding;
+            if (steer) Queue(binding, "", null, CodexRealtimeFeedbackKind.SteerAck, token.Id);
         }
     }
 
@@ -357,7 +383,10 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
                     var channel = options.ChannelMode == CodexRealtimeReasoningChannelMode.Thinking ? null
                         : options.ChannelMode == CodexRealtimeReasoningChannelMode.Commentary || Phase(item) == CodexRealtimeMessagePhase.Commentary
                             ? "commentary" : "speakable";
-                    Queue(binding, CodexRealtimeStartupContext.Truncate(text, 1000), channel);
+                    var kind = options.ResponsesAsItems ? CodexRealtimeFeedbackKind.Item :
+                        Phase(item) is CodexRealtimeMessagePhase.Commentary or CodexRealtimeMessagePhase.PartialAnswer
+                            ? CodexRealtimeFeedbackKind.Progress : CodexRealtimeFeedbackKind.Final;
+                    Queue(binding, CodexRealtimeStartupContext.Truncate(text, 1000), channel, kind);
                 }
             }
         }
@@ -376,8 +405,13 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
             .Select(x => CodexRealtimeProtocol.Text(x, "text") ?? ""))
         : "";
 
-    private void Queue(Binding binding, string text, string? channel)
-        => binding.Run.Feedback.Write(new(binding, text, channel), Encoding.UTF8.GetByteCount(text));
+    private void Queue(Binding binding, string text, string? channel,
+        CodexRealtimeFeedbackKind kind = CodexRealtimeFeedbackKind.Progress, string? wireId = null)
+    {
+        binding.Run.Feedback.Write(new(binding, text, channel, kind, wireId), Encoding.UTF8.GetByteCount(text));
+        if (kind is CodexRealtimeFeedbackKind.Progress or CodexRealtimeFeedbackKind.Final or CodexRealtimeFeedbackKind.Item)
+            binding.HasOutput = true;
+    }
 
     private async Task FlushAsync(RunState run, CancellationToken ct)
     {
@@ -395,12 +429,12 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     private async Task SendFeedbackAsync(Feedback feedback, CancellationToken ct)
     {
         if (!stream.IsCurrent(feedback.Binding.Handoff)) return;
-        await feedback.Binding.Connection.AppendFencedContextAsync(feedback.Binding.Admission,
-            feedback.Text, feedback.Binding.Handoff.Id, feedback.Channel, ct).ConfigureAwait(false);
+        await feedback.Binding.Connection.SendReasoningFeedbackAsync(feedback.Binding.Admission, feedback.Kind,
+            feedback.Text, feedback.WireId ?? feedback.Binding.WireHandoffId, feedback.Channel, options.ResponseItemPrefix, ct).ConfigureAwait(false);
     }
 
     private static Task SendStandaloneAsync(CodexRealtimeConnection connection, string text, CancellationToken ct)
-        => connection.AppendFencedContextAsync(connection.CaptureFeedbackAdmission(), text, channel: "speakable", cancellationToken: ct);
+        => connection.SendReasoningFeedbackAsync(connection.CaptureFeedbackAdmission(), CodexRealtimeFeedbackKind.Speech, text, null, "speakable", null, ct);
 
     /// <summary>Detach transport without ending the logical call or backing reasoning turn.</summary>
     public Task<CodexRealtimeLifecycleStatus> DetachAsync(CancellationToken ct = default) => controller.DetachAsync(ct);
