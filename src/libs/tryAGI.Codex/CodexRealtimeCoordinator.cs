@@ -57,6 +57,8 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     private readonly Lock gate = new();
     private readonly CodexRealtimeFeedbackStream stream;
     private RunState? current;
+    private readonly TaskCompletionSource pumpReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal Task PumpReady => pumpReady.Task;
     private Binding? activeFeedback;
     private Binding? responseFeedback;
     private string? feedbackRequestId;
@@ -72,7 +74,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         internal bool Completed;
     }
     private sealed record Feedback(Binding Binding, string Text, string? Channel, CodexRealtimeFeedbackKind Kind = CodexRealtimeFeedbackKind.Progress, string? WireId = null);
-    private sealed record Control(string Text, bool Speech);
+    private sealed record Control(string Text, bool Speech, string Role);
 
     private sealed class RunState
     {
@@ -115,6 +117,8 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     public Guid ThreadId => threadId;
     /// <summary>The persisted logical voice session.</summary>
     public string SessionId => sessionId;
+    internal bool IsBoundTo(CodexThreadRpc host) => ReferenceEquals(rpc, host);
+    internal string? Protocol => controller.Connection?.Protocol;
     /// <summary>Last owned reasoning failure, if any. No remote action is automatically replayed.</summary>
     public Exception? ReasoningFailure { get { lock (gate) return reasoningFailure; } }
 
@@ -136,10 +140,17 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     }
 
     /// <summary>Queue typed user input on the independent control lane.</summary>
-    public bool TryAppendText(string text) => TryControl(text, false);
+    public bool TryAppendText(string text) => TryControl(text, false, "user");
+
+    /// <summary>Queue role-bearing realtime input. Frameless transport does not carry the role on the wire.</summary>
+    public bool TryAppendText(string text, string role)
+    {
+        if (role is not ("user" or "assistant" or "developer")) throw new ArgumentException("Unsupported realtime text role.", nameof(role));
+        return TryControl(text, false, role);
+    }
 
     /// <summary>Queue explicit standalone speech without manufacturing a user message.</summary>
-    public bool TryAppendSpeech(string text) => TryControl(text, true);
+    public bool TryAppendSpeech(string text) => TryControl(text, true, "developer");
 
     /// <summary>Queue explicitly authored quiet reasoning status if the current V3 handoff permits it.</summary>
     public bool TryAppendReasoningStatus(string text)
@@ -153,12 +164,12 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         }
     }
 
-    private bool TryControl(string text, bool speech)
+    private bool TryControl(string text, bool speech, string role)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         var bytes = Encoding.UTF8.GetByteCount(text);
         if (bytes > 16 * 1024) throw new ArgumentException("Realtime control text exceeds its bound.", nameof(text));
-        lock (gate) return current?.Control.TryWrite(new(text, speech), bytes) == true;
+        lock (gate) return current?.Control.TryWrite(new(text, speech, role), bytes) == true;
     }
 
     /// <summary>Interrupt the backing native turn without waiting for an already admitted tool.</summary>
@@ -180,6 +191,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
             ObjectDisposedException.ThrowIf(disposed, this);
             if (current is not null) throw new InvalidOperationException("A realtime coordinator pump is already running.");
             current = run;
+            pumpReady.TrySetResult();
         }
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetime.Token);
         var token = stop.Token;
@@ -189,7 +201,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
             run.Audio.RunAsync((bytes, cancel) => connection.AppendAudioAsync(bytes, cancel), token),
             run.Control.RunAsync((command, cancel) => command.Speech
                 ? SendStandaloneAsync(connection, command.Text, cancel)
-                : connection.AppendUserTextAsync(command.Text, cancel), token),
+                : connection.AppendRoleTextAsync(command.Text, command.Role, cancel), token),
             run.Feedback.RunAsync((feedback, cancel) => SendFeedbackAsync(feedback, cancel), token),
             run.Events.RunAsync((item, cancel) => observer is null ? Task.CompletedTask : observer(item, cancel).WaitAsync(cancel), token),
             run.AudioEvents.RunAsync((item, cancel) => audioObserver is null ? Task.CompletedTask : audioObserver(item, cancel).WaitAsync(cancel), token),

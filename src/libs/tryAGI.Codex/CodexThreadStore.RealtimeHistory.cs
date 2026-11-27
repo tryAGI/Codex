@@ -303,7 +303,10 @@ public sealed partial class CodexThreadStore
     }
 
     private static CodexStoredRealtimeHistory ReplayRealtimeHistory(CodexStoredRealtimeSession session,
-        CodexRealtimeHistoryMode mode, CodexStoredRealtimeHistoryEvent[] events)
+        CodexRealtimeHistoryMode mode, CodexStoredRealtimeHistoryEvent[] events,
+        Action<CodexStoredRealtimeFrame, CodexStoredRealtimeHistoryEvent>? frameCommitted = null,
+        Action<CodexStoredRealtimeCarryover, CodexStoredRealtimeHistoryEvent>? inputSaved = null,
+        Action<CodexStoredRealtimeHandoffCapture, CodexStoredRealtimeHistoryEvent>? inputAccepted = null)
     {
         if (!Enum.IsDefined(mode) || events is null || events.Length > MaximumItems)
             throw new InvalidDataException("Invalid realtime history enrollment or event count.");
@@ -337,6 +340,7 @@ public sealed partial class CodexThreadStore
                 var frame = Frame(entry, true, boundary, handoffId);
                 if (!frames.TryAdd(frame.Id, frame))
                     throw new InvalidDataException("Realtime transcript frame identity collided.");
+                frameCommitted?.Invoke(frame, boundary);
             }
         }
 
@@ -347,8 +351,12 @@ public sealed partial class CodexThreadStore
             if (selected.Length == 0) return;
             var save = mode != CodexRealtimeHistoryMode.LegacyNoFlush;
             if (save)
-                carryover.Add(new(boundary.Id, session.SessionId, boundary.BeforeTurnCount, reason,
-                    selected.Select(f => f.Id).ToArray(), CarryoverInput(selected, reason, mode == CodexRealtimeHistoryMode.Canonical || session.Protocol == "v3")));
+            {
+                var saved = new CodexStoredRealtimeCarryover(boundary.Id, session.SessionId, boundary.BeforeTurnCount, reason,
+                    selected.Select(f => f.Id).ToArray(), CarryoverInput(selected, reason, mode == CodexRealtimeHistoryMode.Canonical || session.Protocol == "v3"));
+                carryover.Add(saved);
+                inputSaved?.Invoke(saved, boundary);
+            }
             foreach (var frame in selected) frames[frame.Id] = frame with { Disposition = save ? "carried" : "legacyOnly" };
         }
 
@@ -402,8 +410,11 @@ public sealed partial class CodexThreadStore
                         throw new InvalidDataException("Invalid realtime handoff history settlement.");
                     handoffs[handoffId] = capture with { State = item.Kind, TurnId = item.TurnId };
                     if (item.Kind == "accepted")
+                    {
                         foreach (var frameId in capture.FrameIds)
                             frames[frameId] = frames[frameId] with { Disposition = "accepted" };
+                        inputAccepted?.Invoke(capture, item);
+                    }
                     break;
                 }
                 default: throw new InvalidDataException("Unknown realtime history event kind.");

@@ -355,6 +355,12 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
             : AppendContextAsync(text, channel: "speakable", cancellationToken: cancellationToken);
     }
 
+    internal Task AppendRoleTextAsync(string text, string role, CancellationToken ct)
+    {
+        if (role == "user" || protocol == "v3") return AppendUserTextAsync(text, ct);
+        return SendAsync(CodexRealtimeGaProtocol.Message(role, text, preserveDeveloperRole: protocol == "v1"), ct);
+    }
+
     /// <summary>Asks the provider to end the session gracefully.</summary>
     public async Task CloseSessionAsync(CancellationToken cancellationToken = default)
     {

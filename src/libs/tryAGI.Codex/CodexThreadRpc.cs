@@ -65,7 +65,9 @@ public sealed partial class CodexThreadRpc(
     /// <summary>Returns <see langword="true"/> for the thread and turn methods this host serves.</summary>
     public static bool Handles(string method) => method is "thread/start" or "thread/resume" or "thread/fork"
         or "thread/list" or "thread/loaded/list" or "thread/read" or "thread/turns/list" or "thread/items/list"
-        or "turn/start" or "turn/steer" or "turn/interrupt" or "turn/settings/update";
+        or "turn/start" or "turn/steer" or "turn/interrupt" or "turn/settings/update"
+        or "thread/realtime/start" or "thread/realtime/stop" or "thread/realtime/list" or "thread/realtime/listVoices"
+        or "thread/realtime/appendAudio" or "thread/realtime/appendText" or "thread/realtime/appendSpeech";
 
     /// <summary>Serves one App Server thread or turn request.</summary>
     /// <param name="method">Method, for example <c>thread/start</c> or <c>turn/start</c>.</param>
@@ -95,6 +97,13 @@ public sealed partial class CodexThreadRpc(
                 "turn/steer" => Steer(p),
                 "turn/interrupt" => await InterruptAsync(p, ct).ConfigureAwait(false),
                 "turn/settings/update" => Update(p),
+                "thread/realtime/start" => await StartRealtimeAsync(p, ct).ConfigureAwait(false),
+                "thread/realtime/stop" => await StopRealtimeAsync(p, ct).ConfigureAwait(false),
+                "thread/realtime/list" => await ListRealtimeAsync(p, ct).ConfigureAwait(false),
+                "thread/realtime/listVoices" => ListRealtimeVoices(p),
+                "thread/realtime/appendAudio" => AppendRealtimeAudio(p),
+                "thread/realtime/appendText" => AppendRealtimeText(p, false),
+                "thread/realtime/appendSpeech" => AppendRealtimeText(p, true),
                 _ => throw new CodexThreadRpcException(-32601, "Native method not found.")
             };
         }
@@ -111,6 +120,7 @@ public sealed partial class CodexThreadRpc(
         await admission.WaitAsync(ct).ConfigureAwait(false);
         try { Volatile.Write(ref stopping, true); pending = active.Values.ToArray(); }
         finally { admission.Release(); }
+        await DrainRealtimeAsync(ct).ConfigureAwait(false);
         foreach (var running in pending) running.Control.Interrupt();
         await Task.WhenAll(pending.Select(r => r.Completion)).WaitAsync(ct).ConfigureAwait(false);
     }

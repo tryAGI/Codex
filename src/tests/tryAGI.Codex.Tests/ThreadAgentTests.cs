@@ -278,6 +278,85 @@ public sealed class ThreadAgentTests
     }
 
     [Fact]
+    public async Task NativeRealtimeRpcStartsAppendsListsAndStopsWithoutAppServer()
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        var agent = Agent(store, auth, budget, server);
+        using var client = new CodexClient(auth);
+        var incoming = Channel.CreateUnbounded<string>();
+        var outgoing = Channel.CreateUnbounded<string>();
+        var notices = Channel.CreateUnbounded<(string Method, JsonElement Body)>();
+        var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+            Json("{}"), (_, _, _) => throw new InvalidOperationException("Use the native owned executor."),
+            (method, body) => { notices.Writer.TryWrite((method, body)); return Task.CompletedTask; });
+        rpc.EnableRealtime(async (request, ct) =>
+        {
+            Assert.Equal(thread.Id, request.Thread.Id);
+            Assert.Equal("v3", request.SessionOptions.Protocol);
+            Assert.True(request.CoordinatorOptions.DirectAudio);
+            var session = await store.CreateRealtimeSessionAsync(thread.Id, request.Thread.Revision,
+                "voice", "rtc_call", "v3", "voice-owner", ct);
+            var controller = new CodexRealtimeSessionController(store, session.Id, "voice", "voice-owner",
+                (attach, cancel) => client.AttachExistingRealtimeCallAsync(attach.CallId,
+                    new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), attach.Protocol, attach.StartBefore, cancel));
+            return new(new CodexRealtimeCoordinator(store, agent, rpc, controller, session.Id,
+                "voice", "voice-owner", "account", _ => Options(session.Id, Guid.NewGuid()), NoTools, request.CoordinatorOptions));
+        });
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        var token = deadline.Token;
+        var id = thread.Id.ToString();
+        async Task<JsonElement> Invoke(string operation, JsonObject? args = null)
+        {
+            args ??= new JsonObject();
+            if (operation != "listVoices") args["threadId"] = id;
+            Assert.True(CodexThreadRpc.Handles("thread/realtime/" + operation));
+            return await rpc.InvokeAsync("thread/realtime/" + operation, Json(args.ToJsonString()), token);
+        }
+        var voices = await Invoke("listVoices");
+        Assert.Contains(voices.GetProperty("voices").GetProperty("v3").EnumerateArray(), v => v.GetString() == CodexProtocolCatalog.GetDefaultVoice("v3"));
+        Assert.Equal("unsupported", (await Invoke("list")).GetProperty("coverage").GetString());
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => Invoke("start", new() { ["outputModality"] = "bad" }));
+        await Invoke("start", new() { ["outputModality"] = "audio", ["version"] = "v3", ["realtimeSessionId"] = "voice",
+            ["transport"] = new JsonObject { ["type"] = "websocket" }, ["includeStartupContext"] = false });
+        var started = await notices.Reader.ReadAsync(token);
+        Assert.Equal("thread/realtime/started", started.Method);
+        Assert.Equal("voice", started.Body.GetProperty("realtimeSessionId").GetString());
+        var first = await Invoke("list", new() { ["order"] = "position", ["limit"] = 1 });
+        Assert.Equal("ready", first.GetProperty("coverage").GetString());
+        var snapshot = first.GetProperty("snapshotEnd").GetInt64();
+        Assert.Equal("realtimeSessionStarted", first.GetProperty("data")[0].GetProperty("item").GetProperty("type").GetString());
+        await Invoke("appendAudio", new() { ["audio"] = new JsonObject { ["data"] = "AAAAAA==", ["numChannels"] = 1,
+            ["sampleRate"] = 24000, ["samplesPerChannel"] = 2 } });
+        await Invoke("appendText", new() { ["text"] = "user text", ["role"] = "user" });
+        await Invoke("appendSpeech", new() { ["text"] = "speak independently" });
+        var audio = false; var text = false; var speech = false;
+        while (!audio || !text || !speech)
+        {
+            var raw = await outgoing.Reader.ReadAsync(token);
+            audio |= raw.Contains("input_audio.append", StringComparison.Ordinal);
+            text |= raw.Contains("user text", StringComparison.Ordinal);
+            speech |= raw.Contains("speak independently", StringComparison.Ordinal);
+        }
+        Assert.Empty(server.Requests);
+        await incoming.Writer.WriteAsync("""{"type":"output_audio.delta","audio":"AAAAAA=="}""", token);
+        while (true)
+        {
+            var notice = await notices.Reader.ReadAsync(token);
+            if (notice.Method != "thread/realtime/outputAudio/delta") continue;
+            Assert.Equal("AAAAAA==", notice.Body.GetProperty("audio").GetProperty("data").GetString());
+            break;
+        }
+        await Invoke("stop");
+        var end = await Invoke("list", new() { ["order"] = "position" });
+        Assert.Equal(2, end.GetProperty("data").GetArrayLength());
+        Assert.Equal("realtimeSessionClosed", end.GetProperty("data")[1].GetProperty("item").GetProperty("type").GetString());
+        var old = await Invoke("list", new() { ["order"] = "position", ["snapshotEnd"] = snapshot });
+        Assert.Single(old.GetProperty("data").EnumerateArray());
+        Assert.Equal("ended", (await store.ReadAsync(thread.Id, token)).RealtimeSessions!.Single().State);
+    }
+
+    [Fact]
     public async Task NativeCoordinatorKeepsAudioAndControlLiveDuringToolAndContinuesSameThread()
     {
         var (_, store, thread, auth, budget, server) = await Setup();
