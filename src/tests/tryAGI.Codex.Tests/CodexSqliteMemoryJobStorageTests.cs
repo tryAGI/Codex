@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace tryAGI.Codex.Tests;
 
 public sealed class CodexSqliteMemoryJobStorageTests
@@ -292,6 +294,244 @@ public sealed class CodexSqliteMemoryJobStorageTests
         await Assert.ThrowsAsync<IOException>(() => fixture.Open(clock, true));
     }
 
+    private static CodexMemorySamplingAdmission Admission(CodexMemoryJobChange claim) =>
+        new(claim.Key, claim.Next.WorkerId!.Value, claim.OperationId, claim.Next.ClaimedWatermark!.Value, Guid.NewGuid());
+
+    [Fact]
+    public async Task SamplingAdmissionIsOneShotAcrossConnectionsAndReopen()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        CodexMemorySamplingAdmission admission;
+        await using (var first = await fixture.Open(clock, true))
+        await using (var second = await fixture.Open(clock))
+        {
+            Assert.True(await first.PublishSourceAsync(new(thread, 1, true), Ct));
+            admission = Admission(await Claim(Jobs(first, clock), Key(thread), Guid.NewGuid()));
+            var race = await Task.WhenAll(first.TryAdmitSamplingAsync(admission, Ct).AsTask(),
+                second.TryAdmitSamplingAsync(admission with { AttemptId = Guid.NewGuid() }, Ct).AsTask());
+            Assert.Single(race, result => result);
+            Assert.False(await first.TryAdmitSamplingAsync(admission, Ct));
+        }
+        await using var reopened = await fixture.Open(clock);
+        Assert.False(await reopened.TryAdmitSamplingAsync(admission with { AttemptId = Guid.NewGuid() }, Ct));
+        clock.Advance(Lease);
+        var takeover = Admission(await Claim(Jobs(reopened, clock), Key(thread), Guid.NewGuid()));
+        Assert.False(await reopened.TryAdmitSamplingAsync(admission, Ct));
+        Assert.True(await reopened.TryAdmitSamplingAsync(takeover, Ct));
+    }
+
+    [Fact]
+    public async Task RevokedSourceCannotAdmitSampling()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        await using var storage = await fixture.Open(clock, true);
+        Assert.True(await storage.PublishSourceAsync(new(thread, 1, true), Ct));
+        var admission = Admission(await Claim(Jobs(storage, clock), Key(thread), Guid.NewGuid()));
+        Assert.True(await storage.PublishSourceAsync(new(thread, 2, false), Ct));
+        Assert.False(await storage.TryAdmitSamplingAsync(admission, Ct));
+    }
+
+    [Fact]
+    public async Task WorkerExtractsAndConsolidatesExactlyOnce()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        await using var storage = await fixture.Open(clock, true);
+        Assert.True(await storage.PublishSourceAsync(new(thread, 3, true), Ct));
+        var jobs = Jobs(storage, clock);
+        var worker = new CodexMemorySamplingWorker(jobs, storage, clock);
+        var admission = Admission(await Claim(jobs, Key(thread), Guid.NewGuid()));
+        var calls = 0;
+        Task<string?> Sample(CodexMemorySamplingAdmission _, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref calls);
+            return Task.FromResult<string?>("{\"rollout_summary\":\"private-secret\",\"rollout_slug\":\"sample\"}");
+        }
+
+        var operation = Guid.NewGuid();
+        var result = await worker.RunStage1Async(admission, operation, Sample,
+            value => value.Replace("private-secret", "[redacted]", StringComparison.Ordinal), cancellationToken: Ct);
+        Assert.Equal(CodexMemorySamplingOutcome.Completed, result.Outcome);
+        Assert.Equal(CodexMemoryJobSettlement.Applied, result.Receipt!.Settlement);
+        var extraction = await storage.ReadExtractionAsync(new(thread, 3), Ct);
+        Assert.Equal("[redacted]", extraction!.RolloutSummary);
+        Assert.Empty(extraction.RawMemory);
+        Assert.Equal(CodexMemorySamplingOutcome.NotAdmitted,
+            (await worker.RunStage1Async(admission, operation, Sample, value => value, cancellationToken: Ct)).Outcome);
+        Assert.Equal(1, calls);
+
+        var phase2 = Admission(await Claim(jobs, Key(), Guid.NewGuid()));
+        var consolidationCalls = 0;
+        async Task<CodexMemoryConsolidationOutput> Consolidate(CodexMemorySamplingAdmission _, CancellationToken ct)
+        {
+            consolidationCalls++;
+            return new("verified-artifact", await storage.ListEligibleOutputsAsync(cancellationToken: ct));
+        }
+        var phase2Operation = Guid.NewGuid();
+        var consolidated = await worker.RunPhase2Async(phase2, phase2Operation, Consolidate, cancellationToken: Ct);
+        Assert.Equal(CodexMemorySamplingOutcome.Completed, consolidated.Outcome);
+        Assert.Equal(new CodexMemoryConsolidationState("verified-artifact", 1), await storage.ReadConsolidationAsync(Ct));
+        Assert.Equal(CodexMemorySamplingOutcome.NotAdmitted,
+            (await worker.RunPhase2Async(phase2, Guid.NewGuid(), Consolidate, cancellationToken: Ct)).Outcome);
+        Assert.Equal(1, consolidationCalls);
+    }
+
+    [Fact]
+    public async Task LostSamplingAdmissionNeverDispatchesAfterRecovery()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        CodexMemorySamplingAdmission admission;
+        var operation = Guid.NewGuid();
+        var calls = 0;
+        Task<string?> Sample(CodexMemorySamplingAdmission _, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            calls++;
+            return Task.FromResult<string?>(null);
+        }
+        await using (var storage = await fixture.Open(clock, true))
+        {
+            Assert.True(await storage.PublishSourceAsync(new(thread, 1, true), Ct));
+            var jobs = Jobs(storage, clock);
+            admission = Admission(await Claim(jobs, Key(thread), Guid.NewGuid()));
+            var worker = new CodexMemorySamplingWorker(jobs, new LoseSamplingAcknowledgment(storage), clock);
+            await Assert.ThrowsAsync<IOException>(() => worker.RunStage1Async(admission, operation, Sample,
+                value => value, cancellationToken: Ct));
+        }
+        await using var reopened = await fixture.Open(clock);
+        var recovered = new CodexMemorySamplingWorker(Jobs(reopened, clock), reopened, clock);
+        Assert.Equal(CodexMemorySamplingOutcome.NotAdmitted,
+            (await recovered.RunStage1Async(admission, operation, Sample, value => value, cancellationToken: Ct)).Outcome);
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task LostWorkerSettlementReconcilesExactMutationWithoutResampling()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        CodexMemoryJobChange change;
+        CodexMemorySamplingAdmission admission;
+        var operation = Guid.NewGuid();
+        var calls = 0;
+        Task<string?> Sample(CodexMemorySamplingAdmission _, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            calls++;
+            return Task.FromResult<string?>("{\"rollout_summary\":\"durable\",\"rollout_slug\":\"summary\"}");
+        }
+        await using (var storage = await fixture.Open(clock, true))
+        {
+            Assert.True(await storage.PublishSourceAsync(new(thread, 4, true), Ct));
+            admission = Admission(await Claim(Jobs(storage, clock), Key(thread), Guid.NewGuid()));
+            var worker = new CodexMemorySamplingWorker(Jobs(new LoseAcknowledgment(storage), clock), storage, clock);
+            var error = await Assert.ThrowsAsync<CodexMemorySamplingSettlementException>(() =>
+                worker.RunStage1Async(admission, operation, Sample, value => value, cancellationToken: Ct));
+            change = error.Change;
+            Assert.Equal(operation, change.OperationId);
+        }
+        await using var reopened = await fixture.Open(clock);
+        var recovered = new CodexMemorySamplingWorker(Jobs(reopened, clock), reopened, clock);
+        Assert.Equal(CodexMemoryJobSettlement.Applied, (await reopened.ReadReceiptAsync(Key(thread), operation, Ct))!.Settlement);
+        Assert.Equal(CodexMemoryJobSettlement.Applied, (await reopened.ApplyAsync(change, Ct)).Settlement);
+        Assert.Equal(CodexMemorySamplingOutcome.NotAdmitted,
+            (await recovered.RunStage1Async(admission, operation, Sample, value => value, cancellationToken: Ct)).Outcome);
+        Assert.Equal(1, calls);
+        Assert.Equal("durable", (await reopened.ReadExtractionAsync(new(thread, 4), Ct))!.RolloutSummary);
+    }
+
+    [Fact]
+    public async Task WorkerRejectsRevokedResultAndRecordsOnlySafeFailureClassification()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        await using var storage = await fixture.Open(clock, true);
+        Assert.True(await storage.PublishSourceAsync(new(thread, 1, true), Ct));
+        var jobs = Jobs(storage, clock);
+        var worker = new CodexMemorySamplingWorker(jobs, storage, clock);
+        var admission = Admission(await Claim(jobs, Key(thread), Guid.NewGuid()));
+        var result = await worker.RunStage1Async(admission, Guid.NewGuid(), async (_, ct) =>
+        {
+            Assert.True(await storage.PublishSourceAsync(new(thread, 2, false), ct));
+            return "{\"rollout_summary\":\"do not retain\",\"rollout_slug\":\"sample\"}";
+        }, value => value, cancellationToken: Ct);
+        Assert.Equal(CodexMemorySamplingOutcome.Superseded, result.Outcome);
+        Assert.Null(await storage.ReadExtractionAsync(new(thread, 1), Ct));
+
+        clock.Advance(Lease);
+        Assert.True(await storage.PublishSourceAsync(new(thread, 3, true), Ct));
+        var next = Admission(await Claim(jobs, Key(thread), Guid.NewGuid()));
+        var failed = await worker.RunStage1Async(next, Guid.NewGuid(),
+            (_, _) => throw new IOException("provider-secret"), value => value, cancellationToken: Ct);
+        Assert.Equal(CodexMemorySamplingOutcome.Failed, failed.Outcome);
+        var state = (await storage.ReadAsync(Key(thread), Ct)).State!;
+        Assert.Equal("sampling_failed", state.LastError);
+        Assert.Equal(CodexMemoryJobStatus.Failed, state.Status);
+    }
+
+    [Fact]
+    public async Task LegacySchemaUpgradePreservesOutputsAndReceiptsAndRefusesActiveClaims()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var completedThread = Guid.NewGuid();
+        var runningThread = Guid.NewGuid();
+        CodexMemoryJobChange completed;
+        CodexMemorySamplingAdmission oldClaim;
+        await using (var storage = await fixture.Open(clock, true))
+        {
+            completed = await Extract(storage, clock, completedThread, 7, "legacy output");
+            Assert.True(await storage.PublishSourceAsync(new(runningThread, 8, true), Ct));
+            oldClaim = Admission(await Claim(Jobs(storage, clock), Key(runningThread), Guid.NewGuid()));
+        }
+
+        // Reconstruct the exact schema-1 shape in this disposable fixture only.
+        await fixture.MakeLegacySchemaAsync();
+        await Assert.ThrowsAsync<InvalidDataException>(() => fixture.Open(clock));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Upgrade(clock));
+        await Assert.ThrowsAsync<InvalidDataException>(() => fixture.Open(clock));
+
+        clock.Advance(Lease);
+        await using (var upgraded = await fixture.Upgrade(clock))
+        {
+            Assert.Equal("legacy output", (await upgraded.ReadExtractionAsync(new(completedThread, 7), Ct))!.RawMemory);
+            Assert.Equal(CodexMemoryJobSettlement.Applied,
+                (await upgraded.ReadReceiptAsync(Key(completedThread), completed.OperationId, Ct))!.Settlement);
+            Assert.False(await upgraded.TryAdmitSamplingAsync(oldClaim, Ct));
+            var fresh = Admission(await Claim(Jobs(upgraded, clock), Key(runningThread), Guid.NewGuid()));
+            Assert.True(await upgraded.TryAdmitSamplingAsync(fresh, Ct));
+        }
+        await using var reopened = await fixture.Open(clock);
+        Assert.Equal(7L, (await reopened.ReadAsync(Key(completedThread), Ct)).OutputWatermark);
+    }
+
+    private sealed class LoseSamplingAcknowledgment(ICodexMemorySamplingStorage inner) : ICodexMemorySamplingStorage
+    {
+        public async ValueTask<bool> TryAdmitSamplingAsync(CodexMemorySamplingAdmission admission, CancellationToken ct)
+        {
+            if (await inner.TryAdmitSamplingAsync(admission, ct))
+                throw new IOException("Lost sampling admission acknowledgment.");
+            return false;
+        }
+    }
+
     private sealed class Clock : TimeProvider
     {
         private DateTimeOffset now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -302,10 +542,36 @@ public sealed class CodexSqliteMemoryJobStorageTests
     private sealed class Fixture : IDisposable
     {
         private readonly string root = CodexFileSystem.Canonical(Directory.CreateTempSubdirectory("codex-memory-sqlite-").FullName);
+        private string DatabasePath => Path.Combine(root, "memory.sqlite");
         internal Task<CodexMacOsSqliteMemoryJobStorage> Open(Clock clock, bool create = false,
             Func<CodexMemoryJobStorageAccess, CancellationToken, ValueTask>? authorize = null, CodexMemoryScope? scope = null) =>
-            CodexMacOsSqliteMemoryJobStorage.OpenAsync(Path.Combine(root, "memory.sqlite"), scope ?? Scope,
+            CodexMacOsSqliteMemoryJobStorage.OpenAsync(DatabasePath, scope ?? Scope,
                 authorize ?? ((_, _) => ValueTask.CompletedTask), create, clock, Ct);
+        internal Task<CodexMacOsSqliteMemoryJobStorage> Upgrade(Clock clock) =>
+            CodexMacOsSqliteMemoryJobStorage.UpgradeLegacyAsync(DatabasePath, Scope,
+                (_, _) => ValueTask.CompletedTask, clock, Ct);
+
+        internal async Task MakeLegacySchemaAsync()
+        {
+            using var process = Process.Start(new ProcessStartInfo("/usr/bin/sqlite3")
+            {
+                ArgumentList = { "-batch", "-bail", DatabasePath,
+                    "BEGIN IMMEDIATE; DROP TABLE sampling; PRAGMA user_version=1; COMMIT;" },
+                UseShellExecute = false,
+                RedirectStandardError = true,
+            }) ?? throw new InvalidOperationException("SQLite fixture process failed to start.");
+            try
+            {
+                var error = await process.StandardError.ReadToEndAsync(Ct);
+                await process.WaitForExitAsync(Ct);
+                Assert.True(process.ExitCode == 0, error);
+            }
+            finally
+            {
+                if (!process.HasExited) process.Kill();
+                await process.WaitForExitAsync(CancellationToken.None);
+            }
+        }
         public void Dispose() => Directory.Delete(root, true);
     }
 

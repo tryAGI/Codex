@@ -19,9 +19,10 @@ public sealed record CodexMemorySourceUpdate(Guid ThreadId, long Watermark, bool
 /// <param name="Source">Source publication, when applicable.</param>
 /// <param name="OperationId">Receipt lookup identity, when applicable.</param>
 /// <param name="Watermark">Exact requested extraction snapshot, when applicable.</param>
+/// <param name="Sampling">Exact sampling admission, when applicable.</param>
 public sealed record CodexMemoryJobStorageAccess(CodexMemoryJobKey Key, string Operation,
     CodexMemoryJobChange? Change = null, CodexMemorySourceUpdate? Source = null,
-    Guid? OperationId = null, long? Watermark = null);
+    Guid? OperationId = null, long? Watermark = null, CodexMemorySamplingAdmission? Sampling = null);
 
 /// <summary>Current verified consolidation pointer and historical maximum successful coverage.</summary>
 /// <param name="ArtifactRevision">Immutable artifact revision, or null if no safe artifact is published.</param>
@@ -38,10 +39,14 @@ public sealed record CodexMemoryConsolidationState(string? ArtifactRevision, uin
 /// The authorization callback authenticates the exact worker/mutation and verifies any immutable
 /// consolidation artifact before commit. It must not treat a model claim as authorization.
 /// </summary>
-public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobStorage, IAsyncDisposable
+public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobStorage, ICodexMemorySamplingStorage, IAsyncDisposable
 {
     private const int ApplicationId = 1129137485;
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
+    private const string SamplingSchema = """
+        CREATE TABLE sampling(claim BLOB PRIMARY KEY NOT NULL, attempt BLOB NOT NULL UNIQUE,
+            thread BLOB NOT NULL, worker BLOB NOT NULL, watermark INTEGER NOT NULL) WITHOUT ROWID;
+        """;
     private const int MaximumBlobBytes = 8 * 1024 * 1024;
     private const int Ok = 0, Row = 100, Done = 101;
     private const int OpenReadWrite = 0x2, OpenFullMutex = 0x10000, OpenNoFollow = 0x01000000;
@@ -70,7 +75,22 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
     /// </summary>
     public static Task<CodexMacOsSqliteMemoryJobStorage> OpenAsync(string path, CodexMemoryScope scope,
         Func<CodexMemoryJobStorageAccess, CancellationToken, ValueTask> authorize,
-        bool createNew = false, TimeProvider? timeProvider = null, CancellationToken cancellationToken = default)
+        bool createNew = false, TimeProvider? timeProvider = null, CancellationToken cancellationToken = default) =>
+        OpenValidatedAsync(path, scope, authorize, createNew, false, timeProvider, cancellationToken);
+
+    /// <summary>
+    /// Explicitly upgrades a schema-1 job database to durable sampling admission. The host
+    /// must stop all legacy writers first; migration refuses any unexpired running claim.
+    /// Already upgraded databases are reopened without further writes.
+    /// </summary>
+    public static Task<CodexMacOsSqliteMemoryJobStorage> UpgradeLegacyAsync(string path, CodexMemoryScope scope,
+        Func<CodexMemoryJobStorageAccess, CancellationToken, ValueTask> authorize,
+        TimeProvider? timeProvider = null, CancellationToken cancellationToken = default) =>
+        OpenValidatedAsync(path, scope, authorize, false, true, timeProvider, cancellationToken);
+
+    private static Task<CodexMacOsSqliteMemoryJobStorage> OpenValidatedAsync(string path, CodexMemoryScope scope,
+        Func<CodexMemoryJobStorageAccess, CancellationToken, ValueTask> authorize, bool createNew, bool upgradeLegacy,
+        TimeProvider? timeProvider, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!OperatingSystem.IsMacOS()) throw new PlatformNotSupportedException("Local memory job storage requires macOS.");
@@ -84,13 +104,13 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
         if (!Path.IsPathFullyQualified(path) || path != Path.GetFullPath(path) || path.Any(char.IsControl) ||
             Path.GetDirectoryName(path) is not { } directory || directory == "/")
             throw new ArgumentException("Memory database requires a normalized private path.", nameof(path));
-        return Task.Run(() => OpenCore(path, directory, scope, authorize, createNew, timeProvider ?? TimeProvider.System,
-            cancellationToken), cancellationToken);
+        return Task.Run(() => OpenCore(path, directory, scope, authorize, createNew, upgradeLegacy,
+            timeProvider ?? TimeProvider.System, cancellationToken), cancellationToken);
     }
 
     private static CodexMacOsSqliteMemoryJobStorage OpenCore(string path, string directory, CodexMemoryScope scope,
         Func<CodexMemoryJobStorageAccess, CancellationToken, ValueTask> authorize, bool createNew,
-        TimeProvider clock, CancellationToken ct)
+        bool upgradeLegacy, TimeProvider clock, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (!OperatingSystem.IsMacOS()) throw new PlatformNotSupportedException();
@@ -119,7 +139,11 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
             Check(BusyTimeout(db, 5000));
             _ = Limit(db, 0, MaximumBlobBytes + 65536);
             Execute(db, "PRAGMA trusted_schema=OFF; PRAGMA foreign_keys=ON;");
-            if (!createNew) Verify(db, scope);
+            if (!createNew)
+            {
+                var version = ScalarNumber(db, "PRAGMA user_version;");
+                Verify(db, scope, upgradeLegacy && version == 1 ? 1 : SchemaVersion);
+            }
             if (ScalarText(db, "PRAGMA journal_mode=DELETE;") != "delete")
                 throw new IOException("Could not establish SQLite rollback journal mode.");
             Execute(db, "PRAGMA synchronous=EXTRA; PRAGMA fullfsync=ON;");
@@ -145,11 +169,28 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
                             artifact BLOB);
                         INSERT INTO progress(id,max_count,artifact) VALUES(1,0,NULL);
                         PRAGMA application_id=1129137485;
-                        PRAGMA user_version=1;
+                        PRAGMA user_version=2;
                         """);
+                    Execute(db, SamplingSchema);
                     using var identity = Prepare(db, "INSERT INTO identity(id,body) VALUES(1,?1);");
                     identity.Bind(1, Serialize(scope, CodexMemoryStorageJson.Default.CodexMemoryScope));
                     identity.Done();
+                    return true;
+                });
+            else if (upgradeLegacy)
+                Transaction(db, true, ct, () =>
+                {
+                    if (ScalarNumber(db, "PRAGMA user_version;") == SchemaVersion) return true;
+                    Verify(db, scope, 1);
+                    using (var active = Prepare(db, "SELECT 1 FROM job WHERE status=?1 AND lease_until>?2 LIMIT 1;"))
+                    {
+                        active.Bind(1, (long)CodexMemoryJobStatus.Running);
+                        active.Bind(2, clock.GetUtcNow().UtcTicks);
+                        if (active.Next())
+                            throw new InvalidOperationException("Stop legacy memory workers before upgrading live leases.");
+                    }
+                    Execute(db, SamplingSchema);
+                    Execute(db, "PRAGMA user_version=2;");
                     return true;
                 });
             Verify(db, scope);
@@ -163,10 +204,10 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
         }
     }
 
-    private static void Verify(IntPtr db, CodexMemoryScope scope)
+    private static void Verify(IntPtr db, CodexMemoryScope scope, int expectedVersion = SchemaVersion)
     {
         if (ScalarNumber(db, "PRAGMA application_id;") != ApplicationId ||
-            ScalarNumber(db, "PRAGMA user_version;") != SchemaVersion)
+            ScalarNumber(db, "PRAGMA user_version;") != expectedVersion)
             throw new InvalidDataException("Unknown or uninitialized memory job database.");
         using (var identity = Prepare(db, "SELECT body FROM identity WHERE id=1;"))
         {
@@ -180,6 +221,39 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
             FROM source s,job j,extraction e,receipt r,selected k,progress p LIMIT 0;
             """);
         schema.Done();
+        if (expectedVersion == SchemaVersion)
+        {
+            using var sampling = Prepare(db, "SELECT claim,attempt,thread,worker,watermark FROM sampling LIMIT 0;");
+            sampling.Done();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<bool> TryAdmitSamplingAsync(CodexMemorySamplingAdmission admission, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(admission);
+        CheckKey(admission.Key);
+        admission.Validate();
+        await AuthorizeAsync(new(admission.Key, "admit_sampling", Sampling: admission), cancellationToken).ConfigureAwait(false);
+        return await RunAsync(() => Transaction(database, true, cancellationToken, () =>
+        {
+            var observed = Observe(admission.Key);
+            if (!admission.Matches(observed, clock.GetUtcNow())) return false;
+
+            // A receipt for an already admitted claim must never grant another dispatch,
+            // even if the previous caller lost its acknowledgement or restarted.
+            using var statement = Prepare(database, """
+                INSERT INTO sampling(claim,attempt,thread,worker,watermark) VALUES(?1,?2,?3,?4,?5)
+                ON CONFLICT DO NOTHING;
+                """);
+            statement.Bind(1, admission.OwnershipToken.ToByteArray());
+            statement.Bind(2, admission.AttemptId.ToByteArray());
+            statement.Bind(3, KeyBytes(admission.Key));
+            statement.Bind(4, admission.WorkerId.ToByteArray());
+            statement.Bind(5, admission.ClaimedWatermark);
+            statement.Done();
+            return Changes(database) == 1;
+        }), cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -246,8 +320,11 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
         // Do not allow a callback to modify a selected array after authorizing its contents.
         if (!Serialize(frozen, CodexMemoryStorageJson.Default.CodexMemoryJobChange).AsSpan().SequenceEqual(body))
             throw new InvalidDataException("Memory mutation changed during authorization.");
+        // Use a separate snapshot after authorization, so retained caller-owned collections
+        // cannot be changed while the transaction waits for its writer lock.
+        var committed = Deserialize(body, CodexMemoryStorageJson.Default.CodexMemoryJobChange);
         return await RunAsync(() => Transaction(database, true, cancellationToken,
-            () => Apply(frozen, fingerprint, body, cancellationToken)), cancellationToken).ConfigureAwait(false);
+            () => Apply(committed, fingerprint, body, cancellationToken)), cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
