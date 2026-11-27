@@ -78,14 +78,23 @@ internal static class CodexRealtimeProjectionCodec
     }
 
     internal static CodexRealtimeProjectionEnvelope Decode(CodexRealtimeProjectionCheckpoint checkpoint)
+        => Decode(checkpoint, out _);
+
+    internal static CodexRealtimeProjectionEnvelope Decode(CodexRealtimeProjectionCheckpoint checkpoint, out byte[] bytes)
     {
         if (checkpoint.StateBase64 is not { Length: > 0 and <= MaximumBase64 } || checkpoint.StateSha256 is not { Length: 64 })
             throw new InvalidDataException("Invalid realtime projection checkpoint bounds.");
+        try { bytes = Convert.FromBase64String(checkpoint.StateBase64); }
+        catch (FormatException error) { throw new InvalidDataException("Invalid serialized realtime projection checkpoint.", error); }
+        return DecodeBytes(bytes, checkpoint.StateSha256);
+    }
+
+    internal static CodexRealtimeProjectionEnvelope DecodeBytes(byte[] bytes, string digest)
+    {
+        if (bytes.Length is <= 0 or > MaximumBytes || Convert.ToHexStringLower(SHA256.HashData(bytes)) != digest)
+            throw new InvalidDataException("Realtime projection checkpoint digest mismatch.");
         try
         {
-            var bytes = Convert.FromBase64String(checkpoint.StateBase64);
-            if (bytes.Length > MaximumBytes || Convert.ToHexStringLower(SHA256.HashData(bytes)) != checkpoint.StateSha256)
-                throw new InvalidDataException("Realtime projection checkpoint digest mismatch.");
             var envelope = JsonSerializer.Deserialize(bytes, CodexRealtimeProjectionJson.Default.CodexRealtimeProjectionEnvelope)
                 ?? throw new InvalidDataException("Missing realtime projection checkpoint.");
             if (envelope.Version != Version || envelope.Scope is null || envelope.Prefix is null || envelope.State is null)
@@ -93,7 +102,7 @@ internal static class CodexRealtimeProjectionCodec
             envelope.Scope.Validate();
             return envelope;
         }
-        catch (Exception error) when (error is JsonException or FormatException)
+        catch (JsonException error)
         {
             throw new InvalidDataException("Invalid serialized realtime projection checkpoint.", error);
         }

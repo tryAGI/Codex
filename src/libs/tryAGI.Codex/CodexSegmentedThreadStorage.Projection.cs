@@ -4,18 +4,38 @@ namespace tryAGI.Codex;
 
 public sealed partial class CodexSegmentedThreadStorage
 {
+    /// <summary>Read and atomically cache a bounded realtime projection batch in an explicitly
+    /// separate trusted cache namespace. Corrupt derived payloads may be rebuilt from the
+    /// source, but a malformed cache root, rollback or uncertain cache commit is not replayed.
+    /// This never modifies the authoritative thread or dispatches effects.</summary>
+    public Task<CodexCachedRealtimeProjection> ReadAndPersistRealtimeProjectionAsync(
+        CodexPersistentRealtimeProjectionCache cache, Guid threadId, string sessionId,
+        int pageSize = 64, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(cache);
+        cache.RequireSeparateNamespace(roots, pages);
+        return cache.ReadAsync(this, accountId, threadId, sessionId, pageSize, cancellationToken);
+    }
+
     /// <summary>Restore a trusted derived reducer checkpoint and apply only the verified
     /// observation suffix from one captured version-3 root. Save the returned checkpoint
     /// as a single atomic value in account-scoped host storage. A changed scope/prefix,
     /// unavailable index, corrupt checkpoint or unsupported reducer version requires a
     /// full verified replay. This read-only API never emits notifications or authorizes
     /// reasoning, tools, handoff admission, or provider dispatch.</summary>
-    public async Task<CodexRealtimeProjectionRead> ReadRealtimeProjectionAsync(Guid threadId, string sessionId,
+    public Task<CodexRealtimeProjectionRead> ReadRealtimeProjectionAsync(Guid threadId, string sessionId,
         CodexRealtimeProjectionCheckpoint? checkpoint = null, int pageSize = 64,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var prior = checkpoint is null ? null : CodexRealtimeProjectionCodec.Decode(checkpoint);
+        return ReadRealtimeProjectionCoreAsync(threadId, sessionId, prior, pageSize, cancellationToken);
+    }
+
+    internal async Task<CodexRealtimeProjectionRead> ReadRealtimeProjectionCoreAsync(Guid threadId, string sessionId,
+        CodexRealtimeProjectionEnvelope? prior, int pageSize, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         ValidateObservationDeltaRequest(threadId, sessionId, prior?.Prefix, pageSize);
         if (prior is not null && (prior.AccountId != accountId || prior.Scope.SessionId != sessionId))
             throw new InvalidOperationException("Realtime projection checkpoint scope does not match.");

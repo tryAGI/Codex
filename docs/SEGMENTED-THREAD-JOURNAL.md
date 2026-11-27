@@ -78,6 +78,23 @@ The opaque checkpoint includes the exact consumed-prefix proof, reducer version,
 
 The checkpoint is an optional trusted read-side cache, not an authorization token or a replacement for authoritative history validation. Store its base64 state and SHA-256 together atomically; a host must protect the cache against malicious substitution, since a digest is not authentication. The API never installs the checkpoint in the authoritative store, emits notifications or dispatches effects. Corrupt/unsupported/oversized checkpoint data, changed scope or source prefix require explicit verified full replay. The encoded reducer state retains a separate 16 MiB decoded bound; no automatic persistence, eviction, or cross-account cache is introduced.
 
+## Stage 2d: automatic durable derived checkpoint cache
+
+Hosts can opt into automatic read/resume/save without introducing another authoritative journal:
+
+```csharp
+// These are dedicated cache namespaces, separate from native thread storage.
+var cache = new CodexPersistentRealtimeProjectionCache(cacheRootStore, cachePageStore, accountId);
+var result = await storage.ReadAndPersistRealtimeProjectionAsync(cache, threadId, sessionId,
+    cancellationToken: ct);
+```
+
+The adapter uses the existing atomic root CAS and immutable segment contracts. A domain-separated cache key binds account, thread and session. The host must provide separate root/page namespaces, authorization, encryption and retention; passing the identical source store instances is rejected. The bounded cache root records its own generation, source revision/document digest, processed ordinal and exact state digest plus immutable page references. Cache page size is at most 512 KiB, and the decoded checkpoint remains bounded to 16 MiB. A lost page-write receipt cannot publish an incomplete checkpoint. Unchanged pages of a verified retained cache may be reused.
+
+Each call applies a bounded batch from one captured source revision, then publishes the derived cache with an exact generation CAS. An idle read of the same fully consumed revision performs no cache writes. Competing readers cannot overwrite a newer cache generation; `CacheStatus.Conflict` reports that another reader won, while the returned projection remains explicitly bound to its captured source. An ambiguous I/O receipt is reconciled only by the exact candidate root; otherwise the original error remains visible and no write is replayed. A lower or divergent same-revision source cannot replace a newer cache. Missing/invalid derived payload or incompatible prefix can trigger one cold indexed replay; malformed cache roots are rejected. An immutable page with conflicting bytes cannot be overwritten to repair corruption; that requires host storage recovery.
+
+Cache generations do not change the native thread revision. The adapter performs no provider dispatch, notifications, admission, destructive garbage collection or automatic production migration. Each cache result may still be partial (`Projection.HasMore`); its checkpoint is not execution authority. The same retention obligations apply to cache pages reachable by an older in-flight reader.
+
 ## Next stages
 
-Move the host history/item and presentation queries to the bounded index/checkpoint APIs, add host-owned atomic cache persistence and invalidation, and support page-aware writes, compaction, forks and deletion. Only then retire the full-document ceiling for a page-aware store, keeping bounded pages, context windows, manifests and explicit recovery. The Advantage consumer migration remains outside this SDK change.
+Move host history/item and presentation queries to the bounded index/checkpoint APIs, and support page-aware writes, compaction, forks and reference-aware deletion. Only then retire the full-document ceiling for a page-aware store, keeping bounded pages, context windows, manifests and explicit recovery. The Advantage consumer migration remains outside this SDK change.

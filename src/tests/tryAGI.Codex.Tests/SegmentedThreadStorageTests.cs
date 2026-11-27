@@ -47,6 +47,11 @@ public sealed class SegmentedThreadStorageTests
             lock (gate) return rows[id].Clone();
         }
 
+        public JsonElement SingleSnapshot()
+        {
+            lock (gate) return rows.Values.Single().Clone();
+        }
+
         public void ReplaceForFaultInjection(Guid id, JsonElement raw)
         {
             lock (gate) rows[id] = raw.Clone();
@@ -776,6 +781,170 @@ public sealed class SegmentedThreadStorageTests
         await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadRealtimeProjectionAsync(thread.Id, "session", cancellationToken: Ct));
         await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadAsync(thread.Id, Ct));
         Assert.Equal(reads, pages.Reads);
+    }
+
+    [Fact]
+    public async Task PersistentCacheAutomaticallyResumesAndDoesNotWriteOnAnIdleRead()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var cacheRoots = new Roots();
+        var cachePages = new Pages();
+        CodexSegmentedThreadStorage Restart() => new(roots, pages, "account", true, true);
+        CodexPersistentRealtimeProjectionCache Cache() => new(cacheRoots, cachePages, "account");
+        var source = Restart();
+        var store = new CodexThreadStore(source, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_cache", "v3", "owner", Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "a",
+            """{"type":"input_transcript.added","item":{"text":"hello "}}""");
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "b",
+            """{"type":"input_transcript.added","item":{"text":"world"}}""");
+
+        var sourceWrites = roots.Publications;
+        var first = await source.ReadAndPersistRealtimeProjectionAsync(Cache(), thread.Id, "session", 1, Ct);
+        Assert.Equal(CodexRealtimeProjectionCacheStatus.Saved, first.CacheStatus);
+        Assert.Equal(1, first.Projection.ProcessedRecords);
+        Assert.True(first.Projection.HasMore);
+        Assert.Equal(sourceWrites, roots.Publications);
+        var second = await Restart().ReadAndPersistRealtimeProjectionAsync(Cache(), thread.Id, "session", 1, Ct);
+        Assert.Equal(CodexRealtimeProjectionCacheStatus.Saved, second.CacheStatus);
+        Assert.Equal(1, second.Projection.AppliedRecords);
+        Assert.Equal(2, second.Projection.ProcessedRecords);
+        Assert.False(second.Projection.HasMore);
+        Assert.Equal("hello world", Assert.Single(second.Projection.Frames).Text);
+        Assert.Equal(2, cacheRoots.Publications);
+
+        var puts = cachePages.PutCalls;
+        var idle = await Restart().ReadAndPersistRealtimeProjectionAsync(Cache(), thread.Id, "session", cancellationToken: Ct);
+        Assert.Equal(CodexRealtimeProjectionCacheStatus.Unchanged, idle.CacheStatus);
+        Assert.Equal(0, idle.Projection.AppliedRecords);
+        Assert.Equal(2, cacheRoots.Publications);
+        Assert.Equal(puts, cachePages.PutCalls);
+        Assert.Equal(sourceWrites, roots.Publications);
+
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "c",
+            """{"type":"turn.done","turn":{"role":"user","transcript":"hello world!"}}""");
+        var resumed = await Restart().ReadAndPersistRealtimeProjectionAsync(Cache(), thread.Id, "session", cancellationToken: Ct);
+        Assert.Equal(1, resumed.Projection.AppliedRecords);
+        Assert.Equal("hello world!", Assert.Single(resumed.Projection.Frames).Text);
+        Assert.Equal(thread.Revision, resumed.Projection.Revision);
+        Assert.Equal(3, cacheRoots.Publications);
+    }
+
+    [Fact]
+    public async Task PersistentCacheReconcilesLostRootReceiptAndNeverPublishesIncompletePages()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var cacheRoots = new Roots();
+        var cachePages = new Pages();
+        var source = new CodexSegmentedThreadStorage(roots, pages, "account", true, true);
+        var cache = new CodexPersistentRealtimeProjectionCache(cacheRoots, cachePages, "account");
+        var store = new CodexThreadStore(source, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_receipt", "v3", "owner", Ct);
+        cachePages.LoseNextPutReceipt = true;
+        await Assert.ThrowsAsync<IOException>(() => source.ReadAndPersistRealtimeProjectionAsync(cache, thread.Id,
+            "session", cancellationToken: Ct));
+        Assert.Equal(0, cacheRoots.Publications);
+        cacheRoots.LoseNextCommitReceipt = true;
+        var recovered = await source.ReadAndPersistRealtimeProjectionAsync(cache, thread.Id, "session", cancellationToken: Ct);
+        Assert.Equal(CodexRealtimeProjectionCacheStatus.Reconciled, recovered.CacheStatus);
+        Assert.Equal(1, cacheRoots.Publications);
+        var idle = await source.ReadAndPersistRealtimeProjectionAsync(cache, thread.Id, "session", cancellationToken: Ct);
+        Assert.Equal(CodexRealtimeProjectionCacheStatus.Unchanged, idle.CacheStatus);
+        Assert.Equal(1, cacheRoots.Publications);
+    }
+
+    [Fact]
+    public async Task PersistentCacheOlderReaderCannotOverwriteNewerProjection()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var cacheRoots = new Roots();
+        var cachePages = new Pages();
+        var source = new CodexSegmentedThreadStorage(roots, pages, "account", true, true);
+        var cache = new CodexPersistentRealtimeProjectionCache(cacheRoots, cachePages, "account");
+        var store = new CodexThreadStore(source, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_race", "v3", "owner", Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "a",
+            """{"type":"input_transcript.added","item":{"text":"first"}}""");
+        var oldRevision = thread.Revision;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        cacheRoots.BeforeCas = async ct =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                entered.TrySetResult();
+                await release.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+            }
+        };
+        var older = source.ReadAndPersistRealtimeProjectionAsync(cache, thread.Id, "session", cancellationToken: Ct);
+        CodexCachedRealtimeProjection newer;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+            thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "b",
+                """{"type":"input_transcript.added","item":{"text":" second"}}""");
+            newer = await source.ReadAndPersistRealtimeProjectionAsync(cache, thread.Id, "session", cancellationToken: Ct);
+            Assert.Equal(CodexRealtimeProjectionCacheStatus.Saved, newer.CacheStatus);
+        }
+        finally { release.TrySetResult(); }
+        var lost = await older;
+        Assert.Equal(CodexRealtimeProjectionCacheStatus.Conflict, lost.CacheStatus);
+        Assert.Equal(oldRevision, lost.Projection.Revision);
+        Assert.Equal(1, cacheRoots.Publications);
+        var current = await source.ReadAndPersistRealtimeProjectionAsync(cache, thread.Id, "session", cancellationToken: Ct);
+        Assert.Equal(CodexRealtimeProjectionCacheStatus.Unchanged, current.CacheStatus);
+        Assert.Equal(newer.Projection.Revision, current.Projection.Revision);
+        Assert.Equal("first second", Assert.Single(current.Projection.Frames).Text);
+        Assert.Equal(1, cacheRoots.Publications);
+    }
+
+    [Fact]
+    public async Task PersistentCacheRebuildsMissingPayloadButRejectsRollbackAndWrongNamespaces()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var cacheRoots = new Roots();
+        var cachePages = new Pages();
+        var source = new CodexSegmentedThreadStorage(roots, pages, "account", true, true);
+        var cache = new CodexPersistentRealtimeProjectionCache(cacheRoots, cachePages, "account");
+        var store = new CodexThreadStore(source, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_rebuild", "v3", "owner", Ct);
+        var oldRoot = roots.Snapshot(thread.Id);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "a",
+            """{"type":"input_transcript.added","item":{"text":"recover"}}""");
+        await source.ReadAndPersistRealtimeProjectionAsync(cache, thread.Id, "session", cancellationToken: Ct);
+        var saved = cacheRoots.SingleSnapshot();
+        cachePages.Damage(saved.GetProperty("id").GetGuid(), Hashes(saved)[0], remove: true);
+        var rebuilt = await source.ReadAndPersistRealtimeProjectionAsync(cache, thread.Id, "session", cancellationToken: Ct);
+        Assert.Equal(CodexRealtimeProjectionCacheStatus.Saved, rebuilt.CacheStatus);
+        Assert.Equal(1, rebuilt.Projection.AppliedRecords);
+        Assert.Equal("recover", Assert.Single(rebuilt.Projection.Frames).Text);
+        Assert.Equal(2, cacheRoots.Publications);
+
+        roots.ReplaceForFaultInjection(thread.Id, oldRoot);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => source.ReadAndPersistRealtimeProjectionAsync(cache,
+            thread.Id, "session", cancellationToken: Ct));
+        var wrongAccount = new CodexPersistentRealtimeProjectionCache(cacheRoots, cachePages, "other-account");
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => source.ReadAndPersistRealtimeProjectionAsync(wrongAccount,
+            thread.Id, "session", cancellationToken: Ct));
+        var sharedRoots = new CodexPersistentRealtimeProjectionCache(roots, cachePages, "account");
+        await Assert.ThrowsAsync<ArgumentException>(() => source.ReadAndPersistRealtimeProjectionAsync(sharedRoots,
+            thread.Id, "session", cancellationToken: Ct));
+        Assert.Equal(2, cacheRoots.Publications);
     }
 
     [Fact]
