@@ -94,6 +94,107 @@ public sealed class ThreadAgentTests
         new(store, auth, budget, clientFactory: (credentials, observer) => new(credentials, handler: server.Handler(), usageObserver: observer));
     private static Task<CodexToolOutput> NoTools(CodexToolCall call, CancellationToken ct) => throw new InvalidOperationException("Unexpected tool.");
 
+    private sealed class ArtifactMcpTransport(Func<JsonElement, CancellationToken, Task> beforeTool, bool isError) : ICodexMcpTransport
+    {
+        private readonly System.Threading.Channels.Channel<JsonElement> incoming =
+            System.Threading.Channels.Channel.CreateUnbounded<JsonElement>();
+        internal int ToolCalls;
+        public async ValueTask SendAsync(JsonElement message, CancellationToken ct)
+        {
+            var method = message.GetProperty("method").GetString();
+            if (!message.TryGetProperty("id", out var id)) return;
+            JsonNode? result;
+            if (method == "initialize")
+                result = JsonNode.Parse("""{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"test","version":"1"}}""");
+            else
+            {
+                Assert.Equal("tools/call", method);
+                Interlocked.Increment(ref ToolCalls);
+                await beforeTool(message.GetProperty("params"), ct);
+                result = new JsonObject
+                {
+                    ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "actual result" }),
+                    ["isError"] = isError, ["_meta"] = new JsonObject { ["private"] = "never publish this automatically" },
+                };
+            }
+            await incoming.Writer.WriteAsync(Json(new JsonObject
+            {
+                ["jsonrpc"] = "2.0", ["id"] = JsonNode.Parse(id.GetRawText()), ["result"] = result,
+            }.ToJsonString()), ct);
+        }
+        public async ValueTask<JsonElement?> ReceiveAsync(CancellationToken ct) =>
+            await incoming.Reader.WaitToReadAsync(ct) ? await incoming.Reader.ReadAsync(ct) : null;
+        public ValueTask DisposeAsync() { incoming.Writer.TryComplete(); return ValueTask.CompletedTask; }
+    }
+
+    [Theory]
+    [InlineData("codex_app", false)]
+    [InlineData("other_server", false)]
+    [InlineData("codex_app", true)]
+    public async Task ActualNativeMcpInvocationProducesDurableBackingArtifactWithoutDuplicateDispatch(string serverName, bool isError)
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "rtc_mcp", "v3", "voice-owner", Ct);
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "voice-owner", Guid.NewGuid(), Ct);
+        var turn = Guid.NewGuid();
+        server.Replies.Enqueue(Call("mcp-call", "key")); server.Replies.Enqueue(Text("done"));
+        var transport = new ArtifactMcpTransport(async (parameters, ct) =>
+        {
+            Assert.Equal("remote_read", parameters.GetProperty("name").GetString());
+            Assert.Equal("key", parameters.GetProperty("arguments").GetProperty("key").GetString());
+            var snapshot = await store.ReadAsync(thread.Id, ct);
+            var backing = Assert.Single(snapshot.Turns.Single().NativeBackingArtifacts!);
+            Assert.Equal(CodexNativeArtifactStage.Started, backing.Stage);
+            Assert.Equal("mcp-call", backing.SourceDispatchId);
+            Assert.Equal(serverName, backing.Item.GetProperty("server").GetString());
+            Assert.Equal("dispatching", Assert.Single(snapshot.Turns.Single().Dispatches, d => d.CallId == "mcp-call").State);
+        }, isError);
+        var authorized = 0;
+        await using var pool = new CodexMcpConnectionPool(async (_, ct) =>
+        {
+            var client = new CodexMcpClient(transport, (request, _) =>
+            {
+                if (request.Method == "tools/call") Interlocked.Increment(ref authorized);
+                return ValueTask.FromResult(true);
+            });
+            await client.InitializeAsync("test", "1", ct);
+            return client;
+        });
+        var scope = new CodexMcpConnectionScope("account", "connection", serverName, thread.Id.ToString());
+        await pool.ConfigureAsync(new(scope, 1, new string('a', 64)), Ct);
+        var executor = new CodexNativeMcpToolExecutor(pool, new(new(null, "read"), scope, 1, "remote_read"),
+            (result, _) => ValueTask.FromResult(new CodexNativeMcpToolProjection(new("actual result"), Json(new JsonObject
+            {
+                ["content"] = JsonNode.Parse(result.GetProperty("content").GetRawText()),
+            }.ToJsonString()))));
+        CodexNativeToolArtifactContext? observation = null;
+        var run = await Agent(store, auth, budget, server).RunAsync(thread.Id, thread.Revision, turn, "owner",
+            Options(thread.Id, turn), [Input("read")], async (call, ct) =>
+            {
+                observation = call.NativeArtifacts;
+                Assert.NotNull(observation);
+                var result = await executor.ExecuteAsync(call, ct);
+                await Assert.ThrowsAsync<InvalidOperationException>(() => executor.ExecuteAsync(call, ct));
+                return result;
+            }, cancellationToken: Ct);
+        Assert.Equal(1, transport.ToolCalls);
+        Assert.Equal(1, authorized);
+        var artifact = Assert.Single(run.Thread.Turns.Single().NativeBackingArtifacts!);
+        Assert.Equal(CodexNativeArtifactStage.Completed, artifact.Stage);
+        Assert.Equal(isError ? "failed" : "completed", artifact.Item.GetProperty("status").GetString());
+        Assert.False(artifact.Item.GetProperty("result").TryGetProperty("_meta", out _));
+        Assert.Equal("actual result", artifact.Item.GetProperty("result").GetProperty("content")[0].GetProperty("text").GetString());
+        var promotions = CodexThreadStore.ProjectRealtimeItems(run.Thread)
+            .Where(item => (string?)item["type"] == "bemItemPromoted").ToArray();
+        Assert.Equal(serverName == "codex_app" && !isError ? 1 : 0, promotions.Length);
+        if (promotions.Length != 0) Assert.Equal(artifact.ItemId, (string?)promotions[0]["item_id"]);
+        Assert.NotNull(observation);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => observation.ObserveAsync(
+            CodexNativeArtifactStage.Completed, artifact.Item, Ct));
+        Assert.Equal("completed", run.Thread.Turns.Single().Status);
+        Assert.Equal(2, server.Requests.Count);
+    }
+
     [Fact]
     public async Task NativeStreamingArtifactIsQueryableBeforeTerminalOutputAndPromotedOnlyOnce()
     {

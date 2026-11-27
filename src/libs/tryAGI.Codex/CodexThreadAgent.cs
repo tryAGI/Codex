@@ -664,19 +664,43 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         {
             var request = Json(new JsonObject { ["kind"] = call.Kind.ToString(), ["name"] = call.Name,
                 ["namespace"] = call.Namespace, ["input"] = call.Input });
+            CodexNativeToolArtifactContext? artifacts = null;
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 var admitted = await JournalAsync(doc => store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, call.Id,
                     "tool", request, ct), result => result.Thread, ct).ConfigureAwait(false);
                 if (!admitted.Admitted) throw new CodexProtocolException("Tool identity already dispatched; replay refused.");
+                // Do not retain raw public artifact content behind an explicit host redaction
+                // projection. The existing model-output callback remains available unchanged.
+                if (projection is null)
+                {
+                    var itemId = CodexThreadStore.RealtimeTimeline(Turn, true).Select((item, index) =>
+                        (Item: item, Id: CodexRealtimeProtocol.Text(item, "id") ?? Turn.Id + ":" + index))
+                        .SingleOrDefault(x => CodexRealtimeProtocol.Text(x.Item, "type") is "function_call" or "custom_tool_call" &&
+                            CodexRealtimeProtocol.Text(x.Item, "call_id") == call.Id).Id;
+                    if (itemId is not null)
+                        artifacts = new(Current.Id, turnId, Current.AccountId, call.Id, itemId,
+                            async (stage, item, token) =>
+                            {
+                                await gate.WaitAsync(token).ConfigureAwait(false);
+                                try
+                                {
+                                    await JournalAsync(doc => store.ObserveNativeBackingArtifactAsync(doc.Id, doc.Revision,
+                                        turnId, owner, call.Id, stage, item, token), result => result.Thread, token).ConfigureAwait(false);
+                                }
+                                finally { gate.Release(); }
+                            });
+                }
             }
             finally { gate.Release(); }
             var entered = false;
             async Task<CodexToolOutput> Invoke(CancellationToken token)
             {
                 entered = true;
-                var output = await execute(call, token).ConfigureAwait(false);
+                CodexToolOutput output;
+                try { output = await execute(artifacts is null ? call : call with { NativeArtifacts = artifacts }, token).ConfigureAwait(false); }
+                finally { if (artifacts is not null) await artifacts.CloseAsync().ConfigureAwait(false); }
                 var receipt = Json(new JsonObject { ["type"] = call.Kind == CodexToolCallKind.Custom ? "custom_tool_call_output" : "function_call_output",
                     ["call_id"] = call.Id, ["output"] = output.Content() });
                 Remember(call.Id, receipt);
@@ -688,6 +712,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             {
                 // Durable journal admission is not physical callback dispatch. An interruption
                 // winning this boundary must not start the callback after its cancellation.
+                if (artifacts is not null) await artifacts.CloseAsync().ConfigureAwait(false);
                 await SettleAsync(call.Id, true, CancellationToken.None).ConfigureAwait(false);
                 throw;
             }

@@ -25,6 +25,11 @@ public sealed record CodexToolCall(string Id, string Name, string Input, CodexTo
     /// <summary>Item status reported by the provider.</summary>
     public string? Status { get; init; }
 
+    /// <summary>Observation scope supplied only to an admitted native thread executor.
+    /// Never serialized into provider requests or model-facing tool definitions.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public CodexNativeToolArtifactContext? NativeArtifacts { get; internal init; }
+
     internal CodexFunctionCall Function() => Kind == CodexToolCallKind.Function
         ? new(Id, Name, Input) { Namespace = Namespace }
         : throw new CodexProtocolException("The function-only executor cannot dispatch a custom tool.");
