@@ -128,6 +128,56 @@ public sealed class ThreadGoalTests
     }
 
     [Fact]
+    public async Task GoalEmptyContinuationCircuitBreakerPersistsAndExplicitRestartResetsIt()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work"}""");
+        var current = await f.Store.ReadAsync(thread.Id, Ct);
+        var goalId = current.Goal!.Id;
+        var context = Json("""{"role":"user","content":[{"type":"input_text","text":"goal context"}]}""");
+        for (var count = 1; count <= 3; count++)
+        {
+            var id = Guid.NewGuid();
+            var start = await f.Store.StartTurnAsync(thread.Id, current.Revision, id, "owner", [context],
+                cancellationToken: Ct, clientUserMessageIds: [null], turnTrigger: "native:goal", goalContinuationId: goalId);
+            current = await f.Store.CompleteAsync(thread.Id, start.Revision, id, "owner", "completed", [], Ct);
+            Assert.Equal(count, current.Goal!.EmptyContinuationCount);
+            Assert.Equal(count == 3 ? "blocked" : "active", current.Goal.Status);
+            current = await f.Reopen().ReadAsync(thread.Id, Ct);
+        }
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => f.Store.StartTurnAsync(thread.Id, current.Revision,
+            Guid.NewGuid(), "owner", [context], cancellationToken: Ct, clientUserMessageIds: [null],
+            turnTrigger: "native:goal", goalContinuationId: goalId));
+        await Goal(host, thread.Id, """{"status":"active","origin":"user"}""");
+        current = await f.Store.ReadAsync(thread.Id, Ct);
+        Assert.Null(current.Goal!.EmptyContinuationCount);
+        var explicitTurn = Guid.NewGuid();
+        current = await f.Store.StartTurnAsync(thread.Id, current.Revision, explicitTurn, "owner", [context], cancellationToken: Ct);
+        Assert.Null(current.Turns[^1].GoalContinuation);
+    }
+
+    [Fact]
+    public async Task GoalContinuationRejectsNewDispatchAfterPauseOrBudgetLimit()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work","tokenBudget":3}""");
+        var current = await f.Store.ReadAsync(thread.Id, Ct);
+        var goalId = current.Goal!.Id;
+        var id = Guid.NewGuid();
+        var context = Json("""{"role":"user","content":[{"type":"input_text","text":"goal context"}]}""");
+        var started = await f.Store.StartTurnAsync(thread.Id, current.Revision, id, "owner", [context],
+            cancellationToken: Ct, clientUserMessageIds: [null], turnTrigger: "native:goal", goalContinuationId: goalId);
+        var admitted = await f.Store.AdmitAsync(thread.Id, started.Revision, id, "owner", "request", "inference", Json("{}"), Ct);
+        current = await f.Store.SettleAsync(thread.Id, admitted.Thread.Revision, id, "owner", "request", "succeeded",
+            Json("""{"id":"response","usage":{"input_tokens":2,"output_tokens":1}}"""), Ct);
+        Assert.Equal("budgetLimited", current.Goal!.Status);
+        foreach (var kind in new[] { "inference", "tool" })
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                f.Store.AdmitAsync(thread.Id, current.Revision, id, "owner", "late-" + kind, kind, Json("{}"), Ct));
+        Assert.Equal(current.Revision, (await f.Store.ReadAsync(thread.Id, Ct)).Revision);
+    }
+
+    [Fact]
     public async Task GoalInferenceUsageCommitsWithTheOriginalDispatchAndCountsOnlyUncachedTokens()
     {
         var f = new Fixture(); var thread = await f.Create(); var host = f.Host();

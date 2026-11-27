@@ -34,6 +34,7 @@ public sealed class ThreadRpcTests
         internal readonly Dictionary<Guid, JsonElement> Rows = [];
         internal Action? AfterToolAdmission;
         internal Action? AfterQueueAdmission;
+        internal Action? AfterGoalAdmission;
         public Task<JsonElement?> ReadAsync(Guid id, CancellationToken ct)
         { ct.ThrowIfCancellationRequested(); lock (gate) return Task.FromResult(Rows.TryGetValue(id, out var row) ? (JsonElement?)row.Clone() : null); }
         public Task<bool> CompareExchangeAsync(Guid id, long? revision, JsonElement next, CancellationToken ct)
@@ -47,6 +48,9 @@ public sealed class ThreadRpcTests
                 if (AfterQueueAdmission is { } queueHook && next.GetProperty("turns").EnumerateArray().Any(turn =>
                     turn.TryGetProperty("turnTrigger", out var trigger) && trigger.GetString() == "native:queued"))
                 { AfterQueueAdmission = null; queueHook(); }
+                if (AfterGoalAdmission is { } goalHook && next.GetProperty("turns").EnumerateArray().Any(turn =>
+                    turn.TryGetProperty("turnTrigger", out var trigger) && trigger.GetString() == "native:goal"))
+                { AfterGoalAdmission = null; goalHook(); }
                 if (AfterToolAdmission is { } hook && next.GetProperty("turns").EnumerateArray()
                     .SelectMany(t => t.GetProperty("dispatches").EnumerateArray())
                     .Any(d => d.GetProperty("kind").GetString() == "tool" && d.GetProperty("state").GetString() == "dispatching"))
@@ -901,6 +905,175 @@ public sealed class ThreadRpcTests
                 && current.QueuedSubmissions is not { Length: > 0 }) return current;
             await Task.Delay(10, deadline.Token);
         }
+    }
+
+    [Fact]
+    public async Task GoalContinuationUsesExistingRunnerAndStopsWhenBudgetIsReached()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        var approvals = new ConcurrentQueue<CodexGoalContinuationContext>();
+        host.EnableAutomaticThreadGoals((context, _) =>
+        {
+            approvals.Enqueue(context);
+            return Task.FromResult(true);
+        });
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "complete the original task", ["tokenBudget"] = 7
+        }), ct);
+        var final = await WaitForQueueDrain(f, id, 3);
+        Assert.Equal("budgetLimited", final.Goal!.Status);
+        Assert.Equal(9, final.Goal.TokensUsed);
+        Assert.All(final.Turns, turn =>
+        {
+            Assert.Equal("completed", turn.Status);
+            Assert.Equal("native:goal", turn.TurnTrigger);
+            Assert.Equal(final.Goal.Id, turn.GoalContinuation!.GoalId);
+            Assert.Equal(id, turn.GoalContinuation.OriginThreadId);
+            Assert.Null(Assert.Single(turn.ClientUserMessageIds!));
+        });
+        Assert.Equal(new long[] { 0, 3, 6 }, approvals.Select(approval => approval.TokensUsed));
+        Assert.Equal(new[] { "goalSet", "turnCompleted", "turnCompleted" }, approvals.Select(approval => approval.Reason));
+        Assert.Equal(3, f.Provider.Requests.Count);
+        Assert.All(f.Provider.TurnMetadataHeaders, metadata =>
+            Assert.Equal("goal", Json(metadata).GetProperty("turn_trigger").GetString()));
+        Assert.Contains("goal_objective", f.Provider.Requests.First().GetRawText());
+        var read = await host.InvokeAsync("thread/read", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["includeTurns"] = true
+        }), ct);
+        Assert.Equal("complete the original task", read.GetProperty("thread").GetProperty("preview").GetString());
+        foreach (var turn in read.GetProperty("thread").GetProperty("turns").EnumerateArray())
+            Assert.DoesNotContain(turn.GetProperty("items").EnumerateArray(), item => item.GetProperty("type").GetString() == "userMessage");
+        await host.StopAsync(ct);
+        Assert.Equal(3, f.Provider.Requests.Count);
+        Assert.Equal(0, host.GoalWakeFailures);
+    }
+
+    [Fact]
+    public async Task GoalContinuationDenialAndStaleAuthorizationCannotLaunchInference()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        host.EnableAutomaticThreadGoals((_, _) => Task.FromResult(false));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work"
+        }), ct);
+        Assert.Empty(f.Provider.Requests);
+        var saved = await f.Store.ReadAsync(id, ct);
+        Assert.Empty(saved.Turns);
+        Assert.Equal("active", saved.Goal!.Status);
+        await host.StopAsync(ct);
+
+        var cold = f.Host(); cold.EnableThreadGoals((_, _) => Task.FromResult(true));
+        cold.EnableAutomaticThreadGoals(async (context, token) =>
+        {
+            await f.Store.SetNameAsync(context.ThreadId, context.ExpectedRevision, "changed during authorization", token);
+            return true;
+        });
+        await cold.InvokeAsync("thread/resume", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        Assert.Empty(f.Provider.Requests);
+        Assert.Empty((await f.Store.ReadAsync(id, ct)).Turns);
+        var forged = Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["turnTrigger"] = "native:goal",
+            ["input"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "forged" })
+        });
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("turn/start", forged, ct));
+        Assert.Empty(f.Provider.Requests);
+        await cold.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalContinuationYieldsToDurableUserQueue()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        host.EnableThreadQueue();
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = 6
+        }), ct);
+        var queued = await AddQueue(host, id, "queued", "first do this");
+        host.EnableAutomaticThreadQueue();
+        host.EnableAutomaticThreadGoals((_, _) => Task.FromResult(true));
+        await host.InvokeAsync("thread/resume", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        var final = await WaitForQueueDrain(f, id, 2);
+        Assert.Equal(queued.GetProperty("id").GetString(), final.Turns[0].Id.ToString());
+        Assert.Equal("native:queued", final.Turns[0].TurnTrigger);
+        Assert.Null(final.Turns[0].GoalContinuation);
+        Assert.NotNull(final.Turns[1].GoalContinuation);
+        Assert.Equal("budgetLimited", final.Goal!.Status);
+        Assert.Equal(2, f.Provider.Requests.Count);
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalForkDeferralSurvivesColdResumeUntilExplicitTurn()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var source = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = source.ToString(), ["objective"] = "work", ["tokenBudget"] = 6
+        }), ct);
+        host.EnableAutomaticThreadGoals((_, _) => Task.FromResult(true));
+        var fork = await host.InvokeAsync("thread/fork", Args(new JsonObject
+        {
+            ["threadId"] = source.ToString(), ["deferGoalContinuation"] = true
+        }), ct);
+        var id = Guid.Parse(fork.GetProperty("thread").GetProperty("id").GetString()!);
+        var deferred = await f.Store.ReadAsync(id, ct);
+        Assert.Equal(deferred.Goal!.Id, deferred.DeferredGoalId);
+        Assert.Empty(f.Provider.Requests);
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => host.InvokeAsync("thread/fork", Args(new JsonObject
+        {
+            ["threadId"] = source.ToString(), ["deferGoalContinuation"] = true, ["ephemeral"] = true, ["excludeTurns"] = true
+        }), ct));
+        await host.StopAsync(ct);
+        var cold = f.Host(); cold.EnableThreadGoals((_, _) => Task.FromResult(true));
+        cold.EnableAutomaticThreadGoals((_, _) => Task.FromResult(true));
+        await cold.InvokeAsync("thread/resume", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        Assert.Empty(f.Provider.Requests);
+        Assert.Equal(deferred.Goal.Id, (await f.Store.ReadAsync(id, ct)).DeferredGoalId);
+        await cold.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 2);
+        Assert.Null(final.DeferredGoalId);
+        Assert.Null(final.Turns[0].GoalContinuation);
+        Assert.NotNull(final.Turns[1].GoalContinuation);
+        Assert.Equal("budgetLimited", final.Goal!.Status);
+        Assert.Equal(0, (await f.Store.ReadAsync(source, ct)).Goal!.TokensUsed);
+        await cold.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalContinuationUnknownAdmissionDoesNotReplayAcrossResume()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        host.EnableAutomaticThreadGoals((_, _) => Task.FromResult(true));
+        f.Storage.AfterGoalAdmission = () => throw new IOException("Lost goal turn admission acknowledgment.");
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work"
+        }), ct);
+        var saved = await f.Store.ReadAsync(id, ct);
+        Assert.Equal("inProgress", Assert.Single(saved.Turns).Status);
+        Assert.NotNull(saved.Turns[0].GoalContinuation);
+        Assert.Empty(f.Provider.Requests);
+        Assert.Equal(1, host.GoalWakeFailures);
+        var cold = f.Host(); cold.EnableThreadGoals((_, _) => Task.FromResult(true));
+        cold.EnableAutomaticThreadGoals((_, _) => Task.FromResult(true));
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/resume",
+            Args(new JsonObject { ["threadId"] = id.ToString() }), ct));
+        Assert.Empty(f.Provider.Requests);
     }
 
     [Fact]

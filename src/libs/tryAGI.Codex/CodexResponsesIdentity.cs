@@ -35,6 +35,7 @@ public sealed record CodexResponsesIdentity(string SessionId, string ThreadId, s
     // Only the authorized queue admission path can populate these per-turn fields.
     internal JsonElement? QueuedClientMetadata { get; init; }
     internal bool QueuedTurn { get; init; }
+    internal bool GoalTurn { get; init; }
 
     internal void Validate()
     {
@@ -74,6 +75,7 @@ public sealed record CodexResponsesIdentity(string SessionId, string ThreadId, s
         if (ParentTurnId is not null) metadata["parent_turn_id"] = ParentTurnId;
         if (RootTurnId is not null) metadata["root_turn_id"] = RootTurnId;
         if (QueuedTurn) metadata["turn_trigger"] = "queue";
+        else if (GoalTurn) metadata["turn_trigger"] = "goal";
         if (QueuedClientMetadata is { } extra)
             foreach (var property in extra.EnumerateObject())
                 if (!metadata.ContainsKey(property.Name)) metadata[property.Name] = property.Value.GetString();

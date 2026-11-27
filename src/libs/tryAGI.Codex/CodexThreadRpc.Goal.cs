@@ -92,17 +92,21 @@ public sealed partial class CodexThreadRpc
         {
             ["threadId"] = id.ToString(), ["turnId"] = null, ["goal"] = Goal(id, updated.Goal)
         }).ConfigureAwait(false);
+        if (updated.Goal?.Status == "active")
+        {
+            await TryWakeQueueAsync(id).ConfigureAwait(false);
+            await TryWakeGoalAsync(id, "goalSet").ConfigureAwait(false);
+        }
         return Element(new JsonObject { ["goal"] = Goal(id, updated.Goal) });
     }
 
     private async Task NotifyTerminalGoalUsageAsync(CodexThreadDocument thread, CodexStoredTurn turn)
     {
-        if (Volatile.Read(ref goalAuthority) is null || thread.Goal is not { UsageReceipts: { Length: > 0 } receipts } goal)
-            return;
-        var accounted = receipts.Select(receipt => receipt.Id).ToHashSet();
-        if (!turn.Dispatches.Any(dispatch => dispatch.GoalInference is { } binding
-            && binding.OriginThreadId == thread.Id && binding.GoalId == goal.Id && accounted.Contains(binding.UsageId)))
-            return;
+        if (Volatile.Read(ref goalAuthority) is null || thread.Goal is not { } goal) return;
+        var accounted = (goal.UsageReceipts ?? []).Select(receipt => receipt.Id).ToHashSet();
+        var continuation = turn.GoalContinuation is { } auto && auto.OriginThreadId == thread.Id && auto.GoalId == goal.Id;
+        if (!continuation && !turn.Dispatches.Any(dispatch => dispatch.GoalInference is { } binding
+            && binding.OriginThreadId == thread.Id && binding.GoalId == goal.Id && accounted.Contains(binding.UsageId))) return;
         // The result was committed together with the dispatch and is available without another read.
         await EmitAsync("thread/goal/updated", new JsonObject
         {

@@ -83,6 +83,9 @@ public sealed record CodexStoredTurn(
     [property: JsonRequired] CodexStoredDispatch[] Dispatches,
     DateTimeOffset? CompletedAt = null, string?[]? ClientUserMessageIds = null, string? TurnTrigger = null) : IJsonOnDeserialized
 {
+    /// <summary>Host-authorized automatic goal continuation, not a user-originated message.</summary>
+    public CodexGoalContinuationBinding? GoalContinuation { get; init; }
+
     /// <summary>Durable steering inputs subsequently interleaved with model output in the turn timeline.</summary>
     public int[]? RealtimeSteeringInputIndices { get; init; }
 

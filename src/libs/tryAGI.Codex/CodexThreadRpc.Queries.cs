@@ -179,9 +179,10 @@ public sealed partial class CodexThreadRpc
 
     private static string Preview(CodexThreadDocument thread)
     {
-        var text = string.Concat(thread.Turns.Take(1).SelectMany(t => t.Input)
+        var text = string.Concat(thread.Turns.Take(1).SelectMany(t => t.GoalContinuation is null ? t.Input : t.Input.Skip(1))
             .Select(x => x.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.Array
                 ? string.Concat(c.EnumerateArray().Select(y => Text(y, "text") ?? "")) : "")).Trim();
+        if (text.Length == 0 && thread.Goal is { } goal) text = goal.Objective;
         return text[..Math.Min(200, text.Length)];
     }
 
@@ -218,6 +219,8 @@ public sealed partial class CodexThreadRpc
             while (nativeIndex < separate.Length && initialInputCount + separate[nativeIndex].OutputBoundary <= index)
                 result.Add(CodexThreadStore.NativeArtifactItem(separate[nativeIndex++]));
             var id = Text(item, "id") ?? turn.Id + ":" + index; index++;
+            // The first input of a durably bound goal turn is host context, not a user message.
+            if (index == 1 && turn.GoalContinuation is not null) { userIndex++; continue; }
             if (overrides.TryGetValue(id, out var observed))
             {
                 result.Add(CodexThreadStore.NativeArtifactItem(observed));

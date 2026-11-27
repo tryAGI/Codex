@@ -190,33 +190,41 @@ public sealed partial class CodexThreadRpc(
         }
         finally { admission.Release(); }
         await TryWakeQueueAsync(thread.Id).ConfigureAwait(false);
+        await TryWakeGoalAsync(thread.Id, "threadResume").ConfigureAwait(false);
         return response;
     }
 
     private async Task<JsonElement> ForkAsync(JsonElement p, CancellationToken ct)
     {
         string[] fields = ["threadId", "lastTurnId", "beforeTurnId", "excludeTurns", "model", "modelProvider", "cwd",
-            "baseInstructions", "developerInstructions", "approvalPolicy", "sandbox", "approvalsReviewer", "serviceTier", "config", "ephemeral", "threadSource"];
+            "baseInstructions", "developerInstructions", "approvalPolicy", "sandbox", "approvalsReviewer", "serviceTier", "config", "ephemeral", "threadSource", "deferGoalContinuation"];
         ValidateFields(p, fields);
         if (p.TryGetProperty("ephemeral", out var transient) && transient.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
             throw Invalid("Fork ephemeral must be a boolean when present.");
         var source = await store.ReadAsync(Id(p, "threadId"), ct).ConfigureAwait(false);
         if (Flag(source.Settings, "ephemeral")) throw Invalid("Ephemeral threads have no stored fork source.");
+        var deferGoal = Flag(p, "deferGoalContinuation");
+        if (deferGoal && Flag(p, "ephemeral")) throw Invalid("deferGoalContinuation cannot be combined with ephemeral.");
         if (Flag(p, "ephemeral") && !Flag(p, "excludeTurns")) throw Invalid("Ephemeral paginated forks require excludeTurns.");
         var settingsNode = Object(await ResolveLifecycleAsync("thread/fork", p, source.Settings, fields, source.Id, ct).ConfigureAwait(false));
         settingsNode["ephemeral"] = Flag(p, "ephemeral");
         var settings = Element(settingsNode);
+        JsonElement response;
+        Guid destination;
         await admission.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (Volatile.Read(ref stopping)) throw new CodexThreadRpcException(-32010, "Native thread host is draining.");
             RequireNoArchiveTransition(source.Id);
             var next = await store.ForkAsync(source.Id, source.Revision, Guid.CreateVersion7(),
-                OptionalId(p, "lastTurnId"), OptionalId(p, "beforeTurnId"), ct, settings).ConfigureAwait(false);
+                OptionalId(p, "lastTurnId"), OptionalId(p, "beforeTurnId"), ct, settings, deferGoal).ConfigureAwait(false);
             loaded.TryAdd(next.Id, 0);
-            return Lifecycle(next, !Flag(p, "excludeTurns"));
+            destination = next.Id;
+            response = Lifecycle(next, !Flag(p, "excludeTurns"));
         }
         finally { admission.Release(); }
+        await TryWakeGoalAsync(destination, "threadFork").ConfigureAwait(false);
+        return response;
     }
 
     private JsonElement Lifecycle(CodexThreadDocument thread, bool includeTurns)

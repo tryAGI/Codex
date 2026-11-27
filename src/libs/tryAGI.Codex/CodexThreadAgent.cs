@@ -172,7 +172,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         if (handoff is null)
             started = await store.StartTurnAsync(threadId, expectedRevision, turnId, ownerId, persistedInput,
                 identity.RootTurnId is { } root ? Guid.Parse(root) : turnId, cancellationToken,
-                control?.ClientIds, control?.TurnTrigger).ConfigureAwait(false);
+                control?.ClientIds, control?.TurnTrigger, control?.GoalContinuationId).ConfigureAwait(false);
         else
         {
             var accepted = await store.AdmitRealtimeHandoffAsync(threadId, expectedRevision, handoff.SessionId,

@@ -27,16 +27,18 @@ public sealed class CodexAgentControl : IDisposable
     private readonly List<string?> clientIds = [];
     private bool inputInitialized;
     internal string? TurnTrigger { get; private set; }
+    internal Guid? GoalContinuationId { get; private set; }
     internal string?[] ClientIds { get { lock (gate) return clientIds.ToArray(); } }
 
-    internal void InitializeInput(IReadOnlyList<JsonElement> items, string? clientId = null, string? turnTrigger = null)
+    internal void InitializeInput(IReadOnlyList<JsonElement> items, string? clientId = null, string? turnTrigger = null,
+        Guid? goalContinuationId = null)
     {
         lock (gate)
         {
             if (inputInitialized) return;
             foreach (var item in items)
                 if (IsUser(item)) clientIds.Add(clientId);
-            TurnTrigger = turnTrigger; inputInitialized = true;
+            TurnTrigger = turnTrigger; GoalContinuationId = goalContinuationId; inputInitialized = true;
         }
     }
     private static bool IsUser(JsonElement item) => item.TryGetProperty("role", out var role) && role.GetString() == "user";

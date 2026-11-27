@@ -43,14 +43,17 @@ public sealed partial class CodexThreadRpc
     public long NotificationFailures => Interlocked.Read(ref notificationFailures);
 
     private async Task<JsonElement> StartAsync(JsonElement p, CancellationToken ct, Guid? queuedId = null,
-        long? queueRevision = null, JsonElement? queuedMetadata = null)
+        long? queueRevision = null, JsonElement? queuedMetadata = null,
+        CodexStoredThreadGoal? goalContinuation = null, long? goalRevision = null)
     {
         ValidateFields(p, ["threadId", "input", "rootTurnId", "parentTurnId", "model", "effort", "summary", "outputSchema", "serviceTier", "serviceTierForTurn", "personality",
             "cwd", "approvalPolicy", "approvalsReviewer", "sandboxPolicy", "clientUserMessageId", "disabledPluginIds", "toolOutput", "turnTrigger"]);
-        var input = Input(p);
+        var input = goalContinuation is null ? Input(p) : GoalContinuationInput(goalContinuation);
         var clientId = InputIdentity(p, "clientUserMessageId");
-        var trigger = queuedId is null ? InputIdentity(p, "turnTrigger") : CodexThreadStore.QueuedTurnTrigger;
-        if (queuedId is null && trigger == CodexThreadStore.QueuedTurnTrigger) throw Invalid("Reserved native queue trigger.");
+        var trigger = goalContinuation is not null ? CodexThreadStore.GoalTurnTrigger
+            : queuedId is not null ? CodexThreadStore.QueuedTurnTrigger : InputIdentity(p, "turnTrigger");
+        if (queuedId is null && goalContinuation is null && trigger is CodexThreadStore.QueuedTurnTrigger or CodexThreadStore.GoalTurnTrigger)
+            throw Invalid("Reserved native turn trigger.");
         if (Text(p, "personality") is { } personality && personality is not ("none" or "friendly" or "pragmatic"))
             throw Invalid("Invalid deprecated personality value.");
         validateInput?.Invoke(input);
@@ -64,7 +67,7 @@ public sealed partial class CodexThreadRpc
             if (!loaded.ContainsKey(id)) throw Invalid("Resume the native thread before starting a turn.");
             if (active.TryGetValue(id, out var running))
             {
-                if (queuedId is not null) throw Invalid("Thread already has an active or pending turn.");
+                if (queuedId is not null || goalContinuation is not null) throw Invalid("Thread already has an active or pending turn.");
                 // No incompatible overrides may be silently ignored by start-or-steer.
                 if (p.EnumerateObject().Any(x => x.Name is not ("threadId" or "input" or "clientUserMessageId" or "turnTrigger" or "toolOutput")))
                     throw Invalid("Active start-or-steer does not accept settings overrides; use turn/settings/update.");
@@ -79,6 +82,8 @@ public sealed partial class CodexThreadRpc
                     throw new CodexThreadConflictException();
                 if (thread.Turns.LastOrDefault()?.Status == "inProgress") throw Invalid("Thread already has an active or pending turn.");
             }
+            if (goalContinuation is not null && (thread.Revision != goalRevision || thread.Goal?.Id != goalContinuation.Id
+                || !CodexThreadStore.CanContinueGoal(thread))) throw new CodexThreadConflictException();
             var effectiveSettings = TurnSettings(thread.Settings, p);
             if (maximumConcurrentTurns is < 1 or > 64 || active.Count >= maximumConcurrentTurns)
                 throw new CodexThreadRpcException(-32010, "Native thread host concurrent-turn capacity is exhausted.");
@@ -94,7 +99,7 @@ public sealed partial class CodexThreadRpc
                 Identity = new(Text(thread.Settings, "nativeSessionId") ?? id.ToString(), id.ToString(), turnId.ToString())
                 {
                     RootTurnId = (OptionalId(p, "rootTurnId") ?? turnId).ToString(), ParentTurnId = OptionalId(p, "parentTurnId")?.ToString(),
-                    QueuedTurn = queuedId is not null, QueuedClientMetadata = queuedMetadata
+                    QueuedTurn = queuedId is not null, QueuedClientMetadata = queuedMetadata, GoalTurn = goalContinuation is not null
                 },
                 OutputSchema = p.TryGetProperty("outputSchema", out var schema) && schema.ValueKind != JsonValueKind.Null ? schema.Clone() : null
             }, p);
@@ -115,7 +120,7 @@ public sealed partial class CodexThreadRpc
                 thread = await store.UpdateSettingsAsync(thread.Id, thread.Revision, Element(defaultsForFutureTurns), ct).ConfigureAwait(false);
             current = new(turnId, options)
             { ConfigurationRequirements = thread.Settings.TryGetProperty("nativeConfigurationRequirements", out var captured) ? captured.Clone() : null };
-            current.Control.InitializeInput(input, clientId, trigger);
+            current.Control.InitializeInput(input, clientId, trigger, goalContinuation?.Id);
             if (!active.TryAdd(id, current)) throw new CodexThreadConflictException();
             current.Completion = RunAsync(thread, current, input);
         }
@@ -173,7 +178,11 @@ public sealed partial class CodexThreadRpc
                 coordinator.CompleteReasoning(running.Id, "failed");
             RemoveActive(thread.Id, running); running.Control.Dispose();
         }
-        if (wakeQueue) await TryWakeQueueAsync(thread.Id, running.Id).ConfigureAwait(false);
+        if (wakeQueue)
+        {
+            await TryWakeQueueAsync(thread.Id, running.Id).ConfigureAwait(false);
+            await TryWakeGoalAsync(thread.Id, "turnCompleted", running.Id).ConfigureAwait(false);
+        }
     }
 
     /// <summary>Bind a real host worker to this catalog and control plane. The caller supplies

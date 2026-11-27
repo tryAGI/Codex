@@ -65,17 +65,19 @@ public sealed partial class CodexThreadStore
     /// <summary>Records a new turn. Fails when another turn is in progress.</summary>
     public Task<CodexThreadDocument> StartTurnAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, IReadOnlyList<JsonElement> input, Guid? rootTurnId = null, CancellationToken cancellationToken = default,
-        string?[]? clientUserMessageIds = null, string? turnTrigger = null)
+        string?[]? clientUserMessageIds = null, string? turnTrigger = null, Guid? goalContinuationId = null)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             Id(turnId); Token(ownerId);
             RequireUnarchived(document);
             if (document.Turns.Any(t => t.Id == turnId) || document.Turns.LastOrDefault()?.Status == "inProgress")
                 throw new InvalidOperationException("Thread already has this turn or another active turn.");
+            document = PrepareGoalTurn(document, turnTrigger, goalContinuationId);
             document = ConsumeQueuedSubmission(document, turnId, clientUserMessageIds, turnTrigger);
             document = SealRealtimeBeforeTurn(document, turnId);
             var turn = new CodexStoredTurn(turnId, rootTurnId ?? turnId, ownerId, "inProgress", time.GetUtcNow(),
-                Items(input), [], [], ClientUserMessageIds: clientUserMessageIds?.ToArray(), TurnTrigger: turnTrigger);
+                Items(input), [], [], ClientUserMessageIds: clientUserMessageIds?.ToArray(), TurnTrigger: turnTrigger)
+            { GoalContinuation = goalContinuationId is { } goal ? new(document.Id, goal) : null };
             return BindRealtimePresentation(document with { Turns = [.. document.Turns, turn] },
                 turnId, PresentationSession(document)?.SessionId);
         }, cancellationToken);
@@ -153,6 +155,7 @@ public sealed partial class CodexThreadStore
             if (prior.Kind != kind || prior.RequestSha256 != hash) throw new InvalidOperationException("Dispatch identity is already bound to different request bytes.");
             return new(false, before);
         }
+        RequireGoalContinuationDispatch(before, active);
         var dispatch = new CodexStoredDispatch(callId, kind, hash, "dispatching")
         { GoalInference = CaptureGoalInference(before, kind) };
         var turn = active with { Dispatches = [.. active.Dispatches, dispatch] };
@@ -202,7 +205,8 @@ public sealed partial class CodexThreadStore
                 ContextWindowObservation = context,
             };
             if (context is not null) CodexContextWindow.Validate(updated, context);
-            return PublishTerminalReadAttention(PromoteRealtimeArtifacts(Replace(document, updated), turn, updated), updated);
+            var next = ApplyGoalTerminal(Replace(document, updated), updated);
+            return PublishTerminalReadAttention(PromoteRealtimeArtifacts(next, turn, updated), updated);
         }, cancellationToken);
 
     /// <summary>Call only after the host proves the recorded execution owner is lost. A read alone
@@ -220,13 +224,17 @@ public sealed partial class CodexThreadStore
     /// exclusive. A selected active turn is refused; copied call identities remain non-dispatchable.</summary>
     public async Task<CodexThreadDocument> ForkAsync(Guid sourceId, long expectedSourceRevision, Guid destinationId,
         Guid? lastTurnId = null, Guid? beforeTurnId = null, CancellationToken cancellationToken = default,
-        JsonElement? effectiveSettings = null)
+        JsonElement? effectiveSettings = null, bool deferGoalContinuation = false)
     {
         Id(destinationId);
         if (sourceId == destinationId || lastTurnId is not null && beforeTurnId is not null)
             throw new ArgumentException("Fork requires distinct identity and one cutoff at most.");
         var source = await CurrentAsync(sourceId, expectedSourceRevision, cancellationToken).ConfigureAwait(false);
         if (effectiveSettings is { ValueKind: not JsonValueKind.Object }) throw new ArgumentException("Fork settings must be an object.");
+        var goal = ForkGoal(source, effectiveSettings ?? source.Settings);
+        if (deferGoalContinuation && (effectiveSettings ?? source.Settings).TryGetProperty("ephemeral", out var transient)
+            && transient.ValueKind == JsonValueKind.True)
+            throw new ArgumentException("deferGoalContinuation cannot be combined with ephemeral.");
         var count = source.Turns.Length;
         var cutoff = lastTurnId ?? beforeTurnId;
         if (cutoff is { } turnId)
@@ -242,7 +250,8 @@ public sealed partial class CodexThreadStore
             ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected, RealtimeSessions = null, ArchivedAt = null,
             InheritedRealtimeCarryover = ForkRealtimeCarryover(source, count, cutoff is null), CompactionCheckpoint = null,
             DetachedCompactionReceipts = null,
-            ReadReceipt = null, QueuedSubmissions = null, Goal = ForkGoal(source, effectiveSettings ?? source.Settings),
+            ReadReceipt = null, QueuedSubmissions = null, Goal = goal,
+            DeferredGoalId = deferGoalContinuation ? goal?.Id : null,
             Attachments = ForkAttachments(source, effectiveSettings ?? source.Settings, now),
             Settings = effectiveSettings?.Clone() ?? source.Settings }, cancellationToken).ConfigureAwait(false);
     }
@@ -329,6 +338,8 @@ public sealed partial class CodexThreadStore
         ValidateReadReceipt(value.ReadReceipt);
         ValidateQueue(value);
         ValidateGoal(value.Goal);
+        if (value.DeferredGoalId is { } deferred && (deferred == Guid.Empty || value.Goal?.Id != deferred || value.ForkedFromId is null))
+            throw new InvalidDataException("Invalid native deferred goal continuation.");
         ValidateAttachments(value.Attachments);
         ValidateRealtimeSessions(value.RealtimeSessions);
         ValidateRealtimeHistoryProjection(value);
@@ -346,6 +357,7 @@ public sealed partial class CodexThreadStore
                 throw new InvalidDataException("Native terminal history is invalid.");
             _ = Items(turn.Input); _ = Items(turn.Output);
             ValidateRealtimeModeTransitions(turn);
+            ValidateGoalContinuation(turn);
             if (turn.ClientUserMessageIds is { } clients && (clients.Length > MaximumItems || clients.Any(c => c is not null && !ValidToken(c)))
                 || turn.TurnTrigger is { } trigger && !ValidToken(trigger))
                 throw new InvalidDataException("Invalid native user message correlation.");
