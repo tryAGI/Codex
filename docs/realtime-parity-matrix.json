@@ -14535,11 +14535,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient.CreateRealtimeCallFromSdpAsync",
-      "test": "src/tests/tryAGI.Codex.Tests/RealtimeApiCallTests.cs::RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.CallId",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.LocationAcceptsExactRustUuid",
       "evidence": null,
-      "rationale": "Raw SDP Location UUID fixture, including forwarded path. Exact Rust response wrapper to compare."
+      "rationale": "Exact UUID and Location string pinned line 801."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_call.rs:errors_when_location_is_missing",
@@ -14606,11 +14606,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient.CreateRealtimeCallFromSdpAsync",
-      "test": "src/tests/tryAGI.Codex.Tests/RealtimeApiCallTests.cs::RealtimeApiCallTests.RawSdpMalformedResponseIsRejectedWithoutReplay",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.CallId",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.LocationWithoutCallIdIsRejected",
       "evidence": null,
-      "rationale": "Malformed Location rejection candidate."
+      "rationale": "Exact malformed path is rejected, line 787; C# deliberately redacts provider error details, no raw Location text assertion."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_call.rs:rejects_v2_session_call_before_sending_request",
@@ -14796,11 +14796,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "divergent",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.SidebandUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.UntrustedFramelessCallIdsCannotBecomePaths",
       "evidence": null,
-      "rationale": "Realtime adapter transport and event methods: frameless_websocket_url_encodes_call_id_as_one_path_segment. Conservatively retained in the pinned candidate inventory; per-assertion equivalence and exact test evidence remain open."
+      "rationale": "Rust percent-encodes arbitrary call ID ../../admin, SDK intentionally accepts only rtc_ or UUID IDs and rejects traversal. Keep secure boundary; requires explicit parity-scope decision rather than relaxing trust."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:frameless_websocket_url_rejects_dot_only_call_ids",
@@ -14816,11 +14816,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.SidebandUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.UntrustedFramelessCallIdsCannotBecomePaths",
       "evidence": null,
-      "rationale": "Realtime adapter transport and event methods: frameless_websocket_url_rejects_dot_only_call_ids. Conservatively retained in the pinned candidate inventory; per-assertion equivalence and exact test evidence remain open."
+      "rationale": "Exact dot-only inputs rejected before path construction as pinned Rust line 2351; includes stronger SDK rejection of traversal-shaped IDs."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:frameless_websocket_url_rewrites_existing_realtime_path",
@@ -14836,11 +14836,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.RealtimeSocketUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.FramelessRewritesExistingRealtimePathAndPreservesQuery",
       "evidence": null,
-      "rationale": "Realtime adapter transport and event methods: frameless_websocket_url_rewrites_existing_realtime_path. Conservatively retained in the pinned candidate inventory; per-assertion equivalence and exact test evidence remain open."
+      "rationale": "Exact existing realtime path -> live rewrite, foo=bar and explicit model, pinned line 2254. Nested V3 base path normalization remains a separate discrepancy."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:merge_request_headers_matches_http_precedence",
@@ -15596,11 +15596,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeAttachment.cs::CodexClient.AttachExistingRealtimeCallAsync",
-      "test": "src/tests/tryAGI.Codex.Tests/RealtimeAttachmentTests.cs::RealtimeAttachmentTests.AttachmentUsesCanonicalRouteAndExplicitSessionIdentity",
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.SidebandUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.V2ExistingCallUsesCallIdAndNoModelOrIntent",
       "evidence": null,
-      "rationale": "Canonical existing call join, no new session creation."
+      "rationale": "Exact Rust V2 call ID query with no model/intent, line 2318; network attach is separate."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:websocket_url_from_http_base_defaults_to_ws_path",
@@ -15616,11 +15616,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": "src/libs/tryAGI.Codex/CodexClient.cs::CodexClient.DirectRealtimeUri",
-      "test": "src/tests/tryAGI.Codex.Tests/RealtimeSocketParityTests.cs::RealtimeSocketParityTests.RustDirectAndSidebandUris",
+      "status": "divergent",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.RealtimeSocketUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.UnencryptedRealtimeEndpointsAreRejectedBeforeTransport",
       "evidence": null,
-      "rationale": "Native direct URI route candidate; compare each upstream base separately."
+      "rationale": "Rust allows loopback http -> ws; C# secure-only transport rejects http/ws before dispatch. Preserve trust boundary; review a separately authorized test-only transport if required."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:websocket_url_from_nested_v1_base_appends_realtime_path",
@@ -15636,11 +15636,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.RealtimeSocketUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.LegacyNestedV1BaseAppendsRealtimePath",
       "evidence": null,
-      "rationale": "Realtime adapter transport and event methods: websocket_url_from_nested_v1_base_appends_realtime_path. Conservatively retained in the pinned candidate inventory; per-assertion equivalence and exact test evidence remain open."
+      "rationale": "Exact secure nested V1 base URI, intent and explicit model from pinned Rust line 2219."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:websocket_url_from_v1_base_appends_realtime_path",
@@ -15656,11 +15656,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.RealtimeSocketUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.LegacyV1BaseAppendsRealtimePath",
       "evidence": null,
-      "rationale": "Realtime adapter transport and event methods: websocket_url_from_v1_base_appends_realtime_path. Conservatively retained in the pinned candidate inventory; per-assertion equivalence and exact test evidence remain open."
+      "rationale": "Exact pinned Rust V1 path, query order and model assertion at line 2203."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:websocket_url_from_ws_base_defaults_to_ws_path",
@@ -15676,11 +15676,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.RealtimeSocketUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.SecureWebSocketBaseDefaultsToRealtimePath",
       "evidence": null,
-      "rationale": "Realtime adapter transport and event methods: websocket_url_from_ws_base_defaults_to_ws_path. Conservatively retained in the pinned candidate inventory; per-assertion equivalence and exact test evidence remain open."
+      "rationale": "Exact Rust wss root and model assertion at line 2187; no actual network connection."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:websocket_url_omits_intent_for_realtime_v2_conversational_mode",
@@ -15716,11 +15716,11 @@
         "src/tests/tryAGI.Codex.Tests/NativeProtocolTests.cs"
       ],
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.RealtimeSocketUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.V2RootWithoutModelOmitsIntent",
       "evidence": null,
-      "rationale": "Realtime adapter transport and event methods: websocket_url_omits_intent_for_realtime_v2_transcription_mode. Conservatively retained in the pinned candidate inventory; per-assertion equivalence and exact test evidence remain open."
+      "rationale": "The URL builder does not take a mode argument; exact pinned V2 root with no explicit model and no intent, line 2305. Public mode admission is separate."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:websocket_url_preserves_existing_realtime_path_and_extra_query_params",
@@ -15757,10 +15757,10 @@
       ],
       "applicability": "applicable",
       "status": "unverified",
-      "implementation": null,
-      "test": null,
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeProtocol.cs::CodexRealtimeProtocol.RealtimeSocketUri",
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityRoutingTests.cs::RustParityRoutingTests.LegacyRootWithoutModelKeepsIntent",
       "evidence": null,
-      "rationale": "Realtime adapter transport and event methods: websocket_url_v1_ignores_transcription_mode. Conservatively retained in the pinned candidate inventory; per-assertion equivalence and exact test evidence remain open."
+      "rationale": "Exact URI for legacy root without model, but C# public session mode admission is separate and may reject V1 transcription; no full behavioral acceptance."
     },
     {
       "id": "rust-test:codex-api/src/endpoint/realtime_websocket/methods.rs:writer_policy_failure_reaches_realtime_events",
@@ -30482,6 +30482,29 @@
         ]
       },
       "rationale": "Narrow host-observed image/subagent promotion, preserved identity across completion and closure, native item projection. Actual tool producers and live provider behavior not certified."
+    },
+    {
+      "id": "scenario:native-presentation-mcp-producer-admission",
+      "lane": "behavior",
+      "kind": "scenario",
+      "symbol": "native-presentation-mcp-producer-admission",
+      "source": "https://github.com/openai/codex/blob/3d86e43b075adeba2193ec5c22ac92f55afd82e6/codex-rs/core/src/realtime_history_tests.rs#L495",
+      "ownerIssue": 61,
+      "implementationCandidates": [
+        "src/libs/tryAGI.Codex/CodexThreadStore.cs"
+      ],
+      "testCandidates": [
+        "src/tests/tryAGI.Codex.Tests/ThreadAgentTests.cs"
+      ],
+      "applicability": "applicable",
+      "status": "source-reviewed",
+      "implementation": [
+        "src/libs/tryAGI.Codex/CodexNativeMcpToolExecutor.cs::CodexNativeMcpToolExecutor.ExecuteAsync",
+        "src/libs/tryAGI.Codex/CodexNativeToolArtifactContext.cs::CodexNativeToolArtifactContext.ObserveAsync"
+      ],
+      "test": "src/tests/tryAGI.Codex.Tests/ThreadAgentTests.cs::ThreadAgentTests.ActualNativeMcpInvocationProducesDurableBackingArtifactWithoutDuplicateDispatch",
+      "evidence": null,
+      "rationale": "Actual native MCP executor over in-memory transport: durable Started before tools/call, exact admission, single dispatch, completed/failed/non-app eligibility, no private metadata retention and closed observation scope. This is a narrow producer integration scenario, not live provider evidence."
     },
     {
       "id": "scenario:native-presentation-preview-stable-after-interruption",
