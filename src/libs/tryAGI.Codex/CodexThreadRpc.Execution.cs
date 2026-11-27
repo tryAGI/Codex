@@ -42,7 +42,8 @@ public sealed partial class CodexThreadRpc
     /// <summary>Notifications that could not be delivered.</summary>
     public long NotificationFailures => Interlocked.Read(ref notificationFailures);
 
-    private async Task<JsonElement> StartAsync(JsonElement p, CancellationToken ct, Guid? queuedId = null, long? queueRevision = null)
+    private async Task<JsonElement> StartAsync(JsonElement p, CancellationToken ct, Guid? queuedId = null,
+        long? queueRevision = null, JsonElement? queuedMetadata = null)
     {
         ValidateFields(p, ["threadId", "input", "rootTurnId", "parentTurnId", "model", "effort", "summary", "outputSchema", "serviceTier", "serviceTierForTurn", "personality",
             "cwd", "approvalPolicy", "approvalsReviewer", "sandboxPolicy", "clientUserMessageId", "disabledPluginIds", "toolOutput", "turnTrigger"]);
@@ -91,7 +92,10 @@ public sealed partial class CodexThreadRpc
                 ReasoningEffort = Text(thread.Settings, "effort") ?? "low",
                 ReasoningSummary = Text(thread.Settings, "summary"), Verbosity = Text(thread.Settings, "verbosity"), ServiceTier = Text(thread.Settings, "serviceTier"),
                 Identity = new(Text(thread.Settings, "nativeSessionId") ?? id.ToString(), id.ToString(), turnId.ToString())
-                { RootTurnId = (OptionalId(p, "rootTurnId") ?? turnId).ToString(), ParentTurnId = OptionalId(p, "parentTurnId")?.ToString() },
+                {
+                    RootTurnId = (OptionalId(p, "rootTurnId") ?? turnId).ToString(), ParentTurnId = OptionalId(p, "parentTurnId")?.ToString(),
+                    QueuedTurn = queuedId is not null, QueuedClientMetadata = queuedMetadata
+                },
                 OutputSchema = p.TryGetProperty("outputSchema", out var schema) && schema.ValueKind != JsonValueKind.Null ? schema.Clone() : null
             }, p);
             if (Text(p, "serviceTierForTurn") is { } tier)

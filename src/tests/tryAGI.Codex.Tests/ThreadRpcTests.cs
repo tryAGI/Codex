@@ -69,11 +69,13 @@ public sealed class ThreadRpcTests
     private sealed class Provider : HttpMessageHandler
     {
         internal readonly ConcurrentQueue<JsonElement> Requests = new();
+        internal readonly ConcurrentQueue<string> TurnMetadataHeaders = new();
         internal Func<int, string> Before = _ => "";
         internal Func<int, CancellationToken, Task<string>> Reply = (number, _) => Task.FromResult("{\"type\":\"message\",\"id\":\"m_" + number + "\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"answer\"}]}");
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             var body = Json(await (request.Content ?? throw new InvalidOperationException()).ReadAsStringAsync(ct)); Requests.Enqueue(body);
+            TurnMetadataHeaders.Enqueue(request.Headers.TryGetValues("x-codex-turn-metadata", out var values) ? values.Single() : "{}");
             var number = Requests.Count;
             var output = await Reply(number, ct);
             var completed = new JsonObject { ["type"] = "response.completed", ["response"] = new JsonObject
@@ -898,6 +900,84 @@ public sealed class ThreadRpcTests
                 && current.QueuedSubmissions is not { Length: > 0 }) return current;
             await Task.Delay(10, deadline.Token);
         }
+    }
+
+    [Fact]
+    public async Task QueueAuthorizedProviderMetadataIsNestedAndCannotOverrideCoreIdentity()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); host.EnableAutomaticThreadQueue();
+        var id = await Create(host);
+        CodexQueuedMetadataContext? seen = null;
+        host.EnableQueuedProviderMetadata((request, _) =>
+        {
+            seen = request;
+            return Task.FromResult<JsonElement?>(request.Metadata);
+        });
+        var queued = await AddQueue(host, id, "with-metadata", "test", new JsonObject
+        {
+            ["client_type"] = "ios_app", ["custom.name"] = "approved",
+            ["thread_id"] = "spoof-thread", ["TURN_ID"] = "spoof-turn", ["turn_trigger"] = "spoof",
+            ["sandbox"] = "danger-full-access", ["guardian_credits_requested"] = "true",
+            ["account_id"] = "other-account"
+        });
+        var final = await WaitForQueueDrain(f, id, 1);
+        Assert.NotNull(seen);
+        Assert.Equal("account", seen.AccountId);
+        Assert.Equal(id, seen.ThreadId);
+        Assert.Equal(final.Turns[0].Id, seen.SubmissionId);
+        Assert.Equal(queued.GetProperty("id").GetString(), seen.SubmissionId.ToString());
+        var header = Json(Assert.Single(f.Provider.TurnMetadataHeaders));
+        Assert.Equal(id.ToString(), header.GetProperty("thread_id").GetString());
+        Assert.Equal(final.Turns[0].Id.ToString(), header.GetProperty("turn_id").GetString());
+        Assert.Equal("queue", header.GetProperty("turn_trigger").GetString());
+        Assert.Equal("ios_app", header.GetProperty("client_type").GetString());
+        Assert.Equal("approved", header.GetProperty("custom.name").GetString());
+        foreach (var reserved in new[] { "TURN_ID", "sandbox", "guardian_credits_requested", "account_id" })
+            Assert.False(header.TryGetProperty(reserved, out _));
+        var body = Assert.Single(f.Provider.Requests).GetProperty("client_metadata");
+        Assert.False(body.TryGetProperty("client_type", out _));
+        Assert.True(JsonElement.DeepEquals(header, Json(body.GetProperty("x-codex-turn-metadata").GetString()!)));
+        Assert.Equal(0, host.QueueWakeFailures);
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task QueueProviderMetadataDenialBoundsAndStaleAuthorizationNeverConsumeSubmission()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); host.EnableThreadQueue();
+        var id = await Create(host);
+        var queued = await AddQueue(host, id, "metadata", "test", new JsonObject { ["client_type"] = "macos" });
+        var submission = queued.GetProperty("id").GetString()!;
+        var initial = await f.Store.ReadAsync(id, ct);
+        host.EnableQueuedProviderMetadata((_, _) => Task.FromResult<JsonElement?>(null));
+        Assert.Equal(-32000, (await Assert.ThrowsAsync<CodexThreadRpcException>(() =>
+            host.InvokeAsync("thread/queue/start", QueueStartArgs(id, submission), ct))).Code);
+        Assert.Equal(initial.Revision, (await f.Store.ReadAsync(id, ct)).Revision);
+        var cold = f.Host(); cold.EnableThreadQueue();
+        await cold.InvokeAsync("thread/resume", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        cold.EnableQueuedProviderMetadata((_, _) => Task.FromResult<JsonElement?>(Args(new JsonObject
+        {
+            ["client_type"] = new string('x', 129)
+        })));
+        Assert.Equal(-32602, (await Assert.ThrowsAsync<CodexThreadRpcException>(() =>
+            cold.InvokeAsync("thread/queue/start", QueueStartArgs(id, submission), ct))).Code);
+        Assert.Equal(initial.Revision, (await f.Store.ReadAsync(id, ct)).Revision);
+
+        var racing = f.Host(); racing.EnableThreadQueue();
+        await racing.InvokeAsync("thread/resume", Args(new JsonObject { ["threadId"] = id.ToString() }), ct);
+        racing.EnableQueuedProviderMetadata(async (request, token) =>
+        {
+            await f.Store.SetNameAsync(id, request.ExpectedRevision, "revision changed", token);
+            return request.Metadata;
+        });
+        Assert.Equal(-32009, (await Assert.ThrowsAsync<CodexThreadRpcException>(() =>
+            racing.InvokeAsync("thread/queue/start", QueueStartArgs(id, submission), ct))).Code);
+        var saved = await f.Store.ReadAsync(id, ct);
+        Assert.Empty(saved.Turns);
+        Assert.Equal(submission, Assert.Single(saved.QueuedSubmissions!).Id.ToString());
+        Assert.Empty(f.Provider.Requests);
     }
 
     [Fact]

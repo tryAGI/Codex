@@ -7,6 +7,16 @@ namespace tryAGI.Codex;
 public sealed partial class CodexThreadRpc
 {
     private int queueEnabled;
+    private Func<CodexQueuedMetadataContext, CancellationToken, Task<JsonElement?>>? queuedMetadataResolver;
+
+    /// <summary>Installs the host's queued provider-metadata resolver. Return an approved string map
+    /// (possibly empty), or null to deny dispatch. Reserved Core-owned fields are always filtered.</summary>
+    public void EnableQueuedProviderMetadata(Func<CodexQueuedMetadataContext, CancellationToken, Task<JsonElement?>> resolver)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        if (Interlocked.CompareExchange(ref queuedMetadataResolver, resolver, null) is not null)
+            throw new InvalidOperationException("Queued provider metadata resolver is already installed.");
+    }
 
     /// <summary>Enables the experimental durable user queue for a negotiated client surface.
     /// Explicit starts share the existing native turn admission. Automatic idle wake-up is not enabled by this contract.</summary>
@@ -118,15 +128,22 @@ public sealed partial class CodexThreadRpc
 
     private async Task<JsonElement> StartQueuedAsync(CodexThreadDocument thread, CodexStoredQueuedSubmission selected, CancellationToken ct)
     {
-        // Native Responses routing uses trusted identity metadata. Do not silently discard or forward
-        // arbitrary client-supplied provider metadata before the host has a dedicated resolver.
+        JsonElement? approvedMetadata = null;
         if (selected.ResponsesApiClientMetadata is { } metadata && metadata.EnumerateObject().Any())
-            throw new CodexThreadRpcException(-32601, "Queued provider metadata requires a host resolver.");
+        {
+            var resolver = Volatile.Read(ref queuedMetadataResolver)
+                ?? throw new CodexThreadRpcException(-32601, "Queued provider metadata requires a host resolver.");
+            // Resolve outside admission and bind the result to the exact observed queue revision.
+            var approved = await resolver(new(thread.AccountId, thread.Id, selected.Id, thread.Revision, metadata.Clone()), ct)
+                .ConfigureAwait(false);
+            if (approved is null) throw new CodexThreadRpcException(-32000, "Queued provider metadata was not authorized.");
+            approvedMetadata = CodexQueuedClientMetadata.Filter(approved.Value);
+        }
         return await StartAsync(Element(new JsonObject
         {
             ["threadId"] = thread.Id.ToString(), ["input"] = JsonNode.Parse(selected.Input.GetRawText()),
             ["clientUserMessageId"] = selected.ClientUserMessageId
-        }), ct, selected.Id, thread.Revision).ConfigureAwait(false);
+        }), ct, selected.Id, thread.Revision, approvedMetadata).ConfigureAwait(false);
     }
 
     private Task NotifyQueueChangedAsync(Guid id)
