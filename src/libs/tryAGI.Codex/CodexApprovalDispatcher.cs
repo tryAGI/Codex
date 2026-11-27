@@ -11,7 +11,9 @@ public sealed class CodexApprovalDispatcher
     private readonly Func<CodexApprovalAction, CancellationToken, ValueTask> authorizeDispatch;
 
     /// <summary>Creates a dispatcher with an explicit current host policy check in addition
-    /// to the original authenticated reviewer decision. A denied policy never consumes a grant.</summary>
+    /// to the original authenticated reviewer decision. The policy check must be read-only and
+    /// repeatable: it runs before and after durable consumption. A pre-consume denial leaves the
+    /// grant unconsumed; a later denial burns it without dispatch.</summary>
     public CodexApprovalDispatcher(CodexApprovalStore approvals,
         Func<CodexApprovalAction, CancellationToken, ValueTask> authorizeDispatch)
     {
@@ -35,6 +37,10 @@ public sealed class CodexApprovalDispatcher
         cancellationToken.ThrowIfCancellationRequested();
         var consumed = await approvals.TryConsumeAsync(approvalId, exactAction, cancellationToken).ConfigureAwait(false)
             ?? throw new UnauthorizedAccessException("No unexpired exact-action approval is available.");
+        // Recheck current policy after the potentially delayed durable CAS. A denial
+        // here burns the grant rather than making it reusable after a policy change.
+        cancellationToken.ThrowIfCancellationRequested();
+        await authorizeDispatch(exactAction, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (!approvals.IsUnexpired(consumed))
             throw new UnauthorizedAccessException("Approval expired before dispatch.");

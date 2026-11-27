@@ -22,7 +22,7 @@ All paths in the Rust column are relative to `codex-rs` at the pinned revision.
 | `file-system`, `file-watcher/src/file_watcher_tests.rs`, exec-server no_follow and fs_sandbox_windows_tests | Opt-in `CodexMacOsRootedFileSystem` uses a pinned root descriptor and kernel O_NOFOLLOW_ANY for readFile/getMetadata/readDirectory, and rejects all mutations. Existing path-based host is unchanged and is not an enforcement fallback. General rooted mutation, recursive/watch and platform coverage remain open. | #103, #144 |
 | `file-search/src/lib.rs`, `snapshot.rs`, `matcher_tests.rs`; `app-server/tests/suite/fuzzy_file_search.rs` | `CodexFileSearch` implements one-shot search and connection-scoped sessions, cancellation and top-50 notifications; `CodexStableDirectoryFileSearchSource` uses a host-protected rooted traversal. Exact Nucleo scores and ignore/snapshot behavior remain separate. | #102, #136, #137 |
 | `apply-patch/src/lib.rs`, `apply-patch/src/file_update_tests.rs`, `apply-patch/tests/suite`; command_exec apply_patch line endings test | Existing `CodexPatch`, `CodexPatchUpdate`, `CodexWorkspacePatch`, `CodexWorkspacePatchTransport` and related tests; preconditions and plan digest already represented. | Preserve; differential coverage and authorization integration pending #79, #80 |
-| `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. `CodexMacOsSqliteApprovalStorage` supplies real durable CAS and `CodexApprovalDispatcher` gates an actual contained command. Production command/patch/tool routing, cross-platform storage, compiled enforcement, scoped grants and legacy routing remain separate (#158). | #80, #111–#113; coordinate #64 |
+| `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. `CodexMacOsSqliteApprovalStorage` supplies real durable CAS and `CodexApprovalDispatcher` gates an actual contained command. `CodexApprovalCommandAdapter` and `CodexApprovalProcessAdapter` integrate the durable consume gate into native launch routing for explicit noninteractive host plans. Production policy/approval resolution, interactive control, patch/tool routing, cross-platform storage, scoped grants and legacy routing remain separate (#158). | #80, #111–#113; coordinate #64 |
 | `execpolicy`, `sandboxing`, `network-proxy`; sandboxing platform tests, network-proxy authorization_path_tests and host_policy_tests | `CodexMacOsLeafCommandAdapter` provides actual deny-default Seatbelt for a restricted macOS single-process lane (no fork, no PTY, no direct network, approved stable workspace). General OS and network policy compilation and tree containment remain open. | #81, #104, #132; coordinate #86 and #98 |
 | `app-server-protocol/src/protocol/v2/review.rs`; `app-server/tests/suite/v2/review.rs`; `core/src/guardian`; app-server guardian_v2 / guardian_v3_sync_tests | `CodexReviewRpc` validates inline review targets, verifies a committed correlated turn, routes advisory Guardian assessment and exact denial escalation through a trusted adapter and approval store. `CodexGuardianReviewJournal` commits ordered auto-review lifecycle records and binds exact recorded denials to one pending approval. Actual runner, host storage/reviewer integration and strict-review dispatch fence remain separate. | #82, #129, #130, #142 |
 
@@ -299,3 +299,37 @@ type in concurrent work; the next admitted run passed. No gates were weakened.
 Actual production command/exec, process/*, workspace patch and MCP/tool wiring
 and non-macOS durable storage are tracked in #158; no Advantage deployment or
 power-loss certification is claimed.
+
+## Exact native launch approval adapters (#158)
+
+`CodexApprovalCommandAdapter` and `CodexApprovalProcessAdapter` implement the existing
+command/exec and process/spawn adapter contracts. They snapshot the exact request before
+trusted preparation, then use the same versioned binary action identity for review and
+durable admission. The fingerprint includes the RPC family, host execution ID, connection,
+process handle, exact argv, cwd, ordinal environment values (including null versus empty),
+terminal/stream flags, requested policy, output cap, timeout, and the trusted effective
+enforcement-plan digest and thread/turn/item/environment scope. Neither client process
+IDs nor display commands are authority. The host must retain one approval ID per attempt
+and independently bind the selected contained launch callback to the exact resolved policy,
+including defaults and adapter identity. The callback receives the frozen request and
+fresh consumed record and must enforce that policy and deadline at actual admission.
+
+The dispatcher checks current host policy before and again after durable consumption.
+Post-consume policy denial, expiry, cancellation, ambiguous CAS or launch failure never
+reconstructs a reusable grant. Command and process families cannot share approval. The
+wrappers explicitly reject interactive stdin and PTY (subsequent input requires its own
+authority), and do not select an unsandboxed fallback. No new process-tree containment
+is claimed; the production process adapter and interactive admission remain #132/#158.
+Patch and native MCP/function/custom tool routing, consumer wiring, and durable host
+mapping of the approval identity to an attempt remain open.
+
+Validation: the native library compiled in admitted run
+native-20261127-e907f0be426d4253ba1154e1520059a5. The first shared build was blocked by a
+missing parallel Realtime reducer type (native-20261127-8299aa890ef2477bb39f8f89986f9587);
+the second by unrelated ThreadAgentMailboxTests.cs xUnit2031, reported in #110.
+Nine focused test cases cover fingerprint completeness, immutable snapshots, cross-family
+and attempt denial, post-CAS policy revocation/expiry, uncertain consume, interactive denial,
+actual native command RPC through the approval RPC bridge/SQLite/Seatbelt on macOS, and
+the process RPC response/exit lifecycle using a synthetic contained session. These tests
+are not yet locally certified at publication; verify exact-commit CI and the actual macOS
+lane separately. No analysis or test gate was disabled.
