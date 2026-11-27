@@ -34,6 +34,7 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
             return new JsonObject
             {
                 ["slug"] = slug, ["display_name"] = slug, ["description"] = "Synthetic differential model",
+                ["base_instructions"] = "Synthetic offline differential fixture. No tool or inference execution.",
                 ["default_reasoning_level"] = "medium",
                 ["supported_reasoning_levels"] = new JsonArray(new JsonObject
                     { ["effort"] = "medium", ["description"] = "Synthetic reasoning effort" }),
