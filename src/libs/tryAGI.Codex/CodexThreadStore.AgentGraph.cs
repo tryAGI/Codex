@@ -13,6 +13,11 @@ public sealed partial class CodexThreadStore
         Id(rootThreadId);
         var graphStorage = RequireSpawnGraphStorage();
         var graph = await graphStorage.ReadSpawnGraphAsync(accountId, rootThreadId, cancellationToken).ConfigureAwait(false);
+        return ValidateSpawnGraph(graph, rootThreadId);
+    }
+
+    private CodexThreadSpawnGraph ValidateSpawnGraph(CodexThreadSpawnGraph graph, Guid rootThreadId)
+    {
         if (graph is null || graph.AccountId != accountId || graph.RootThreadId != rootThreadId ||
             string.IsNullOrWhiteSpace(graph.Revision) || graph.Revision.Length > 1024 ||
             graph.Edges is null || graph.Edges.Count > MaximumSpawnEdges)
