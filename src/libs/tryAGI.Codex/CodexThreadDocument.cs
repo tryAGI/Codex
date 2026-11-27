@@ -38,7 +38,7 @@ public sealed partial record CodexThreadDocument(
     [property: JsonRequired] DateTimeOffset CreatedAt,
     [property: JsonRequired] DateTimeOffset UpdatedAt,
     [property: JsonRequired] CodexStoredTurn[] Turns,
-    Guid? ForkedFromId = null, long? ForkedFromRevision = null)
+    Guid? ForkedFromId = null, long? ForkedFromRevision = null) : IJsonOnDeserialized
 {
     /// <summary>Optional durable logical realtime sessions; absent in older thread documents.</summary>
     public CodexStoredRealtimeSession[]? RealtimeSessions { get; init; }
@@ -48,6 +48,8 @@ public sealed partial record CodexThreadDocument(
 
     /// <summary>Optional CAS-installed model-context projection; original turns remain authoritative.</summary>
     public CodexStoredCompactionCheckpoint? CompactionCheckpoint { get; init; }
+
+    void IJsonOnDeserialized.OnDeserialized() => CodexNativeMailSampling.Validate(this);
 }
 
 /// <summary>One stored turn.</summary>
@@ -105,7 +107,12 @@ public sealed record CodexStoredDispatch(
     [property: JsonRequired] string Kind,
     [property: JsonRequired] string RequestSha256,
     [property: JsonRequired] string State,
-    JsonElement? Result = null);
+    JsonElement? Result = null)
+{
+    /// <summary>Exact agent-mail occurrences observed by a validated normal inference.
+    /// This is sampling evidence, not mailbox delivery authority or provider billing.</summary>
+    public CodexStoredMailSampling? MailSampling { get; init; }
+}
 
 /// <summary>Result of <see cref="CodexThreadStore.AdmitAsync"/>.</summary>
 /// <param name="Admitted">The turn was newly admitted; <see langword="false"/> when it already existed.</param>

@@ -42,14 +42,14 @@ internal static class CodexRetainedJournalMetadata
     {
         if (metadata.ValueKind != JsonValueKind.Object || Encoding.UTF8.GetByteCount(metadata.GetRawText()) > MaximumMetadataBytes)
             return false;
-        foreach (var name in new[] { "retain_across_windows", "client_authored", CodexCompactionProvenance.ClearFileSources })
+        foreach (var name in new[] { "retain_across_windows", "client_authored", CodexCompactionProvenance.ClearFileSources, CodexNativeMailSampling.SampledKey })
             if (metadata.TryGetProperty(name, out var flag) &&
                 flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False or JsonValueKind.Null))
                 return false;
-        foreach (var name in new[] { "history_sequence", CodexCompactionProvenance.SampledSequence })
+        foreach (var name in new[] { "history_sequence", CodexCompactionProvenance.SampledSequence, CodexNativeMailSampling.SequenceKey })
             if (metadata.TryGetProperty(name, out var sequence) && sequence.ValueKind != JsonValueKind.Null &&
                 (sequence.ValueKind != JsonValueKind.Number || !sequence.TryGetInt64(out var number) ||
-                 number < (name == "history_sequence" ? 1 : 0)))
+                 number < (name == CodexCompactionProvenance.SampledSequence ? 0 : 1)))
                 return false;
         return true;
     }
@@ -89,7 +89,8 @@ internal static class CodexRetainedJournalMetadata
                 entry.Index >= (entry.Output ? turn.Output.Length : turn.Input.Length) ||
                 !entry.Output && (turn.RealtimeSteeringInputIndices ?? []).Contains(entry.Index) ||
                 !ValidMetadata(entry.Metadata) ||
-                entry.Metadata.TryGetProperty(CodexCompactionProvenance.ClearFileSources, out _))
+                entry.Metadata.TryGetProperty(CodexCompactionProvenance.ClearFileSources, out _) ||
+                CodexNativeMailSampling.HasReservedKeys(entry.Metadata))
                 throw new InvalidDataException("Invalid native retention annotation position or metadata.");
             bytes += Encoding.UTF8.GetByteCount(entry.Metadata.GetRawText());
             if (bytes > MaximumTurnMetadataBytes)
@@ -154,7 +155,9 @@ internal static class CodexRetainedJournalMetadata
             annotations.Where((metadata, index) => metadata is { } value &&
                 (!ValidMetadata(value) ||
                  value.TryGetProperty(CodexCompactionProvenance.ClearFileSources, out _) &&
-                 !CodexThreadCompaction.IsCheckpoint(projection[index]))).Any()))
+                 !CodexThreadCompaction.IsCheckpoint(projection[index]) ||
+                 CodexNativeMailSampling.HasReservedKeys(value) &&
+                 (!CodexNativeMailSampling.IsMail(projection[index]) || CodexNativeMailSampling.Sequence(value) is null))).Any()))
             return false;
 
         // Only inspect original history for structured retained items. Ordinary message-only
@@ -163,32 +166,35 @@ internal static class CodexRetainedJournalMetadata
         if (!structured) return true;
 
         var pairs = new Dictionary<string, (JsonElement Call, JsonElement Output, JsonElement CallMetadata, JsonElement OutputMetadata)>(StringComparer.Ordinal);
-        var exact = new Dictionary<string, List<(JsonElement Item, JsonElement? Metadata)>>(StringComparer.Ordinal);
+        var exact = new Dictionary<string, List<(JsonElement Item, JsonElement? Metadata, long Sequence)>>(StringComparer.Ordinal);
+        var sampled = CodexNativeMailSampling.Sampled(document);
         var coveredCount = checkpoint.ThroughTurnCount + (checkpoint.ActiveBoundary is null ? 0 : 1);
         for (var turnIndex = 0; turnIndex < coveredCount; turnIndex++)
         {
             var turn = document.Turns[turnIndex];
             var boundary = turnIndex == checkpoint.ThroughTurnCount ? checkpoint.ActiveBoundary : null;
-            if (turn.Status != "completed" && boundary is null) continue;
             var inputCount = boundary?.InputCount ?? turn.Input.Length;
-            var outputCount = boundary?.OutputCount ?? turn.Output.Length;
+            // Interrupted turns project their initial input and receipt facts, never
+            // their unvalidated output. Their pending mail can still be retained.
+            var outputCount = boundary?.OutputCount ?? (turn.Status == "completed" ? turn.Output.Length : 0);
             var metadata = ForTurn(turn);
-            void AddExact(JsonElement item, JsonElement? sidecar)
+            void AddExact(JsonElement item, JsonElement? sidecar, long sequence)
             {
                 if (CodexRealtimeProtocol.Text(item, "type") != "agent_message" &&
                     !(IsStandalone(item) && (Flag(sidecar, "retain_across_windows") || Flag(sidecar, "client_authored")))) return;
                 var hash = ItemHash(item);
                 if (!exact.TryGetValue(hash, out var candidates)) exact[hash] = candidates = [];
-                candidates.Add((item, sidecar));
+                candidates.Add((item, sidecar, sequence));
             }
 
             for (var inputIndex = 0; inputIndex < inputCount; inputIndex++)
-                AddExact(turn.Input[inputIndex], At(metadata, false, inputIndex));
+                AddExact(turn.Input[inputIndex], At(metadata, false, inputIndex),
+                    CodexNativeMailSampling.Sequence(turnIndex, false, inputIndex));
             for (var outputIndex = 0; outputIndex < outputCount; outputIndex++)
             {
                 var item = turn.Output[outputIndex];
                 var sidecar = At(metadata, true, outputIndex);
-                AddExact(item, sidecar);
+                AddExact(item, sidecar, CodexNativeMailSampling.Sequence(turnIndex, true, outputIndex));
                 if (outputIndex + 1 >= outputCount || !IsCall(item) ||
                     sidecar is not { } callMeta || At(metadata, true, outputIndex + 1) is not { } outputMeta ||
                     !Flag(callMeta, "retain_across_windows") || !Flag(outputMeta, "retain_across_windows") ||
@@ -199,11 +205,14 @@ internal static class CodexRetainedJournalMetadata
         }
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        var mailOccurrences = new HashSet<long>();
         for (var index = 0; index < projection.Length; index++)
         {
             var item = projection[index];
             if (IsMessage(item) || CodexThreadCompaction.IsCheckpoint(item)) continue;
             var metadata = annotations?[index];
+            if (CodexNativeMailSampling.Sequence(metadata) is { } sequence && !mailOccurrences.Add(sequence))
+                return false;
             if (IsCall(item))
             {
                 var id = CodexRealtimeProtocol.Text(item, "call_id");
@@ -216,7 +225,8 @@ internal static class CodexRetainedJournalMetadata
                 index++; // The adjacent output is historical, never a new invocation.
             }
             else if (!exact.TryGetValue(ItemHash(item), out var candidates) ||
-                !candidates.Any(candidate => JsonElement.DeepEquals(item, candidate.Item) && Equal(metadata, candidate.Metadata)))
+                !candidates.Any(candidate => JsonElement.DeepEquals(item, candidate.Item) &&
+                    CodexNativeMailSampling.Matches(metadata, candidate.Metadata, candidate.Sequence, sampled)))
                 return false;
         }
         return true;

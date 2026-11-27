@@ -430,12 +430,35 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             finally { gate.Release(); }
         }
 
-        internal void ObserveNativeCompletion(CodexResponseOptions settings, IReadOnlyList<JsonElement> input,
-            CodexResponseEvent terminal)
+        internal async Task ObserveNativeCompletion(CodexResponseOptions settings, IReadOnlyList<JsonElement> input,
+            CodexResponseEvent terminal, CancellationToken ct)
         {
             LastEffectiveSettings = settings;
             observedForegroundCompletion = true;
             contextObservation = CodexContextWindow.Capture(settings, Current.CompactionCheckpoint, authOwner, input, terminal, contextObservation);
+            // Accounting completion alone is insufficient: the native runner reaches this
+            // callback only after terminal output validation. Compaction never reaches it.
+            if (terminal.Type != "response.completed" || terminal.RequestId is not { } requestId ||
+                terminal.ResponseId is not { } responseId || !input.Any(CodexNativeMailSampling.IsMail)) return;
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var receipt = Turn.Dispatches.SingleOrDefault(item => item.CallId == requestId);
+                if (receipt is not { Kind: "inference", State: "succeeded", MailSampling: null } ||
+                    receipt.Result is not { } result || CodexRealtimeProtocol.Text(result, "id") != responseId) return;
+                var metadata = new List<JsonElement?>();
+                var projected = CodexThreadCompaction.Project(Current, Current.CompactionCheckpoint, settings.Model,
+                    CodexThreadCompaction.ScopeHash(settings), Current.Turns.Length,
+                    currentTurnId: turnId, includeActiveOutput: true, metadata: metadata);
+                // Never match repeated text by content search. If the actual submitted history
+                // cannot be reconstructed occurrence-for-occurrence, leave the mail pending.
+                if (!CodexThreadStore.SameHistory(projected, input)) return;
+                var occurrences = CodexNativeMailSampling.Capture(Current, projected, metadata);
+                if (occurrences.Length == 0) return;
+                await JournalAsync(doc => store.RecordNativeMailSamplingAsync(doc.Id, doc.Revision, turnId,
+                    owner, requestId, new(responseId, occurrences), ct), ct).ConfigureAwait(false);
+            }
+            finally { gate.Release(); }
         }
 
         internal async Task<IReadOnlyList<JsonElement>> PrepareWireHistoryAsync(CodexClient client,

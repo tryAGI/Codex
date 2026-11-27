@@ -84,13 +84,15 @@ public static class CodexRetainedContext
         var selected = new SortedDictionary<int, CodexRetainedContextEntry>();
         var sampled = Math.Max(options.SampledThroughSequence ?? 0,
             CodexCompactionProvenance.SampledThrough(history));
-        var pending = history.Where(e => Type(e.Item) == "agent_message" && Sequence(e) is { } n && n > sampled)
+        var pending = history.Where(e => Type(e.Item) == "agent_message" && !CodexNativeMailSampling.IsSampled(e) &&
+                Sequence(e) is { } n && n > sampled)
             .Select(Sequence).FirstOrDefault();
         // A legacy item without a sequence has no proof of delivery. Keep bounded
         // mail pending rather than inventing a normal-inference acknowledgement.
         var firstUnsequenced = -1;
         for (var index = 0; index < history.Count; index++)
-            if (Type(history[index].Item) == "agent_message" && Sequence(history[index]) is null)
+            if (Type(history[index].Item) == "agent_message" && !CodexNativeMailSampling.IsSampled(history[index]) &&
+                Sequence(history[index]) is null)
             {
                 firstUnsequenced = index;
                 break;
@@ -110,7 +112,7 @@ public static class CodexRetainedContext
             var call = callIndex >= 0 && Always(source) && Always(history[callIndex]) &&
                 MatchingTool(history[callIndex].Item, source.Item) ? history[callIndex] : null;
             end = call is null ? sourceIndex - 1 : callIndex - 1;
-            if (!Eligible(source, options, pending)) continue;
+            if (!Eligible(source, options, sampled)) continue;
 
             var full = Always(source) || ClientDeveloper(source);
             var chargeImages = options.ChargeImages && !full;
@@ -198,7 +200,7 @@ public static class CodexRetainedContext
     private static bool IsMessage(JsonElement item) => Type(item) is "message" ||
         Type(item) is null && Text(item, "role") is not null;
 
-    private static bool Eligible(CodexRetainedContextEntry e, CodexRetainedContextOptions options, long? pending)
+    private static bool Eligible(CodexRetainedContextEntry e, CodexRetainedContextOptions options, long sampled)
     {
         if (OptionalFlag(e.Metadata, "retain_across_windows") ??
             (options.RetainClientDeveloperMessages && ClientDeveloper(e) ||
@@ -207,7 +209,7 @@ public static class CodexRetainedContext
         if (Type(item) == "agent_message")
         {
             if (FullTokens(item, options) > 10_000) return false;
-            if (Sequence(e) is not { } sequence || pending is { } first && sequence >= first) return true;
+            if (!CodexNativeMailSampling.IsSampled(e) && (Sequence(e) is not { } sequence || sequence > sampled)) return true;
             var text = Parts(item).FirstOrDefault();
             var message = text.ValueKind == JsonValueKind.Object ? Text(text, "text") : null;
             if (message?.StartsWith("Message Type: FINAL_ANSWER\n", StringComparison.Ordinal) == true) return false;

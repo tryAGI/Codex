@@ -201,6 +201,7 @@ public static class CodexThreadCompaction
                     writer.WriteString("state", receipt.State);
                     writer.WritePropertyName("result");
                     if (receipt.Result is { } result) result.WriteTo(writer); else writer.WriteNullValue();
+                    CodexNativeMailSampling.WriteReceipt(writer, receipt);
                     writer.WriteEndObject();
                 }
                 writer.WriteEndArray();
@@ -260,6 +261,7 @@ public static class CodexThreadCompaction
                 writer.WriteString("state", receipt.State);
                 writer.WritePropertyName("result");
                 if (receipt.Result is { } result) result.WriteTo(writer); else writer.WriteNullValue();
+                CodexNativeMailSampling.WriteReceipt(writer, receipt);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();
@@ -294,17 +296,20 @@ public static class CodexThreadCompaction
         List<JsonElement?>? metadata = null)
     {
         var history = new List<JsonElement>();
-        void Add(JsonElement item, JsonElement? annotation = null)
+        var sampled = metadata is null ? null : CodexNativeMailSampling.Sampled(document);
+        void Add(JsonElement item, JsonElement? annotation = null, long? sequence = null)
         {
             history.Add(item.Clone());
-            metadata?.Add(annotation?.Clone());
+            if (metadata is not null)
+                metadata.Add(CodexNativeMailSampling.Annotate(item, annotation, sequence, sampled!)?.Clone());
         }
 
-        void AddOutputs(CodexStoredTurn turn, int start)
+        void AddOutputs(CodexStoredTurn turn, int turnIndex, int start)
         {
             var annotations = metadata is null ? null : CodexRetainedJournalMetadata.ForTurn(turn);
             for (var index = start; index < turn.Output.Length; index++)
-                Add(turn.Output[index], CodexRetainedJournalMetadata.At(annotations, true, index));
+                Add(turn.Output[index], CodexRetainedJournalMetadata.At(annotations, true, index),
+                    CodexNativeMailSampling.Sequence(turnIndex, true, index));
         }
         if (firstTurnIndex == 0 && checkpoint is not null && checkpoint.Model == model && checkpoint.ScopeSha256 == scope &&
             checkpoint.ThreadId == document.Id && checkpoint.ThroughTurnCount <= throughTurnCount)
@@ -322,7 +327,7 @@ public static class CodexThreadCompaction
                 if (boundary is not null)
                 {
                     // The initial input and preceding carryover are already compacted.
-                    AddOutputs(document.Turns[firstTurnIndex], boundary.OutputCount);
+                    AddOutputs(document.Turns[firstTurnIndex], firstTurnIndex, boundary.OutputCount);
                     firstTurnIndex++;
                 }
             }
@@ -339,14 +344,23 @@ public static class CodexThreadCompaction
                 var steering = (turn.RealtimeSteeringInputIndices ?? []).ToHashSet();
                 for (var inputIndex = 0; inputIndex < turn.Input.Length; inputIndex++)
                     if (!steering.Contains(inputIndex))
-                        Add(turn.Input[inputIndex], CodexRetainedJournalMetadata.At(annotations, false, inputIndex));
+                        Add(turn.Input[inputIndex], CodexRetainedJournalMetadata.At(annotations, false, inputIndex),
+                            CodexNativeMailSampling.Sequence(index, false, inputIndex));
                 for (var outputIndex = 0; outputIndex < turn.Output.Length; outputIndex++)
-                    Add(turn.Output[outputIndex], CodexRetainedJournalMetadata.At(annotations, true, outputIndex));
+                    Add(turn.Output[outputIndex], CodexRetainedJournalMetadata.At(annotations, true, outputIndex),
+                        CodexNativeMailSampling.Sequence(index, true, outputIndex));
             }
             else
             {
                 var inputs = turn.Id == currentTurnId && currentInput is not null ? currentInput : turn.Input;
-                foreach (var item in inputs) Add(item);
+                for (var inputIndex = 0; inputIndex < inputs.Count; inputIndex++)
+                {
+                    var item = inputs[inputIndex];
+                    // Explicit host projections have no exact native occurrence proof.
+                    long? sequence = inputIndex < turn.Input.Length && JsonElement.DeepEquals(item, turn.Input[inputIndex])
+                        ? CodexNativeMailSampling.Sequence(index, false, inputIndex) : null;
+                    Add(item, sequence: sequence);
+                }
             }
             if (turn.Status != "completed" && turn.Id != currentTurnId)
             {
