@@ -181,14 +181,25 @@ public sealed class CodexMemoryBackend
     /// <summary>Immutable pipeline namespace selected by the host for this backend.</summary>
     public CodexMemoryVersion Version => scope.Version;
 
-    internal bool IsBoundTo(CodexThreadDocument thread) => thread.Id == threadId && thread.AccountId == scope.AccountId;
+    internal bool IsBoundTo(CodexThreadDocument thread) => IsBoundTo(thread.AccountId, thread.Id);
+    internal bool IsBoundTo(string accountId, Guid id) => id == threadId && accountId == scope.AccountId;
 
     /// <summary>
     /// Reads the generated summary once, without listing the namespace. Disabled memory
     /// performs no storage or authorization calls. Missing or empty summary is normal.
     /// Permission failures and malformed storage responses are not silently ignored.
     /// </summary>
-    public async Task<string?> ReadSummaryAsync(CancellationToken cancellationToken = default)
+    public Task<string?> ReadSummaryAsync(CancellationToken cancellationToken = default) =>
+        ReadSummaryCoreAsync(forContext: true, cancellationToken);
+
+    /// <summary>
+    /// Reads the original nonblank summary for thread/memory/read, subject to the SDK's
+    /// file-size limit. Unlike the prompt summary, whitespace and content are not truncated.
+    /// </summary>
+    public Task<string?> ReadRpcSummaryAsync(CancellationToken cancellationToken = default) =>
+        ReadSummaryCoreAsync(forContext: false, cancellationToken);
+
+    private async Task<string?> ReadSummaryCoreAsync(bool forContext, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var effective = policy();
@@ -205,7 +216,7 @@ public sealed class CodexMemoryBackend
             CheckFile(file);
             CheckPolicy(dedicated: false);
             var summary = file.Content.Trim();
-            return summary.Length == 0 ? null : Truncate(summary, 2500);
+            return summary.Length == 0 ? null : forContext ? Truncate(summary, 2500) : file.Content;
         }
         catch (KeyNotFoundException) { return null; }
     }

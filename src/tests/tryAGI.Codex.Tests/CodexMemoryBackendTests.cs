@@ -333,6 +333,145 @@ public sealed class CodexMemoryBackendTests
         Assert.Contains(stored.Dispatches, d => d.Kind == "tool" && d.CallId == "memory-call");
     }
 
+    private const string V2Summary = "v1\n## User Profile\n## User preferences\n## General Tips\n## What's in Memory\n";
+
+    [Fact]
+    public async Task MemoryReadRpcReturnsOriginalSummaryFromLoadedThreadOnly()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var storage = new Storage();
+        var summary = "  " + new string('x', 12_000) + "\n";
+        storage.Put("memory_summary.md", summary);
+        var policy = new CodexMemoryPolicy(true, true, false, CodexMemoryVersion.V2);
+        var backend = Create(storage, () => policy);
+        var rpc = new CodexMemoryRpc(Scope.AccountId,
+            (id, _) => ValueTask.FromResult<CodexMemoryBackend?>(id == Thread ? backend : null),
+            (_, _) => ValueTask.CompletedTask);
+        var result = await rpc.InvokeAsync("thread/memory/read", Json("{\"threadId\":\"" + Thread + "\"}"), cancellationToken: ct);
+        Assert.Equal(summary, result.GetProperty("summary").GetString());
+        Assert.Equal(1, storage.ContentReads);
+        policy = policy.WithConfiguration(true, false, false);
+        Assert.Null((await rpc.ReadThreadAsync(Thread, ct)).Summary);
+        Assert.Equal(1, storage.ContentReads);
+        var absent = await Assert.ThrowsAsync<CodexThreadRpcException>(() => rpc.ReadThreadAsync(Guid.NewGuid(), ct));
+        Assert.Equal(-32602, absent.Code);
+        Assert.False(rpc.Handles("memory/reset"));
+    }
+
+    [Fact]
+    public async Task ReadRpcChecksAuthorizationAndAccountBeforeStorage()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var storage = new Storage();
+        var backend = Create(storage);
+        var denied = new CodexMemoryRpc(Scope.AccountId, (_, _) => throw new InvalidOperationException("Must not resolve"),
+            (_, _) => throw new UnauthorizedAccessException());
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => denied.ReadThreadAsync(Thread, ct));
+        var foreign = new CodexMemoryRpc("foreign", (_, _) => ValueTask.FromResult<CodexMemoryBackend?>(backend),
+            (_, _) => ValueTask.CompletedTask);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => foreign.ReadThreadAsync(Thread, ct));
+        Assert.Equal(0, storage.OpenCount);
+    }
+
+    [Theory]
+    [InlineData("memory/status", "{\"minConsolidatedThreads\":0}")]
+    [InlineData("memory/status", "{\"minConsolidatedThreads\":4097}")]
+    [InlineData("memory/status", "{\"minConsolidatedThreads\":2,\"minConsolidatedThreads\":3}")]
+    [InlineData("memory/reset", "{\"operationId\":\"untrusted\"}")]
+    public async Task MemoryRpcRejectsMalformedWireBeforeAuthorization(string method, string arguments)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var lifecycle = new LifecycleStorage();
+        var rpc = new CodexMemoryRpc(Scope.AccountId, (_, _) => throw new InvalidOperationException(),
+            (_, _) => throw new InvalidOperationException("Must not authorize"), lifecycle);
+        var error = await Assert.ThrowsAsync<CodexThreadRpcException>(() =>
+            rpc.InvokeAsync(method, Json(arguments), Guid.NewGuid(), ct));
+        Assert.Equal(-32602, error.Code);
+        Assert.Equal(0, lifecycle.Reads);
+        Assert.Equal(0, lifecycle.Writes);
+    }
+
+    [Fact]
+    public async Task ReadinessRequiresSuccessfulConsolidationAndValidArtifactWhenV1Exists()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var lifecycle = new LifecycleStorage { Observation = new(0, false, false) };
+        var rpc = new CodexMemoryRpc(Scope.AccountId, (_, _) => throw new InvalidOperationException(),
+            (_, _) => ValueTask.CompletedTask, lifecycle);
+        Assert.True((await rpc.StatusAsync(cancellationToken: ct)).V2Ready);
+        lifecycle.Observation = new(2, true, false);
+        Assert.False((await rpc.StatusAsync(2, ct)).V2Ready);
+        lifecycle.Observation = new(2, true, true);
+        var result = await rpc.InvokeAsync("memory/status", Json("{\"minConsolidatedThreads\":2}"), cancellationToken: ct);
+        Assert.Equal(2u, result.GetProperty("v2ConsolidatedThreads").GetUInt32());
+        Assert.True(result.GetProperty("v2Ready").GetBoolean());
+        Assert.Equal(2, result.EnumerateObject().Count());
+        Assert.False((await rpc.StatusAsync(cancellationToken: ct)).V2Ready);
+        Assert.Equal(4, lifecycle.Reads);
+    }
+
+    [Fact]
+    public void V2ReadinessFormatMatchesPinnedRustWorkspaceRules()
+    {
+        Assert.True(CodexMemoryReadiness.IsValidV2Summary(V2Summary));
+        Assert.True(CodexMemoryReadiness.IsValidV2Summary(V2Summary.Replace("\n", "\r\n")));
+        Assert.False(CodexMemoryReadiness.IsValidV2Summary("v2" + V2Summary[2..]));
+        Assert.False(CodexMemoryReadiness.IsValidV2Summary(V2Summary.Replace("## General Tips", "### General Tips")));
+        Assert.False(CodexMemoryReadiness.IsValidV2Summary(V2Summary + new string('é', 5000)));
+    }
+
+    [Fact]
+    public async Task LifecycleMutationRequiresStableHostIdAndExactReceipt()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var lifecycle = new LifecycleStorage();
+        var authorized = new List<CodexMemoryRpcAccess>();
+        var rpc = new CodexMemoryRpc(Scope.AccountId, (_, _) => throw new InvalidOperationException(),
+            (access, _) => { authorized.Add(access); return ValueTask.CompletedTask; }, lifecycle);
+        await Assert.ThrowsAsync<CodexThreadRpcException>(() => rpc.ResetAsync(Guid.Empty, ct));
+        Assert.Empty(authorized);
+        Assert.Equal(0, lifecycle.Writes);
+        var modeId = Guid.NewGuid();
+        var result = await rpc.InvokeAsync("thread/memoryMode/set",
+            Json("{\"threadId\":\"" + Thread + "\",\"mode\":\"disabled\"}"), modeId, ct);
+        Assert.Equal("{}", result.GetRawText());
+        Assert.Equal(new(Scope.AccountId, "thread/memoryMode/set", Thread, CodexThreadMemoryMode.Disabled, modeId), Assert.Single(authorized));
+        var resetId = Guid.NewGuid();
+        await rpc.ResetAsync(resetId, ct);
+        await rpc.ResetAsync(resetId, ct);
+        Assert.Equal(2, lifecycle.Writes);
+        lifecycle.ForeignReceipt = true;
+        await Assert.ThrowsAsync<InvalidDataException>(() => rpc.ResetAsync(Guid.NewGuid(), ct));
+    }
+
+    private sealed class LifecycleStorage : ICodexMemoryLifecycleStorage
+    {
+        private readonly Dictionary<Guid, CodexMemoryLifecycleReceipt> receipts = [];
+        public CodexMemoryReadinessObservation Observation { get; set; } = new(0, true, false);
+        public int Reads { get; private set; }
+        public int Writes { get; private set; }
+        public bool ForeignReceipt { get; set; }
+        public ValueTask<CodexMemoryReadinessObservation> ReadReadinessAsync(string accountId, CancellationToken cancellationToken)
+        {
+            Reads++;
+            return ValueTask.FromResult(Observation);
+        }
+        public ValueTask<CodexMemoryLifecycleReceipt> ApplyAsync(CodexMemoryRpcAccess access, CancellationToken cancellationToken)
+        {
+            var id = access.OperationId!.Value;
+            if (receipts.TryGetValue(id, out var prior))
+            {
+                if (prior.Access != access) throw new InvalidOperationException("Operation contents changed.");
+                return ValueTask.FromResult(prior);
+            }
+            Writes++;
+            var result = new CodexMemoryLifecycleReceipt(ForeignReceipt ? access with { AccountId = "foreign" } : access,
+                CodexMemoryLifecycleSettlement.Applied);
+            receipts.Add(id, result);
+            return ValueTask.FromResult(result);
+        }
+    }
+
     private sealed class ThreadStorage : ICodexThreadStorage
     {
         private JsonElement? row;
