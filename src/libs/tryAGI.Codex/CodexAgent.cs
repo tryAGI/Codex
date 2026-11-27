@@ -32,7 +32,7 @@ public sealed class CodexAgent(CodexClient client)
     // The native journal may project compacted history and append newly captured
     // world-state fragments; it must never rewrite the original history or call fence.
     internal Func<CodexResponseOptions, List<JsonElement>, CancellationToken, Task<IReadOnlyList<JsonElement>>>? PrepareNativeHistory { get; init; }
-    internal Func<CodexResponseOptions, IReadOnlyList<JsonElement>, CodexResponseEvent, CancellationToken, Task>? ObserveNativeCompletion { get; init; }
+    internal Action<CodexResponseOptions, IReadOnlyList<JsonElement>, CodexResponseEvent>? ObserveNativeCompletion { get; init; }
 
     /// <summary>Runs one turn with flat function tools until the model answers without calling one.</summary>
     /// <param name="options">Model, instructions and advertised tools.</param>
@@ -142,8 +142,7 @@ public sealed class CodexAgent(CodexClient client)
                 if (item.CompletedOutput is not null)
                 {
                     completedOutput = item.CompletedOutput;
-                    if (ObserveNativeCompletion is not null)
-                        await ObserveNativeCompletion(requestOptions, wireHistory, item, cancellationToken).ConfigureAwait(false);
+                    ObserveNativeCompletion?.Invoke(requestOptions, wireHistory, item);
                 }
             }
             cancellationToken.ThrowIfCancellationRequested();

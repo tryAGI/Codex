@@ -22,11 +22,47 @@ public sealed class NativeMailSamplingTests
             => ValueTask.FromResult(new CodexCredentials("test", "account"));
     }
 
-    private sealed class Budget : ICodexUsageObserver
+    private sealed class Budget(CancellationTokenSource? cancel = null, bool throwOnComplete = false) : ICodexUsageObserver
     {
+        internal int Completed;
         public Task ReserveAsync(string id, string model, CancellationToken ct) => Task.CompletedTask;
-        public Task CompleteAsync(string id, string model, JsonElement response, CancellationToken ct) => Task.CompletedTask;
+        public Task CompleteAsync(string id, string model, JsonElement response, CancellationToken ct)
+        {
+            Completed++;
+            cancel?.Cancel();
+            if (throwOnComplete) throw new IOException("Accounting acknowledgement lost.");
+            return Task.CompletedTask;
+        }
         public Task IncompleteAsync(string id, string model, CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingStorage(string? failure = null) : ICodexThreadStorage
+    {
+        private readonly RealtimeHistoryTests.Storage inner = new();
+        private bool injected;
+        internal List<JsonElement> Committed { get; } = [];
+        public Task<JsonElement?> ReadAsync(Guid id, CancellationToken ct) => inner.ReadAsync(id, ct);
+        public async Task<bool> CompareExchangeAsync(Guid id, long? revision, JsonElement body, CancellationToken ct)
+        {
+            var containsProof = body.GetProperty("turns").EnumerateArray().Any(turn =>
+                turn.GetProperty("dispatches").EnumerateArray().Any(receipt => receipt.TryGetProperty("mailSampling", out _)));
+            if (!injected && containsProof && failure == "before")
+            {
+                injected = true;
+                throw new IOException("Sampling settlement failed before commit.");
+            }
+            var committed = await inner.CompareExchangeAsync(id, revision, body, ct);
+            if (committed)
+            {
+                Committed.Add(body.Clone());
+                if (!injected && containsProof && failure == "after")
+                {
+                    injected = true;
+                    throw new IOException("Sampling settlement acknowledgement lost.");
+                }
+            }
+            return committed;
+        }
     }
 
     private sealed class Handler(string response, List<JsonElement> requests) : HttpMessageHandler
@@ -44,13 +80,77 @@ public sealed class NativeMailSamplingTests
     private static CodexResponseOptions Settings(Guid thread, Guid turn, string instructions = "instructions") =>
         new("model", instructions) { Identity = new("session", thread.ToString(), turn.ToString()) };
 
-    private static CodexThreadAgent Agent(CodexThreadStore store, List<JsonElement> requests, string response = Success) =>
-        new(store, new Credentials(), new Budget(), clientFactory: (credentials, usage) =>
+    private static CodexThreadAgent Agent(CodexThreadStore store, List<JsonElement> requests, string response = Success,
+        Budget? budget = null) =>
+        new(store, new Credentials(), budget ?? new Budget(), clientFactory: (credentials, usage) =>
             new CodexClient(credentials, handler: new Handler(response, requests), usageObserver: usage));
 
     private static Task<CodexThreadDocument> Compact(CodexThreadStore store, CodexThreadCompactionCandidate candidate)
         => store.InstallCompactionAsync(candidate, new(candidate.Model, "compact", Checkpoint, null,
             candidate.History, candidate.ExecutedCallIds), cancellationToken: Ct);
+
+    private static void AssertAtomicSampling(RecordingStorage storage)
+    {
+        var receipts = storage.Committed.SelectMany(body => body.GetProperty("turns").EnumerateArray())
+            .SelectMany(turn => turn.GetProperty("dispatches").EnumerateArray())
+            .Where(receipt => receipt.GetProperty("kind").GetString() == "inference" &&
+                receipt.GetProperty("state").GetString() == "succeeded").ToArray();
+        Assert.NotEmpty(receipts);
+        Assert.All(receipts, receipt => Assert.True(receipt.TryGetProperty("mailSampling", out var sampling) &&
+            sampling.GetProperty("occurrences").GetArrayLength() == 1));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("before")]
+    [InlineData("after")]
+    [InlineData("accounting")]
+    public async Task SamplingAndInferenceReceiptShareOneCommitEvenWhenAcknowledgementIsLost(string? failure)
+    {
+        var storage = new RecordingStorage(failure);
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var turn = Guid.NewGuid();
+        var requests = new List<JsonElement>();
+        var budget = new Budget(throwOnComplete: failure == "accounting");
+        Task<CodexThreadAgentResult> Run() => Agent(store, requests, budget: budget).RunAsync(
+            thread.Id, thread.Revision, turn, "runner", Settings(thread.Id, turn), [Mail, User],
+            (_, _) => throw new InvalidOperationException("No tools"), cancellationToken: Ct);
+        if (failure is null)
+            await Run();
+        else
+            await Assert.ThrowsAsync<IOException>(Run);
+        AssertAtomicSampling(storage);
+        Assert.Single(requests);
+        Assert.Equal(1, budget.Completed);
+        var restarted = new CodexThreadStore(storage, "account");
+        var loaded = await restarted.ReadAsync(thread.Id, Ct);
+        var receipt = Assert.Single(loaded.Turns[0].Dispatches);
+        Assert.Equal("succeeded", receipt.State);
+        Assert.Single(receipt.MailSampling!.Occurrences);
+        Assert.Equal(failure is null ? "completed" : "failed", loaded.Turns[0].Status);
+    }
+
+    [Fact]
+    public async Task CancellationAfterValidatedTerminalDoesNotEraseAtomicSampling()
+    {
+        var storage = new RecordingStorage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var turn = Guid.NewGuid();
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        var requests = new List<JsonElement>();
+        var budget = new Budget(cancel);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Agent(store, requests, budget: budget).RunAsync(
+            thread.Id, thread.Revision, turn, "runner", Settings(thread.Id, turn), [Mail, User],
+            (_, _) => throw new InvalidOperationException("No tools"), cancellationToken: cancel.Token));
+        AssertAtomicSampling(storage);
+        Assert.Single(requests);
+        Assert.Equal(1, budget.Completed);
+        var loaded = await new CodexThreadStore(storage, "account").ReadAsync(thread.Id, Ct);
+        Assert.Equal("interrupted", loaded.Turns[0].Status);
+        Assert.Single(CodexNativeMailSampling.Sampled(loaded));
+    }
 
     [Fact]
     public async Task SuccessfulNormalInferenceProvesDistinctIdenticalOccurrencesAcrossRestartAndFork()

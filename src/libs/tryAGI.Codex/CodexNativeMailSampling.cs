@@ -177,25 +177,34 @@ internal static class CodexNativeMailSampling
     }
 }
 
+// Internal observer extension, not a new public accounting contract. Only the
+// Responses transport can distinguish validated normal output from billed terminals.
+internal interface ICodexValidatedResponseObserver
+{
+    Task CompleteValidatedAsync(string requestId, CodexResponseOptions settings, string responseId,
+        JsonElement response, CancellationToken cancellationToken);
+}
+
 public sealed partial class CodexThreadStore
 {
-    // Only the native runner calls this after output validation and durable settlement.
-    // A crash before this CAS leaves mail pending; uncertain accounting is never proof.
-    internal Task<CodexThreadDocument> RecordNativeMailSamplingAsync(Guid threadId, long revision,
-        Guid turnId, string owner, string requestId, CodexStoredMailSampling sampling, CancellationToken ct)
+    // Publish the successful receipt and its sampling evidence in the SAME CAS.
+    // No independently committed successful result can lose the associated proof.
+    internal Task<CodexThreadDocument> SettleNativeMailSamplingAsync(Guid threadId, long revision,
+        Guid turnId, string owner, string requestId, JsonElement response, CodexStoredMailSampling sampling,
+        CancellationToken ct)
         => ChangeAsync(threadId, revision, document =>
         {
             var turn = Active(document, turnId, owner);
             var receipt = turn.Dispatches.SingleOrDefault(item => item.CallId == requestId);
-            if (receipt is not { Kind: "inference", State: "succeeded", MailSampling: null })
-                throw new InvalidOperationException("Native sampling requires a newly validated successful inference receipt.");
+            if (receipt is not { Kind: "inference", State: "dispatching" or "unknown", MailSampling: null })
+                throw new InvalidOperationException("Native sampling requires an unsettled validated inference receipt.");
             var updated = turn with
             {
                 Dispatches = turn.Dispatches.Select(item => item.CallId == requestId
-                    ? item with { MailSampling = sampling } : item).ToArray(),
+                    ? item with { State = "succeeded", Result = response.Clone(), MailSampling = sampling } : item).ToArray(),
             };
             var next = Replace(document, updated);
             CodexNativeMailSampling.Validate(next);
-            return next;
+            return PromoteRealtimeArtifacts(next, turn, updated);
         }, ct);
 }

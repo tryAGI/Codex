@@ -243,15 +243,40 @@ public sealed partial class CodexClient
                 throw new CodexProtocolException($"Codex response terminated ({type}; {category}); usage is unknown and output must not execute.");
             }
             diagnostics.Event(interruptedTerminal ? "response.completed" : type, payload);
+            string? outputFailure = null;
+            var validatedBeforeAccounting = false;
             if (terminal && usageObserver is not null &&
                 payload.TryGetProperty("response", out var accountingResponse) && accountingResponse.ValueKind == JsonValueKind.Object)
             {
                 accountingAttempted = true;
                 // A confirmed terminal receipt must survive cancellation of the caller.
                 using var save = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                await usageObserver.CompleteAsync(accountingId, settings.Model, accountingResponse, save.Token).ConfigureAwait(false);
-                accountingComplete = true;
-                diagnostics.Mark("usage.persisted");
+                var validated = false;
+                var nativeObserver = usageObserver as ICodexValidatedResponseObserver;
+                try
+                {
+                    if (nativeObserver is not null && settings.RequestKind == "turn" &&
+                        type == "response.completed" && !interruptedTerminal &&
+                        interruption?.InterruptSent != true && !cancellationToken.IsCancellationRequested)
+                    {
+                        validatedBeforeAccounting = true;
+                        outputFailure = outputValidation.Event(type, payload);
+                        validated = outputFailure is null && outputValidation.CompletedOutput is not null;
+                    }
+                }
+                finally
+                {
+                    // Even rejected output or an unexpected validation exception must
+                    // account for the known terminal. Only validated normal inference
+                    // may settle model-visible sampling evidence with its receipt.
+                    if (validated && correlation.ResponseId is { } responseId && nativeObserver is not null)
+                        await nativeObserver.CompleteValidatedAsync(accountingId, settings, responseId,
+                            accountingResponse, save.Token).ConfigureAwait(false);
+                    else
+                        await usageObserver.CompleteAsync(accountingId, settings.Model, accountingResponse, save.Token).ConfigureAwait(false);
+                    accountingComplete = true;
+                    diagnostics.Mark("usage.persisted");
+                }
             }
             if (terminal && interruption is not null && cancellationToken.IsCancellationRequested)
             {
@@ -260,7 +285,8 @@ public sealed partial class CodexClient
                 diagnostics.Mark("transport.websocket_cancelled");
                 cancellationToken.ThrowIfCancellationRequested();
             }
-            if (outputValidation.Event(type, payload, interruptedTerminal) is { } outputFailure)
+            if (!validatedBeforeAccounting) outputFailure = outputValidation.Event(type, payload, interruptedTerminal);
+            if (outputFailure is not null)
             {
                 diagnostics.Mark("response.protocol_rejected." + outputFailure);
                 throw new CodexProtocolException("Codex completed output rejected (" + outputFailure + "); not a silent success.");
