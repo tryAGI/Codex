@@ -42,7 +42,16 @@ internal sealed class CodexResponsesRouting
 
     internal void Capture(HttpResponseMessage response, object requestGeneration)
     {
-        if (!response.Headers.TryGetValues(Header, out var values)) return;
+        if (response.Headers.TryGetValues(Header, out var values)) Capture(values, requestGeneration);
+    }
+
+    internal string? GetState(object requestGeneration)
+    {
+        lock (gate) return ReferenceEquals(generation, requestGeneration) ? state : null;
+    }
+
+    internal void Capture(IEnumerable<string> values, object requestGeneration)
+    {
         var headers = values.Take(2).ToArray();
         if (headers.Length != 1 || !Valid(headers[0])) return;
         lock (gate)

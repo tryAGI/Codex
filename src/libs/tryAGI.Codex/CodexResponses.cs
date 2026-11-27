@@ -36,6 +36,10 @@ public sealed record CodexResponseOptions(string Model, string Instructions)
     public string? ServiceTier { get; init; }
     /// <summary>Correlation identity sent as client metadata.</summary>
     public CodexResponsesIdentity? Identity { get; init; }
+    /// <summary>Optional caller-owned native WebSocket transport. The default remains SSE.</summary>
+    public CodexResponsesWebSocketSession? WebSocketSession { get; init; }
+    /// <summary>Prime a new WebSocket using a non-generating response.create before inference.</summary>
+    public bool PrewarmWebSocket { get; init; }
 }
 /// <summary>One server-sent event of a Responses stream.</summary>
 /// <param name="Type">Event type, for example <c>response.output_text.delta</c>.</param>
@@ -47,7 +51,7 @@ public sealed partial class CodexClient
 {
     private readonly CodexResponsesRouting responsesRouting = new();
 
-    /// <summary>Native Codex Responses SSE stream, using ChatGPT OAuth. No hosted connector or CLI agent.</summary>
+    /// <summary>Native Codex Responses SSE or optional WebSocket stream, using ChatGPT OAuth.</summary>
     public async IAsyncEnumerable<CodexResponseEvent> StreamResponseAsync(CodexResponseOptions settings,
         IReadOnlyList<JsonElement> input, [EnumeratorCancellation] CancellationToken cancellationToken = default,
         Action<CodexResponseDiagnostic>? observeDiagnostics = null)
@@ -126,17 +130,38 @@ public sealed partial class CodexClient
         }
         var started = Stopwatch.GetTimestamp();
         deadline.Token.ThrowIfCancellationRequested();
-        // Entering SendAsync is the conservative boundary: even an immediate
-        // transport exception cannot prove that the provider received no bytes.
+        using var ws = settings.WebSocketSession is { } session
+            ? await session.OpenAsync(request, responsesRouting, routingGeneration, options.MaximumMessageBytes, deadline.Token).ConfigureAwait(false)
+            : null;
+        if (settings.WebSocketSession is not null && ws is null) diagnostics.Mark("transport.websocket_fallback_sse");
+        // Entering SendAsync is the conservative boundary: no replay after ambiguous dispatch.
+        // Even unexpected generation during a prewarm must not be replayed automatically.
         dispatchStarted = true;
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
-        diagnostics.Mark("response.headers");
-        await EnsureCallSuccessAsync(response, deadline.Token).ConfigureAwait(false);
-        responsesRouting.Capture(response, routingGeneration);
-        await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
+        if (ws is not null && settings.PrewarmWebSocket && ws.NeedsPrewarm)
+        {
+            diagnostics.Mark("transport.websocket_prewarm");
+            await ws.PrewarmAsync(body, deadline.Token).ConfigureAwait(false);
+        }
+        using var response = ws is null
+            ? await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false)
+            : null;
+        if (response is not null)
+        {
+            diagnostics.Mark("response.headers");
+            await EnsureCallSuccessAsync(response, deadline.Token).ConfigureAwait(false);
+            responsesRouting.Capture(response, routingGeneration);
+        }
+        else
+        {
+            diagnostics.Mark("transport.websocket");
+            await ws!.SendAsync(body, false, deadline.Token).ConfigureAwait(false);
+        }
+        await using var stream = response is not null
+            ? await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false) : null;
+        var events = ws is not null ? ws.ReadAsync(deadline.Token) : ReadSseAsync(stream!, options.MaximumMessageBytes, deadline.Token);
         var completed = false;
         var outputValidation = new CodexResponseOutputValidation();
-        await foreach (var data in ReadSseAsync(stream, options.MaximumMessageBytes, deadline.Token).ConfigureAwait(false))
+        await foreach (var data in events.ConfigureAwait(false))
         {
             if (data == "[DONE]") break;
             using var document = JsonDocument.Parse(data);
@@ -160,6 +185,7 @@ public sealed partial class CodexClient
                 diagnostics.Mark("response.protocol_rejected." + outputFailure);
                 throw new CodexProtocolException("Codex completed output rejected (" + outputFailure + "); not a silent success.");
             }
+            ws?.Observe(type, payload, body);
             completed |= type == "response.completed";
             yield return new(type, payload, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             if (completed) yield break;
