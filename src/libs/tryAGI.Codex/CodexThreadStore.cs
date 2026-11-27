@@ -127,7 +127,8 @@ public sealed partial class CodexThreadStore
         => SynchronizeOutputCoreAsync(threadId, expectedRevision, expectedTurnId, ownerId, output, null, cancellationToken);
 
     internal Task<CodexThreadDocument> SynchronizeOutputCoreAsync(Guid threadId, long expectedRevision, Guid expectedTurnId,
-        string ownerId, IReadOnlyList<JsonElement> output, CodexRealtimeModeCapture? mode, CancellationToken cancellationToken)
+        string ownerId, IReadOnlyList<JsonElement> output, CodexRealtimeModeCapture? mode, CancellationToken cancellationToken,
+        CodexGoalSteeringCapture? goalContext = null)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             var turn = Active(document, expectedTurnId, ownerId);
@@ -143,6 +144,14 @@ public sealed partial class CodexThreadStore
                     !JsonElement.DeepEquals(next[index], mode.Message))
                     throw new InvalidOperationException("Realtime mode capture was not retained in the exact native input.");
                 turn = turn with { RealtimeModeTransitions = [.. turn.RealtimeModeTransitions ?? [], mode.Transition] };
+            }
+            if (goalContext is not null)
+            {
+                RequireGoalSteeringKey(document, goalContext.Key);
+                var index = goalContext.Transition.OutputIndex;
+                if (index < turn.Output.Length || index >= next.Length || !JsonElement.DeepEquals(next[index], goalContext.Message))
+                    throw new InvalidOperationException("Goal context was not retained in the exact native input.");
+                turn = turn with { GoalSteeringTransitions = [.. turn.GoalSteeringTransitions ?? [], goalContext.Transition] };
             }
             var updated = turn with { Output = next };
             return PromoteRealtimeArtifacts(Replace(document, updated) with { Format = 2 }, turn, updated);
@@ -161,8 +170,13 @@ public sealed partial class CodexThreadStore
         return AdmitCoreAsync(threadId, revision, turnId, owner, call.Id, "tool", CodexNativeGoalTools.Request(call), call.Name, ct);
     }
 
+    internal Task<CodexThreadAdmission> AdmitSteeredInferenceAsync(Guid threadId, long revision, Guid turnId, string owner,
+        string callId, JsonElement request, CodexGoalSteeringKey key, CancellationToken ct)
+        => AdmitCoreAsync(threadId, revision, turnId, owner, callId, "inference", request, null, ct, key);
+
     private async Task<CodexThreadAdmission> AdmitCoreAsync(Guid threadId, long expectedRevision, Guid turnId,
-        string ownerId, string callId, string kind, JsonElement request, string? nativeGoalTool, CancellationToken cancellationToken)
+        string ownerId, string callId, string kind, JsonElement request, string? nativeGoalTool, CancellationToken cancellationToken,
+        CodexGoalSteeringKey? goalKey = null)
     {
         Token(callId);
         if (kind is not ("inference" or "tool")) throw new ArgumentException("Invalid dispatch kind.", nameof(kind));
@@ -175,6 +189,7 @@ public sealed partial class CodexThreadStore
             if (prior.Kind != kind || prior.RequestSha256 != hash) throw new InvalidOperationException("Dispatch identity is already bound to different request bytes.");
             return new(false, before);
         }
+        RequireGoalSteeringKey(before, goalKey);
         RequireGoalContinuationDispatch(before, active, nativeGoalTool);
         var goalNotice = CaptureGoalNotice(before, turnId);
         before = ObserveGoalExecutionTime(before, turnId, true);
@@ -390,6 +405,7 @@ public sealed partial class CodexThreadStore
             _ = Items(turn.Input); _ = Items(turn.Output);
             ValidateRealtimeModeTransitions(turn);
             ValidateGoalContinuation(turn);
+            ValidateGoalSteeringTransitions(turn);
             ValidateDescendantGoalAttribution(turn);
             if (turn.ClientUserMessageIds is { } clients && (clients.Length > MaximumItems || clients.Any(c => c is not null && !ValidToken(c)))
                 || turn.TurnTrigger is { } trigger && !ValidToken(trigger))

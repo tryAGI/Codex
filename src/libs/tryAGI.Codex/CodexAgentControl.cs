@@ -29,6 +29,7 @@ public sealed class CodexAgentControl : IDisposable
     internal string? TurnTrigger { get; private set; }
     internal Guid? GoalContinuationId { get; private set; }
     internal CodexGoalToolPolicy? GoalTools { get; set; }
+    internal bool GoalSteeringEnabled { get; set; }
     internal Guid? DescendantGoalRootThreadId { get; private set; }
     internal CodexDescendantGoalAttribution? CapturedDescendantGoal { get; set; }
 

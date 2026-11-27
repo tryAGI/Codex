@@ -114,6 +114,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 throw new InvalidOperationException("Native goal tools require an unredacted persistent user thread.");
             options = options with { Tools = CodexNativeGoalTools.Attach(options.Tools) };
         }
+        if (control?.GoalSteeringEnabled == true && (journalProjection is not null || historyTurnLimit is not null || !CodexThreadStore.ReadStateEligible(before)))
+            throw new InvalidOperationException("Goal steering requires complete, unredacted persistent user history.");
         var descendantGoal = control?.CapturedDescendantGoal;
         if (control?.DescendantGoalRootThreadId is { } goalRoot)
         {
@@ -218,7 +220,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             }
             var runner = new CodexAgent(client)
             {
-                PrepareNativeHistory = historyTurnLimit is null && journalProjection is null && options.AutomaticCompaction is not null
+                PrepareNativeHistory = historyTurnLimit is null && journalProjection is null && (options.AutomaticCompaction is not null || control?.GoalSteeringEnabled == true)
                     ? (settings, history, ct) => execution.PrepareWireHistoryAsync(client, settings, history, observeDiagnostics, ct,
                         BackgroundCompactions, authOwner, guard,
                         (candidate, effective, context) =>
@@ -328,6 +330,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private readonly Func<JsonElement, JsonElement>? projection;
         private readonly CodexAgentControl? control;
         private CodexRealtimeModeCapture? pendingMode;
+        private CodexGoalSteeringSnapshot? capturedGoal;
+        private CodexGoalSteeringCapture? pendingGoalContext;
+        private CodexGoalSteeringKey? preparedGoalKey;
         private readonly bool deferModeUntilProjection;
         private CodexStoredRealtimeSession? capturedModeSession;
         private bool modeCapturePending;
@@ -460,6 +465,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 var turn = actual.Turns.Single(t => t.Id == turnId);
                 if (turn.OwnerId != owner || turn.Status != "inProgress")
                     throw new InvalidOperationException("Realtime mode capture lost its native turn owner.");
+                if (control?.GoalSteeringEnabled == true) capturedGoal = CodexGoalSteeringSnapshot.From(actual.Goal);
                 if (deferModeUntilProjection)
                 {
                     // Freeze the logical state with the captured steering/input generation.
@@ -524,21 +530,40 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         {
             var wire = await PrepareCompactedWireHistoryAsync(client, settings, originalHistory,
                 observeDiagnostics, ct, scheduler, authOwner, credentialGuard, schedule).ConfigureAwait(false);
-            if (!modeCapturePending) return wire;
+            if (!modeCapturePending && capturedGoal is null) return wire;
 
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                // A checkpoint can remove every prior world-state fragment. Render the
-                // captured state against the actual projected prompt, including its suffix.
-                pendingMode = CodexRealtimeModeContext.CaptureProjected(Current, capturedModeSession, wire,
-                    originalHistory.Count - Seed.Count);
-                modeCapturePending = false;
-                capturedModeSession = null;
-                if (pendingMode is not { } capture) return wire;
-                originalHistory.Add(capture.Message);
+                // Reconstruct world-state context against the actual retained prompt.
+                // Both fragments are appended to the original durable history, never
+                // substituted for an observed prefix.
+                if (modeCapturePending)
+                {
+                    pendingMode = CodexRealtimeModeContext.CaptureProjected(Current, capturedModeSession, wire,
+                        originalHistory.Count - Seed.Count);
+                    modeCapturePending = false;
+                    capturedModeSession = null;
+                    if (pendingMode is { } capture)
+                    {
+                        originalHistory.Add(capture.Message);
+                        wire = Array.AsReadOnly(wire.Append(capture.Message).ToArray());
+                    }
+                }
+                if (capturedGoal is { } goal)
+                {
+                    preparedGoalKey = goal.Key;
+                    capturedGoal = null;
+                    pendingGoalContext = CodexGoalSteeringContext.Capture(Current, goal, wire,
+                        originalHistory.Count - Seed.Count);
+                    if (pendingGoalContext is { } context)
+                    {
+                        originalHistory.Add(context.Message);
+                        wire = Array.AsReadOnly(wire.Append(context.Message).ToArray());
+                    }
+                }
                 await SynchronizeAsync(originalHistory.Skip(Seed.Count).ToArray(), ct).ConfigureAwait(false);
-                preparedWireHistory = Array.AsReadOnly(wire.Append(capture.Message).ToArray());
+                preparedWireHistory = wire;
                 return preparedWireHistory;
             }
             finally { gate.Release(); }
@@ -702,8 +727,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                         CodexRealtimeProtocol.Text(input[^1], "type") != "compaction_trigger")
                         throw new CodexThreadConflictException();
                     // No CAS retry: compaction must be admitted against its exact captured prefix.
-                    var compactAdmission = await store.AdmitAsync(Current.Id, candidate.Revision, turnId, owner, id,
-                        "inference", request, ct).ConfigureAwait(false);
+                    var compactAdmission = capturedGoal is { } captured
+                        ? await store.AdmitSteeredInferenceAsync(Current.Id, candidate.Revision, turnId, owner, id, request, captured.Key, ct).ConfigureAwait(false)
+                        : await store.AdmitAsync(Current.Id, candidate.Revision, turnId, owner, id, "inference", request, ct).ConfigureAwait(false);
                     if (!compactAdmission.Admitted) throw new CodexProtocolException("Compaction identity already dispatched; replay refused.");
                     Current = compactAdmission.Thread;
                     inlineCallId = id;
@@ -722,8 +748,10 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                         await SynchronizeAsync(input.Skip(Seed.Count).ToArray(), ct).ConfigureAwait(false);
                         await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
                     }
-                    var admission = await JournalAsync(doc => store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, id,
-                        "inference", request, ct), result => result.Thread, ct).ConfigureAwait(false);
+                    var admission = await JournalAsync(doc => preparedGoalKey is { } key
+                        ? store.AdmitSteeredInferenceAsync(doc.Id, doc.Revision, turnId, owner, id, request, key, ct)
+                        : store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, id, "inference", request, ct),
+                        result => result.Thread, ct).ConfigureAwait(false);
                     if (!admission.Admitted) throw new CodexProtocolException("Inference identity already dispatched; replay refused.");
                     preparedMailInput = allowMailSampling && input.Any(CodexNativeMailSampling.IsMail) ? input : null;
                     preparedInferenceRequestId = projection is null ? id : null;
@@ -950,6 +978,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try { snapshot = Current; }
             finally { gate.Release(); }
+            if (command.Name == CodexNativeGoalTools.Update && preparedGoalKey is { } sampled && !sampled.SameObjective(snapshot.Goal))
+                return (CodexNativeGoalTools.Error("The goal objective or generation changed after sampling; inspect the new goal first."), false);
             if (CodexNativeGoalTools.Rejection(command, snapshot.Goal) is { } rejection)
                 return (CodexNativeGoalTools.Error(rejection), false);
 
@@ -1022,8 +1052,10 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             if (projection is not null) output = output.Select(projection).ToArray();
             if (output.Count == Turn.Output.Length && !output.Where((item, i) => !JsonElement.DeepEquals(item, Turn.Output[i])).Any()) return;
             var mode = pendingMode;
-            await JournalAsync(doc => store.SynchronizeOutputCoreAsync(doc.Id, doc.Revision, turnId, owner, output, mode, ct), ct).ConfigureAwait(false);
+            var goalContext = pendingGoalContext;
+            await JournalAsync(doc => store.SynchronizeOutputCoreAsync(doc.Id, doc.Revision, turnId, owner, output, mode, ct, goalContext), ct).ConfigureAwait(false);
             pendingMode = null;
+            pendingGoalContext = null;
         }
         internal async Task FinishAsync(IReadOnlyList<JsonElement> history, CancellationToken ct)
         {

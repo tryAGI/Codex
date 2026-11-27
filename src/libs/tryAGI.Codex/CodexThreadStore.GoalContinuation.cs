@@ -63,7 +63,7 @@ public sealed partial class CodexThreadStore
         // Match the three-empty-response circuit breaker for completed empty turns.
         if (turn.Status == "interrupted") return thread;
         var hasActivity = turn.Input.Length > 1 || turn.Dispatches.Any(d => d.Kind == "tool")
-            || turn.Output.Any(item =>
+            || turn.Output.Where((item, index) => !CodexGoalSteeringContext.IsRecorded(turn, index, item)).Any(item =>
             {
                 var role = CodexRealtimeProtocol.Text(item, "role");
                 var type = CodexRealtimeProtocol.Text(item, "type");

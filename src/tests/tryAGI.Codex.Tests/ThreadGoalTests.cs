@@ -197,6 +197,37 @@ public sealed class ThreadGoalTests
     }
 
     [Fact]
+    public async Task GoalSteeringContextIsDurableAndOnlyReinjectedWhenProjectionNeedsIt()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"original"}""");
+        var current = await f.Store.ReadAsync(thread.Id, Ct);
+        var turnId = Guid.NewGuid();
+        current = await f.Store.StartTurnAsync(thread.Id, current.Revision, turnId, "owner", [], cancellationToken: Ct);
+        var snapshot = CodexGoalSteeringSnapshot.From(current.Goal);
+        var capture = CodexGoalSteeringContext.Capture(current, snapshot, [], 0)!;
+        current = await f.Store.SynchronizeOutputCoreAsync(thread.Id, current.Revision, turnId, "owner",
+            [capture.Message], null, Ct, capture);
+        var saved = await f.Reopen().ReadAsync(thread.Id, Ct);
+        Assert.True(CodexGoalSteeringContext.IsRecorded(saved.Turns[^1], 0, capture.Message));
+        Assert.Null(CodexGoalSteeringContext.Capture(saved, snapshot, [capture.Message], 1));
+        Assert.NotNull(CodexGoalSteeringContext.Capture(saved, snapshot, [], 1));
+        await Goal(host, thread.Id, """{"objective":"updated"}""");
+        current = await f.Store.ReadAsync(thread.Id, Ct);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => f.Store.AdmitSteeredInferenceAsync(
+            thread.Id, current.Revision, turnId, "owner", "stale", Json("{}"), snapshot.Key, Ct));
+        Assert.Empty((await f.Store.ReadAsync(thread.Id, Ct)).Turns[^1].Dispatches);
+        var updated = CodexGoalSteeringContext.Capture(current, CodexGoalSteeringSnapshot.From(current.Goal), [capture.Message], 1)!;
+        Assert.NotEqual(capture.Transition.StateSha256, updated.Transition.StateSha256);
+        current = await f.Store.SynchronizeOutputCoreAsync(thread.Id, current.Revision, turnId, "owner",
+            [capture.Message, updated.Message], null, Ct, updated);
+        var admitted = await f.Store.AdmitSteeredInferenceAsync(thread.Id, current.Revision, turnId, "owner",
+            "current", Json("{}"), updated.Key, Ct);
+        Assert.True(admitted.Admitted);
+        Assert.Equal(2, admitted.Thread.Turns[^1].GoalSteeringTransitions!.Length);
+    }
+
+    [Fact]
     public async Task GoalTimeUsesMonotonicIntervalsAndExcludesPauseAndIdle()
     {
         var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
