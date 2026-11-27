@@ -113,6 +113,13 @@ public sealed record CodexRealtimeEvent(string Type, JsonElement Payload, double
     /// <summary>The wire adapter that produced this event, or null for a manually constructed event.</summary>
     public string? Protocol { get; init; }
 
+    /// <summary>Generation captured at receipt for asynchronous feedback. Never serialized.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public CodexRealtimeConnection.FeedbackAdmission? Admission { get; init; }
+
+    /// <summary>A superseded response receipt remains raw, but must not release feedback or playback.</summary>
+    public bool StaleForFeedback { get; init; }
+
     /// <summary>Whether the pinned Rust adapter recognizes this event type (independent of payload validity).</summary>
     public bool RecognizedByRust => Protocol is { } protocol
         ? CodexRealtimeEventProjections.Recognized(protocol, Type)

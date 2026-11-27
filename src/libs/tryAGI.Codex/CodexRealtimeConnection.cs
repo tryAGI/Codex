@@ -21,6 +21,17 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     private bool responseActive;
     private bool responsePending;
     private string? pendingResponseRequestId;
+    private JsonObject? pendingResponsePayload;
+    private string? activeResponseId;
+    private bool cancelRequested;
+    private JsonObject? unacknowledgedResponse;
+    private ResponseAdmission? activeResponseAdmission;
+    private string? outputAudioItemId;
+    private uint outputAudioEndMs;
+    private readonly HashSet<string> retiredResponses = new(StringComparer.Ordinal);
+    private readonly Queue<string> retiredResponseOrder = new();
+    private readonly HashSet<string> retiredFunctions = new(StringComparer.Ordinal);
+    private bool feedbackRetired;
     /// <summary>GA response metadata echoed by the provider; not supported by frameless V3.</summary>
     public const string ResponseRequestMetadataKey = "client_request_id";
     private sealed record ResponseAdmission(bool Allowed);
@@ -38,10 +49,53 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     {
         lock (responseAdmissionGate)
         {
-            if (responseAdmission.Allowed != allowed)
+            if (!feedbackRetired && responseAdmission.Allowed != allowed)
                 Volatile.Write(ref responseAdmission, new(allowed));
         }
     }
+
+    /// <summary>Opaque, connection-bound feedback generation. Capture before starting asynchronous work.</summary>
+    public sealed class FeedbackAdmission
+    {
+        internal FeedbackAdmission(CodexRealtimeConnection owner, object stamp) => (Owner, Stamp) = (owner, stamp);
+        internal CodexRealtimeConnection Owner { get; }
+        internal object Stamp { get; }
+    }
+
+    /// <summary>Captures the current generation, without granting permission to speak.</summary>
+    public FeedbackAdmission CaptureFeedbackAdmission() => new(this, Volatile.Read(ref responseAdmission));
+
+    /// <summary>Whether this token still refers to the same connection and current speech-permitted generation.</summary>
+    public bool IsFeedbackAdmissionCurrent(FeedbackAdmission admission) =>
+        ReferenceEquals(admission.Owner, this) && ReferenceEquals(admission.Stamp, Volatile.Read(ref responseAdmission)) &&
+        ((ResponseAdmission)admission.Stamp).Allowed && Volatile.Read(ref disposed) == 0;
+
+    /// <summary>Fences pending speech from the previous turn, including work not yet submitted to the socket.</summary>
+    public void InvalidatePendingFeedback()
+    {
+        lock (responseAdmissionGate)
+            Volatile.Write(ref responseAdmission, new(responseAdmission.Allowed && !feedbackRetired));
+    }
+
+    /// <summary>Permanently retires this connection's feedback admission after a terminal policy/session failure.</summary>
+    public void RetireFeedbackAdmission()
+    {
+        lock (responseAdmissionGate)
+        {
+            feedbackRetired = true;
+            Volatile.Write(ref responseAdmission, new(false));
+        }
+    }
+
+    /// <summary>Appends feedback only for a still-current generation. False means the feedback was stale or suppressed.</summary>
+    public Task<bool> AppendFencedContextAsync(FeedbackAdmission admission, string text, string? delegationId = null,
+        string? channel = "speakable", CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(admission);
+        if (!IsFeedbackAdmissionCurrent(admission)) return Task.FromResult(false);
+        return AppendContextCoreAsync(text, delegationId, channel, cancellationToken, null, (ResponseAdmission)admission.Stamp, rejectStale: true);
+    }
+
     private int reading;
     private int disposed;
 
@@ -186,27 +240,21 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                 var payload = document.RootElement.Clone();
                 var type = CodexRealtimeProtocol.Text(payload, "type") ?? throw new CodexProtocolException("Sideband event omitted its type.");
                 ModelIdentity.Observe(payload);
-                if (protocol == "v2" && type is "response.created" or "response.done" or "response.function_call_arguments.done")
+                var item = new CodexRealtimeEvent(type, payload, Stopwatch.GetElapsedTime(connectedAt).TotalMilliseconds) { Protocol = protocol };
+                if (protocol == "v2" && type is "response.created" or "response.done" or "response.cancelled" or
+                    "response.function_call_arguments.done" or "conversation.item.done" or "input_audio_buffer.speech_started" or
+                    "response.output_audio.delta" or "response.audio.delta" or "error")
                 {
                     await writeGate.WaitAsync(linked.Token).ConfigureAwait(false);
                     try
                     {
-                        if (type == "response.function_call_arguments.done" && CodexRealtimeProtocol.Text(payload, "call_id") is { } functionId)
-                        {
-                            if (pendingFunctions.Count >= 128) throw new CodexProtocolException("GA pending function bound exceeded.");
-                            pendingFunctions.Add(functionId);
-                        }
-                        else
-                        {
-                            responseActive = type == "response.created";
-                            if (type == "response.done" && payload.TryGetProperty("response", out var response) && CodexRealtimeProtocol.Text(response, "status") is "cancelled" or "failed" or "incomplete")
-                                pendingFunctions.Clear();
-                        }
-                        await FlushPendingResponseUnderGateAsync(linked.Token).ConfigureAwait(false);
+                        item = item with { StaleForFeedback = IsStaleGaReceipt(item) };
+                        if (!item.StaleForFeedback) await ObserveGaLifecycleUnderGateAsync(item, linked.Token).ConfigureAwait(false);
                     }
                     finally { writeGate.Release(); }
                 }
-                yield return new(type, payload, Stopwatch.GetElapsedTime(connectedAt).TotalMilliseconds) { Protocol = protocol };
+                else if (protocol == "v3" && item.Turn is { Role: "user" }) InvalidatePendingFeedback();
+                yield return item with { Admission = item.StaleForFeedback ? null : CaptureFeedbackAdmission() };
             }
         }
         finally { Interlocked.Exchange(ref reading, 0); }
@@ -228,22 +276,24 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         return AppendContextCoreAsync(text, delegationId, channel, cancellationToken, responseRequestId);
     }
 
-    private async Task AppendContextCoreAsync(string text, string? delegationId, string? channel,
-        CancellationToken cancellationToken, string? responseRequestId)
+    private async Task<bool> AppendContextCoreAsync(string text, string? delegationId, string? channel,
+        CancellationToken cancellationToken, string? responseRequestId, ResponseAdmission? capturedAdmission = null, bool rejectStale = false)
     {
         if (channel is not (null or "speakable" or "commentary")) throw new ArgumentException("Unsupported context channel.");
         if (responseRequestId is not null && (responseRequestId.Length is < 1 or > 128 || responseRequestId.Any(char.IsControl)))
             throw new ArgumentException("Response request identity must contain 1..128 printable characters.", nameof(responseRequestId));
         if (responseRequestId is not null && (protocol != "v2" || channel != "speakable"))
             throw new NotSupportedException("Response request metadata requires an explicit GA speakable response.");
-        var requestedAdmission = Volatile.Read(ref responseAdmission);
+        var requestedAdmission = capturedAdmission ?? Volatile.Read(ref responseAdmission);
         // Keep a complete multipart context append contiguous when several producers share this connection.
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
         await writeGate.WaitAsync(linked.Token).ConfigureAwait(false);
         try
         {
+            if (rejectStale && (!requestedAdmission.Allowed || !ReferenceEquals(requestedAdmission, Volatile.Read(ref responseAdmission)))) return false;
             if (protocol == "v2")
             {
+                if (delegationId is not null && retiredFunctions.Contains(delegationId)) return false;
                 if (toolOutputs.Count >= 4096 && delegationId is not null && !toolOutputs.Contains(delegationId))
                     throw new CodexProtocolException("GA tool receipt bound exceeded; rotate the connection.");
                 var output = delegationId is not null && toolOutputs.Add(delegationId);
@@ -251,8 +301,16 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                     : CodexRealtimeGaProtocol.Message("developer", channel == "commentary" ? "Background context, not a request to speak: " + text : text), linked.Token).ConfigureAwait(false);
                 if (channel == "speakable") await RequestResponseUnderGateAsync(linked.Token, requestedAdmission, responseRequestId).ConfigureAwait(false);
             }
+            else if (protocol == "v1")
+            {
+                if (!requestedAdmission.Allowed || !ReferenceEquals(requestedAdmission, Volatile.Read(ref responseAdmission))) return false;
+                var legacy = delegationId is null ? CodexRealtimeGaProtocol.Message("developer", text, preserveDeveloperRole: true)
+                    : new JsonObject { ["type"] = "conversation.handoff.append", ["handoff_id"] = delegationId, ["output_text"] = text };
+                if (!await SendUnderGateAsync(legacy, linked.Token, requestedAdmission).ConfigureAwait(false)) return false;
+            }
             else foreach (var item in CodexRealtimeProtocol.Context(text, delegationId, channel))
                 await SendUnderGateAsync(item, linked.Token, requestedAdmission).ConfigureAwait(false);
+            return !rejectStale || ReferenceEquals(requestedAdmission, Volatile.Read(ref responseAdmission));
         }
         finally { writeGate.Release(); }
     }
@@ -263,7 +321,9 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     public Task AppendUserTextAsync(string text, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
-        return protocol == "v2" ? AppendGaUserAsync(text, cancellationToken) : AppendContextAsync(text, channel: "speakable", cancellationToken: cancellationToken);
+        return protocol == "v2" ? AppendGaUserAsync(text, cancellationToken)
+            : protocol == "v1" ? SendAsync(CodexRealtimeGaProtocol.Message("user", text, preserveDeveloperRole: true), cancellationToken)
+            : AppendContextAsync(text, channel: "speakable", cancellationToken: cancellationToken);
     }
 
     /// <summary>Asks the provider to end the session gracefully.</summary>
@@ -321,45 +381,242 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         await writeGate.WaitAsync(linked.Token).ConfigureAwait(false);
         try
         {
-            if (protocol == "v2" && message["type"]?.GetValue<string>() == "response.create" && message.Count == 1)
-                await RequestResponseUnderGateAsync(linked.Token, requestedAdmission).ConfigureAwait(false);
+            if (protocol == "v2" && message["type"]?.GetValue<string>() == "response.create")
+                await RequestResponseUnderGateAsync(linked.Token, requestedAdmission, rawResponse: message).ConfigureAwait(false);
+            else if (protocol == "v2" && message["type"]?.GetValue<string>() == "response.cancel")
+            {
+                var id = message["response_id"]?.GetValue<string>();
+                if (responseActive && !cancelRequested && (id is null || activeResponseId == id))
+                {
+                    InterruptFeedbackUnderGate(); cancelRequested = true;
+                    await SendUnderGateAsync(message, linked.Token).ConfigureAwait(false);
+                }
+            }
             else await SendUnderGateAsync(message, linked.Token, requestedAdmission).ConfigureAwait(false);
         }
         finally { writeGate.Release(); }
     }
 
-    private async Task RequestResponseUnderGateAsync(CancellationToken ct, ResponseAdmission? requestedAdmission = null, string? responseRequestId = null)
+    private static string? ResponseRequestId(JsonObject message) =>
+        (message["response"] as JsonObject)?["metadata"] is JsonObject metadata &&
+        metadata[ResponseRequestMetadataKey] is JsonValue value && value.TryGetValue<string>(out var id) ? id : null;
+
+    private async Task RequestResponseUnderGateAsync(CancellationToken ct, ResponseAdmission? requestedAdmission = null,
+        string? responseRequestId = null, JsonObject? rawResponse = null)
     {
         var admission = Volatile.Read(ref responseAdmission);
         if (!admission.Allowed || requestedAdmission is not null && !ReferenceEquals(admission, requestedAdmission)) return;
+        var message = rawResponse ?? new JsonObject { ["type"] = "response.create" };
+        if (rawResponse is null && responseRequestId is not null)
+            message["response"] = new JsonObject { ["metadata"] = new JsonObject { [ResponseRequestMetadataKey] = responseRequestId } };
+        responseRequestId ??= ResponseRequestId(message);
         if (responseActive || pendingFunctions.Count > 0)
         {
-            if (!ReferenceEquals(pendingResponseAdmission, admission)) pendingResponseRequestId = null;
-            if (pendingResponseRequestId is { } pending && responseRequestId is { } requested && pending != requested)
-                throw new CodexProtocolException("A different correlated response is already pending.");
-            responsePending = true; pendingResponseAdmission = admission;
-            pendingResponseRequestId ??= responseRequestId;
+            QueueResponseUnderGate(message, admission, responseRequestId);
             return;
         }
-        var message = new JsonObject { ["type"] = "response.create" };
-        if (responseRequestId is not null)
-            message["response"] = new JsonObject { ["metadata"] = new JsonObject { [ResponseRequestMetadataKey] = responseRequestId } };
         if (await SendUnderGateAsync(message, ct, admission).ConfigureAwait(false))
-            responseActive = true;
+        {
+            responseActive = true; activeResponseId = null; cancelRequested = false;
+            activeResponseAdmission = admission; unacknowledgedResponse = message;
+        }
     }
+
+    private void QueueResponseUnderGate(JsonObject message, ResponseAdmission admission, string? requestId)
+    {
+        if (!ReferenceEquals(pendingResponseAdmission, admission)) ClearPendingResponse();
+        if (pendingResponseRequestId is { } pending && requestId is { } requested && pending != requested)
+            throw new CodexProtocolException("A different correlated response is already pending.");
+        if (pendingResponsePayload is { Count: > 1 } existing && message.Count > 1 && !JsonNode.DeepEquals(existing, message))
+            throw new CodexProtocolException("A different configured response is already pending.");
+        responsePending = true; pendingResponseAdmission = admission;
+        pendingResponseRequestId ??= requestId;
+        if (pendingResponsePayload is null || pendingResponsePayload.Count == 1) pendingResponsePayload = message;
+    }
+
+    private void ClearPendingResponse()
+    {
+        responsePending = false; pendingResponseAdmission = null; pendingResponseRequestId = null; pendingResponsePayload = null;
+    }
+
     private async Task FlushPendingResponseUnderGateAsync(CancellationToken ct)
     {
         if (responseActive || !responsePending || pendingFunctions.Count != 0) return;
         var admission = pendingResponseAdmission;
-        var requestId = pendingResponseRequestId;
-        responsePending = false; pendingResponseAdmission = null;
-        pendingResponseRequestId = null;
-        if (ReferenceEquals(admission, Volatile.Read(ref responseAdmission)))
-            await RequestResponseUnderGateAsync(ct, admission, requestId).ConfigureAwait(false);
+        var message = pendingResponsePayload;
+        ClearPendingResponse();
+        if (message is not null && ReferenceEquals(admission, Volatile.Read(ref responseAdmission)))
+            await RequestResponseUnderGateAsync(ct, admission, rawResponse: message).ConfigureAwait(false);
+    }
+
+    private void RetireResponseId(string? id)
+    {
+        if (id is null || !retiredResponses.Add(id)) return;
+        retiredResponseOrder.Enqueue(id);
+        if (retiredResponseOrder.Count > 512) retiredResponses.Remove(retiredResponseOrder.Dequeue());
+    }
+
+    private void RetirePendingFunctionsUnderGate()
+    {
+        foreach (var id in pendingFunctions) retiredFunctions.Add(id);
+        if (retiredFunctions.Count > 4096) throw new CodexProtocolException("Retired tool receipt bound exceeded; rotate the connection.");
+        pendingFunctions.Clear();
+    }
+
+    private void InterruptFeedbackUnderGate()
+    {
+        InvalidatePendingFeedback();
+        ClearPendingResponse();
+        RetirePendingFunctionsUnderGate();
+        unacknowledgedResponse = null;
+    }
+
+    private static string? ErrorMessage(JsonElement payload)
+    {
+        if (CodexRealtimeProtocol.Text(payload, "message") is { } message) return message;
+        if (!payload.TryGetProperty("error", out var error)) return null;
+        return CodexRealtimeProtocol.Text(error, "message") ?? (error.ValueKind == JsonValueKind.String ? error.GetString() : null);
+    }
+
+    private bool IsStaleGaReceipt(CodexRealtimeEvent item)
+    {
+        var id = item.Response?.ResponseId ?? CodexRealtimeProtocol.Text(item.Payload, "response_id");
+        if (id is not null && retiredResponses.Contains(id)) return true;
+        if (item.Type is "response.done" or "response.cancelled") return activeResponseId is not null && id != activeResponseId;
+        if (item.Type is "response.function_call_arguments.done" or "conversation.item.done" or "response.audio.delta" or "response.output_audio.delta")
+            return activeResponseId is not null && id is not null && activeResponseId != id ||
+                activeResponseAdmission is not null && !ReferenceEquals(activeResponseAdmission, Volatile.Read(ref responseAdmission));
+        return false;
+    }
+
+    private async Task ObserveGaLifecycleUnderGateAsync(CodexRealtimeEvent item, CancellationToken ct)
+    {
+        var payload = item.Payload;
+        var eventType = item.Type;
+        var id = item.Response?.ResponseId ?? CodexRealtimeProtocol.Text(payload, "response_id");
+        if (id is not null && retiredResponses.Contains(id)) return;
+        if (eventType == "response.created")
+        {
+            if (activeResponseId is not null && id is not null && activeResponseId != id)
+            {
+                RetireResponseId(activeResponseId);
+                if (ReferenceEquals(activeResponseAdmission, Volatile.Read(ref responseAdmission))) InterruptFeedbackUnderGate();
+                else RetirePendingFunctionsUnderGate();
+                outputAudioItemId = null; outputAudioEndMs = 0;
+                activeResponseAdmission = null; cancelRequested = false;
+            }
+            responseActive = true; activeResponseId = id ?? activeResponseId;
+            activeResponseAdmission ??= Volatile.Read(ref responseAdmission);
+            unacknowledgedResponse = null;
+        }
+        else if (eventType is "response.done" or "response.cancelled")
+        {
+            // A terminal for a superseded response cannot release the current response queue.
+            if (activeResponseId is not null && id != activeResponseId) return;
+            var abnormal = eventType == "response.cancelled" || item.Response?.Status is "cancelled" or "failed" or "incomplete";
+            if (abnormal)
+            {
+                // A queued explicit request survives a normal provider terminal only if its generation is still current.
+                var previous = Volatile.Read(ref responseAdmission);
+                var preservePending = pendingFunctions.Count == 0 && ReferenceEquals(pendingResponseAdmission, previous);
+                if (ReferenceEquals(activeResponseAdmission, previous))
+                {
+                    InvalidatePendingFeedback();
+                    if (preservePending) pendingResponseAdmission = Volatile.Read(ref responseAdmission);
+                }
+                RetirePendingFunctionsUnderGate();
+            }
+            RetireResponseId(id ?? activeResponseId);
+            responseActive = false; activeResponseId = null; activeResponseAdmission = null; unacknowledgedResponse = null; cancelRequested = false;
+            outputAudioItemId = null; outputAudioEndMs = 0;
+            await FlushPendingResponseUnderGateAsync(ct).ConfigureAwait(false);
+        }
+        else if (eventType == "error")
+        {
+            var attempted = unacknowledgedResponse;
+            var admission = activeResponseAdmission;
+            if (attempted is null || admission is null) return;
+            var eventId = item.Error?.EventId;
+            var sentId = attempted["event_id"] is JsonValue value && value.TryGetValue<string>(out var sent) ? sent : null;
+            if (eventId is not null && eventId != sentId) return;
+            if (ErrorMessage(payload)?.StartsWith("Conversation already has an active response in progress:", StringComparison.Ordinal) == true)
+            {
+                // Exactly the pinned Rust retry condition. Never replay an ambiguous transport failure.
+                unacknowledgedResponse = null; responseActive = true;
+                if (ReferenceEquals(admission, Volatile.Read(ref responseAdmission)) && admission.Allowed &&
+                    (!responsePending || !ReferenceEquals(pendingResponseAdmission, admission)))
+                    QueueResponseUnderGate(attempted, admission, ResponseRequestId(attempted));
+            }
+            else if (eventId is not null && eventId == sentId)
+            {
+                unacknowledgedResponse = null; responseActive = false; activeResponseId = null; activeResponseAdmission = null;
+                ClearPendingResponse();
+            }
+        }
+        else if (eventType == "input_audio_buffer.speech_started")
+        {
+            InterruptFeedbackUnderGate();
+            var outputItem = outputAudioItemId;
+            var end = outputAudioEndMs;
+            outputAudioItemId = null; outputAudioEndMs = 0;
+            if (outputItem is not null && end > 0 && (item.SpeechStarted?.ItemId is null || item.SpeechStarted.ItemId == outputItem))
+                await SendUnderGateAsync(new JsonObject
+                {
+                    ["type"] = "conversation.item.truncate", ["item_id"] = outputItem, ["content_index"] = 0, ["audio_end_ms"] = end,
+                }, ct).ConfigureAwait(false);
+        }
+        else if (eventType is "response.audio.delta" or "response.output_audio.delta")
+        {
+            if (activeResponseId is not null && id is not null && activeResponseId != id ||
+                activeResponseAdmission is not null && !ReferenceEquals(activeResponseAdmission, Volatile.Read(ref responseAdmission))) return;
+            CodexRealtimeAudio? frame;
+            try { frame = item.Audio; }
+            catch (CodexProtocolException) { return; } // Preserve the raw malformed event for the caller.
+            if (frame?.ItemId is not { } outputItem) return;
+            var samples = frame.SamplesPerChannel ?? (uint)(frame.Pcm16.Length / 2 / frame.Channels);
+            var duration = (uint)Math.Min(uint.MaxValue, (ulong)samples * 1000 / (uint)frame.SampleRate);
+            if (duration == 0) return;
+            if (outputAudioItemId == outputItem) outputAudioEndMs = (uint)Math.Min(uint.MaxValue, (ulong)outputAudioEndMs + duration);
+            else { outputAudioItemId = outputItem; outputAudioEndMs = duration; }
+        }
+        else
+        {
+            if (activeResponseId is not null && id is not null && activeResponseId != id ||
+                activeResponseAdmission is not null && !ReferenceEquals(activeResponseAdmission, Volatile.Read(ref responseAdmission))) return;
+            var functionId = eventType == "response.function_call_arguments.done" ? CodexRealtimeProtocol.Text(payload, "call_id") : null;
+            if (eventType == "conversation.item.done" && item.ConversationItem?.Item is { } function &&
+                CodexRealtimeProtocol.Text(function, "type") == "function_call")
+                functionId = CodexRealtimeProtocol.Text(function, "call_id") ?? CodexRealtimeProtocol.Text(function, "id");
+            if (functionId is null || toolOutputs.Contains(functionId) || retiredFunctions.Contains(functionId)) return;
+            if (pendingFunctions.Count >= 128 && !pendingFunctions.Contains(functionId))
+                throw new CodexProtocolException("GA pending function bound exceeded.");
+            pendingFunctions.Add(functionId);
+        }
+    }
+
+    /// <summary>Cancels the current GA response if its optional provider identity still matches.
+    /// V3 has no pinned response.cancel wire command; fence feedback and stop local playback instead.</summary>
+    public async Task<bool> CancelResponseAsync(string? responseId = null, CancellationToken cancellationToken = default)
+    {
+        if (protocol != "v2") throw new NotSupportedException("The pinned adapter only exposes explicit cancellation for GA V2.");
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
+        await writeGate.WaitAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            if (!responseActive || cancelRequested || responseId is not null && responseId != activeResponseId) return false;
+            InterruptFeedbackUnderGate(); cancelRequested = true;
+            var message = new JsonObject { ["type"] = "response.cancel" };
+            if (activeResponseId is { } id) message["response_id"] = id;
+            await SendUnderGateAsync(message, linked.Token).ConfigureAwait(false);
+            return true;
+        }
+        finally { writeGate.Release(); }
     }
     private async Task<bool> SendUnderGateAsync(JsonObject message, CancellationToken ct, ResponseAdmission? requestedAdmission = null)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+        if (protocol == "v2" && message["item"] is JsonObject output && output["type"]?.GetValue<string>() == "function_call_output" &&
+            output["call_id"]?.GetValue<string>() is { } staleCall && retiredFunctions.Contains(staleCall)) return false;
         var bytes = Encoding.UTF8.GetBytes(message.ToJsonString());
         if (bytes.Length > maximumBytes) throw new CodexProtocolException("Outbound sideband message exceeded the configured bound.");
         // Prepare both legal wire forms before the admission lock. Sleep must never wait
@@ -385,7 +642,8 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                 write = socket.SendAsync(selected.AsMemory(), WebSocketMessageType.Text, true, ct);
             }
         }
-        else if (protocol == "v2" && message["type"]?.GetValue<string>() == "response.create")
+        else if (message["type"]?.GetValue<string>() == "response.create" ||
+            protocol == "v1" && requestedAdmission is not null && message["type"]?.GetValue<string>() == "conversation.handoff.append")
         {
             // Only initiation is serialized with suppression; never hold this lock over network I/O.
             lock (responseAdmissionGate)
@@ -409,6 +667,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0) return ValueTask.CompletedTask;
+        RetireFeedbackAdmission();
         lifetime.Cancel();
         socket.Abort();
         socket.Dispose();

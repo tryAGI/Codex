@@ -84,10 +84,10 @@ internal static class CodexRealtimeGaProtocol
     {
         var result = CodexRealtimeProtocol.AudioAppend(pcm); result["type"] = "input_audio_buffer.append"; return result;
     }
-    public static JsonObject Message(string role, string text)
+    public static JsonObject Message(string role, string text, bool preserveDeveloperRole = false)
     {
         if (role is not ("user" or "assistant" or "developer" or "system")) throw new ArgumentException("Unsupported message role.");
-        return new() { ["type"] = "conversation.item.create", ["item"] = new JsonObject { ["type"] = "message", ["role"] = role == "developer" ? "system" : role,
+        return new() { ["type"] = "conversation.item.create", ["item"] = new JsonObject { ["type"] = "message", ["role"] = role == "developer" && !preserveDeveloperRole ? "system" : role,
             ["content"] = new JsonArray(new JsonObject { ["type"] = role == "assistant" ? "output_text" : "input_text", ["text"] = text }) } };
     }
     public static JsonObject FunctionOutput(string callId, string output) => new() { ["type"] = "conversation.item.create", ["item"] = new JsonObject
