@@ -269,6 +269,68 @@ public sealed class ThreadCompactionCheckpointTests
         Assert.Equal(1, calls);
     }
 
+    [Theory]
+    [InlineData("attached")]
+    [InlineData("detached")]
+    [InlineData("ended")]
+    public async Task InlineCompactionRecapturesOnlyRequiredRealtimeWorldState(string lifecycle)
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "rtc_call", "v3", "voice-owner", Ct);
+        thread = await store.ConfigureRealtimeModeInstructionsAsync(thread.Id, thread.Revision, "voice", "voice-owner",
+            new("custom start", "custom end"), Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "voice-owner", attachment, Ct);
+        if (lifecycle == "detached")
+            thread = await store.DetachRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "voice-owner", attachment, Ct);
+        var budget = new Budget();
+        var server = new Server(midTurn: true, toolRounds: 2);
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage));
+        var turn = Guid.NewGuid();
+        var settings = Settings(thread.Id, turn) with
+        {
+            Tools = [Json("""{"type":"function","name":"read","parameters":{"type":"object","properties":{}}}""")],
+            AutomaticCompaction = new() { TokenThreshold = 1, MaximumInlineCompactions = 1 },
+        };
+        var effects = 0;
+        var result = await agent.RunAsync(thread.Id, thread.Revision, turn, "owner", settings, [User("first input")],
+            async (_, ct) =>
+            {
+                if (++effects == 1 && lifecycle == "ended")
+                {
+                    var current = await store.ReadAsync(thread.Id, ct);
+                    current = await store.DetachRealtimeSessionAsync(current.Id, current.Revision, "voice", "voice-owner", attachment, ct);
+                    var endId = Guid.NewGuid();
+                    current = (await store.BeginRealtimeEndAsync(current.Id, current.Revision, "voice", "voice-owner", null, endId, ct)).Thread;
+                    await store.CompleteRealtimeEndAsync(current.Id, current.Revision, "voice", "voice-owner", endId, ct);
+                }
+                return new CodexToolOutput("receipt");
+            }, cancellationToken: Ct);
+        Assert.Equal(2, effects);
+        Assert.Equal(4, budget.Completed);
+        var stored = Assert.Single(result.Thread.Turns);
+        var checkpoint = result.Thread.CompactionCheckpoint!;
+        Assert.DoesNotContain(checkpoint.Projection, CodexRealtimeModeContext.IsModeFragment);
+        Assert.Equal(4, server.Requests.Count);
+        const string start = "<realtime_conversation>\ncustom start\n</realtime_conversation>";
+        static string[] Modes(JsonElement request) => request.GetProperty("input").EnumerateArray()
+            .Where(CodexRealtimeModeContext.IsModeFragment).Select(item => item.GetProperty("content").GetString()!).ToArray();
+        Assert.Equal([start], Modes(server.Requests[0]));
+        Assert.Equal([start], Modes(server.Requests[1]));
+        Assert.Equal(lifecycle == "ended" ? [] : new[] { start }, Modes(server.Requests[2]));
+        Assert.Equal(lifecycle == "ended" ? [] : new[] { start }, Modes(server.Requests[3]));
+        Assert.Equal(lifecycle == "ended" ? 1 : 2, stored.RealtimeModeTransitions!.Length);
+        Assert.All(stored.RealtimeModeTransitions!, transition => Assert.True(transition.Active));
+        var restored = await new CodexThreadStore(storage, "account").ReadAsync(thread.Id, Ct);
+        Assert.Equal(stored.RealtimeModeTransitions, Assert.Single(restored.Turns).RealtimeModeTransitions);
+        var projected = CodexThreadCompaction.Project(restored, restored.CompactionCheckpoint, settings.Model,
+            CodexThreadCompaction.ScopeHash(settings), restored.Turns.Length);
+        Assert.Equal(lifecycle == "ended" ? 0 : 1, projected.Count(CodexRealtimeModeContext.IsModeFragment));
+    }
+
     [Fact]
     public async Task InlineCandidateCannotInstallAfterConcurrentInput()
     {
@@ -497,6 +559,54 @@ public sealed class ThreadCompactionCheckpointTests
         Assert.DoesNotContain(continuation, item => CodexRealtimeProtocol.Text(item, "call_id") == "executed");
         Assert.Equal(2, continuation.Count(item => CodexRealtimeProtocol.Text(item, "call_id") == "executed-2"));
         Assert.Equal(4, server.Requests.Count);
+    }
+
+    [Fact]
+    public async Task SpeculativeCompactionRecapturesActiveRealtimeModeAfterAdoption()
+    {
+        var (_, store, thread, _) = await RealtimeHistoryTests.Setup();
+        var budget = new Budget();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var server = new Server(midTurn: true, toolRounds: 2) { CompactionEntered = entered, ReleaseCompaction = release };
+        await using var scheduler = new CodexThreadCompactionScheduler();
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage))
+        { BackgroundCompactions = scheduler };
+        var turn = Guid.NewGuid();
+        var settings = Settings(thread.Id, turn) with
+        {
+            Tools = [Json("""{"type":"function","name":"read","parameters":{"type":"object","properties":{}}}""")],
+            AutomaticCompaction = new() { TokenThreshold = 1600, BackgroundTokenThreshold = 900 },
+        };
+        var effects = 0;
+        var result = await agent.RunAsync(thread.Id, thread.Revision, turn, "owner", settings, [User("first")],
+            async (_, ct) =>
+            {
+                if (++effects == 1) return new CodexToolOutput(new string('a', 3800));
+                await entered.Task.WaitAsync(ct);
+                Assert.Equal(0, scheduler.Completed);
+                release.TrySetResult();
+                return new CodexToolOutput(new string('b', 1800));
+            }, cancellationToken: Ct);
+        Assert.Equal(2, effects);
+        Assert.Equal(4, budget.Completed);
+        Assert.Equal(1, scheduler.Started);
+        var checkpoint = result.Thread.CompactionCheckpoint!;
+        Assert.Equal(4, checkpoint.ActiveBoundary!.OutputCount);
+        Assert.DoesNotContain(checkpoint.Projection, CodexRealtimeModeContext.IsModeFragment);
+        var stored = Assert.Single(result.Thread.Turns);
+        Assert.Equal(2, stored.RealtimeModeTransitions!.Length);
+        Assert.All(stored.RealtimeModeTransitions, transition => Assert.True(transition.Active));
+        var reasoningRequests = server.Requests.Where(request => !request.GetProperty("input").EnumerateArray()
+            .Any(item => CodexRealtimeProtocol.Text(item, "type") == "compaction_trigger")).ToArray();
+        Assert.Equal(3, reasoningRequests.Length);
+        foreach (var request in reasoningRequests)
+            Assert.Single(request.GetProperty("input").EnumerateArray(), CodexRealtimeModeContext.IsModeFragment);
+        var continuation = reasoningRequests[^1].GetProperty("input").EnumerateArray().ToArray();
+        Assert.Single(continuation, item => CodexRealtimeProtocol.Text(item, "type") == "compaction");
+        Assert.Contains(continuation, item => CodexRealtimeProtocol.Text(item, "call_id") == "executed-2");
+        Assert.True(CodexRealtimeModeContext.IsModeFragment(continuation[^1]));
     }
 
     [Fact]

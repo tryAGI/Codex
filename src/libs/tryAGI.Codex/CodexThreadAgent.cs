@@ -296,6 +296,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private readonly Func<JsonElement, JsonElement>? projection;
         private readonly CodexAgentControl? control;
         private CodexRealtimeModeCapture? pendingMode;
+        private readonly bool deferModeUntilProjection;
+        private CodexStoredRealtimeSession? capturedModeSession;
+        private bool modeCapturePending;
         private readonly CodexRealtimeArtifactStream artifacts = new();
         private IReadOnlyList<JsonElement>? preparedWireHistory;
         private CodexThreadCompactionCandidate? inlineCandidate;
@@ -320,6 +323,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         {
             this.store = store; Current = current; this.turnId = turnId; this.owner = owner; this.budget = budget; this.projection = projection; this.control = control;
             this.authOwner = authOwner;
+            deferModeUntilProjection = projection is null && historyTurnLimit is null && settings.AutomaticCompaction is not null;
             if (projection is null && historyTurnLimit is null && current.Turns.Length > 1)
                 contextObservation = CodexContextWindow.ReadObservation(current.Turns[^2], current);
             var firstTurnIndex = Math.Max(0, current.Turns.Length - (historyTurnLimit ?? current.Turns.Length));
@@ -408,8 +412,18 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 var turn = actual.Turns.Single(t => t.Id == turnId);
                 if (turn.OwnerId != owner || turn.Status != "inProgress")
                     throw new InvalidOperationException("Realtime mode capture lost its native turn owner.");
-                pendingMode = CodexRealtimeModeContext.Capture(actual, history, Seed.Count);
-                if (pendingMode is { } capture) history.Add(capture.Message);
+                if (deferModeUntilProjection)
+                {
+                    // Freeze the logical state with the captured steering/input generation.
+                    // A slow compaction must not sample a different realtime lifecycle.
+                    capturedModeSession = CodexRealtimeModeContext.CaptureSession(actual);
+                    modeCapturePending = true;
+                }
+                else
+                {
+                    pendingMode = CodexRealtimeModeContext.Capture(actual, history, Seed.Count);
+                    if (pendingMode is { } capture) history.Add(capture.Message);
+                }
             }
             finally { gate.Release(); }
         }
@@ -423,6 +437,35 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         }
 
         internal async Task<IReadOnlyList<JsonElement>> PrepareWireHistoryAsync(CodexClient client,
+            CodexResponseOptions settings, List<JsonElement> originalHistory,
+            Action<CodexResponseDiagnostic>? observeDiagnostics, CancellationToken ct,
+            CodexThreadCompactionScheduler? scheduler, CodexThreadCompactionScheduler.AuthOwner authOwner,
+            ICodexCredentialProvider credentialGuard,
+            Action<CodexThreadCompactionCandidate, CodexResponseOptions, CodexContextWindowStatus> schedule)
+        {
+            var wire = await PrepareCompactedWireHistoryAsync(client, settings, originalHistory,
+                observeDiagnostics, ct, scheduler, authOwner, credentialGuard, schedule).ConfigureAwait(false);
+            if (!modeCapturePending) return wire;
+
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                // A checkpoint can remove every prior world-state fragment. Render the
+                // captured state against the actual projected prompt, including its suffix.
+                pendingMode = CodexRealtimeModeContext.CaptureProjected(Current, capturedModeSession, wire,
+                    originalHistory.Count - Seed.Count);
+                modeCapturePending = false;
+                capturedModeSession = null;
+                if (pendingMode is not { } capture) return wire;
+                originalHistory.Add(capture.Message);
+                await SynchronizeAsync(originalHistory.Skip(Seed.Count).ToArray(), ct).ConfigureAwait(false);
+                preparedWireHistory = Array.AsReadOnly(wire.Append(capture.Message).ToArray());
+                return preparedWireHistory;
+            }
+            finally { gate.Release(); }
+        }
+
+        private async Task<IReadOnlyList<JsonElement>> PrepareCompactedWireHistoryAsync(CodexClient client,
             CodexResponseOptions settings, IReadOnlyList<JsonElement> originalHistory,
             Action<CodexResponseDiagnostic>? observeDiagnostics, CancellationToken ct,
             CodexThreadCompactionScheduler? scheduler, CodexThreadCompactionScheduler.AuthOwner authOwner,
