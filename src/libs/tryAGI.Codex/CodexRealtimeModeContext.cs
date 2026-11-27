@@ -43,18 +43,41 @@ internal static class CodexRealtimeModeContext
         CodexRealtimeSessionOptions.ValidateModeInstructions(instructions?.End);
     }
 
+    internal static CodexStoredRealtimeSession? CaptureSession(CodexThreadDocument document)
+        => document.RealtimeSessions?.LastOrDefault(s => s.UsedAttachmentIds is { Length: > 0 });
+
     internal static CodexRealtimeModeCapture? Capture(CodexThreadDocument document,
         IReadOnlyList<JsonElement> retained, int seedCount)
+        => CaptureProjected(document, CaptureSession(document), retained, retained.Count - seedCount);
+
+    internal static CodexRealtimeModeCapture? CaptureProjected(CodexThreadDocument document,
+        CodexStoredRealtimeSession? session, IReadOnlyList<JsonElement> retained, int outputIndex)
     {
-        CodexStoredRealtimeModeTransition? previous = null;
+        // The final retained fragment, not the most recent occurrence in the original
+        // journal, determines the state visible to the model. A compacted-away
+        // transition is unknown. Only recognize fragments authored by the journal.
+        var transitions = new Dictionary<string, (CodexStoredRealtimeModeTransition Transition, JsonElement Item)>(StringComparer.Ordinal);
         foreach (var turn in document.Turns)
             foreach (var transition in turn.RealtimeModeTransitions ?? [])
-                if (retained.Any(item => JsonElement.DeepEquals(item, turn.Output[transition.OutputIndex])))
-                    previous = transition;
+            {
+                var item = turn.Output[transition.OutputIndex];
+                if (CodexRealtimeProtocol.Text(item, "content") is { } content)
+                    transitions[content] = (transition, item);
+            }
+        CodexStoredRealtimeModeTransition? previous = null;
+        for (var index = retained.Count - 1; index >= 0; index--)
+        {
+            var item = retained[index];
+            if (IsModeFragment(item) && CodexRealtimeProtocol.Text(item, "content") is { } content &&
+                transitions.TryGetValue(content, out var known) && JsonElement.DeepEquals(item, known.Item))
+            {
+                previous = known.Transition;
+                break;
+            }
+        }
 
         // A detached transport does not end its logical call. An uncertain lifecycle is not
         // proof of an end, and cannot introduce a new mode transition before reconciliation.
-        var session = document.RealtimeSessions?.LastOrDefault(s => s.UsedAttachmentIds is { Length: > 0 });
         if (session?.State is "recoveryRequired" or "ending") return null;
         var active = session?.State is "attached" or "detached";
         if (previous?.Active == active || previous is null && !active) return null;
@@ -68,7 +91,7 @@ internal static class CodexRealtimeModeContext
             ["content"] = "<realtime_conversation>\n" + instructions + "\n</realtime_conversation>",
         }.ToJsonString());
         var message = parsed.RootElement.Clone();
-        return new(new(retained.Count - seedCount, active, sessionId, Digest(message), end), message);
+        return new(new(outputIndex, active, sessionId, Digest(message), end), message);
     }
 
     internal static string Digest(JsonElement message)

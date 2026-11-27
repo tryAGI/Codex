@@ -29,9 +29,9 @@ public sealed record CodexAgentResult(string Text, IReadOnlyList<JsonElement> Hi
 /// <summary>Bounded native reasoning/tool loop. The host retains responsibility for tool authorization and durable action deduplication.</summary>
 public sealed class CodexAgent(CodexClient client)
 {
-    // The native journal can prepare a compacted wire projection without modifying
-    // the original history accumulated by this runner or its executed-call fence.
-    internal Func<CodexResponseOptions, IReadOnlyList<JsonElement>, CancellationToken, Task<IReadOnlyList<JsonElement>>>? PrepareNativeHistory { get; init; }
+    // The native journal may project compacted history and append newly captured
+    // world-state fragments; it must never rewrite the original history or call fence.
+    internal Func<CodexResponseOptions, List<JsonElement>, CancellationToken, Task<IReadOnlyList<JsonElement>>>? PrepareNativeHistory { get; init; }
     internal Action<CodexResponseOptions, IReadOnlyList<JsonElement>, CodexResponseEvent>? ObserveNativeCompletion { get; init; }
 
     /// <summary>Runs one turn with flat function tools until the model answers without calling one.</summary>
