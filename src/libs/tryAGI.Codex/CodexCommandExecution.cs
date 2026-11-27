@@ -152,7 +152,7 @@ public sealed class CodexCommandExecution : IAsyncDisposable
 
     private async Task<JsonElement> ExecuteAsync(CommandParams input, CancellationToken cancellationToken)
     {
-        var request = Validate(input);
+        var request = Validate(connectionId, input);
         var key = input.ProcessId is null ? "internal:" + Guid.NewGuid().ToString("N") : "client:" + input.ProcessId;
         var entry = new Running(request);
         CancellationTokenSource linked;
@@ -203,7 +203,7 @@ public sealed class CodexCommandExecution : IAsyncDisposable
         }
     }
 
-    private CodexCommandRequest Validate(CommandParams input)
+    internal static CodexCommandRequest Validate(string connectionId, CommandParams input)
     {
         if (input.Command is not { Length: > 0 and <= 1024 } || string.IsNullOrWhiteSpace(input.Command[0]) ||
             input.Command.Any(x => x is null || x.Contains('\0')) || input.Command.Sum(x => (long)x.Length) > 131072)
@@ -237,16 +237,16 @@ public sealed class CodexCommandExecution : IAsyncDisposable
             input.OutputBytesCap ?? 1048576, TimeSpan.FromMilliseconds(input.TimeoutMs ?? 60000));
     }
 
-    private static bool ValidSize(CodexCommandTerminalSize? size) => size is { Rows: > 0, Cols: > 0 };
-    private static CodexThreadRpcException Invalid(string message) => new(-32600, message);
+    internal static bool ValidSize(CodexCommandTerminalSize? size) => size is { Rows: > 0, Cols: > 0 };
+    internal static CodexThreadRpcException Invalid(string message) => new(-32600, message);
 
-    private static T Read<T>(JsonElement parameters, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> type)
+    internal static T Read<T>(JsonElement parameters, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> type)
     {
         try { return parameters.Deserialize(type) ?? throw Invalid("Missing command parameters."); }
         catch (JsonException) { throw Invalid("Malformed or unsupported command parameters."); }
     }
 
-    private static void EnsureUniqueFields(JsonElement value)
+    internal static void EnsureUniqueFields(JsonElement value)
     {
         if (value.ValueKind == JsonValueKind.Object)
         {
@@ -261,7 +261,7 @@ public sealed class CodexCommandExecution : IAsyncDisposable
             foreach (var item in value.EnumerateArray()) EnsureUniqueFields(item);
     }
 
-    private static byte[] Decode(string? base64)
+    internal static byte[] Decode(string? base64)
     {
         if (base64 is null) return [];
         if (base64.Length > 1398104) throw Invalid("Stdin chunk is too large.");
@@ -284,7 +284,9 @@ public sealed class CodexCommandExecution : IAsyncDisposable
 
     private async Task CloseAsync(Task[] pending)
     {
-        await lifetime.CancelAsync().ConfigureAwait(false);
+        try { await lifetime.CancelAsync().ConfigureAwait(false); }
+        catch (Exception error) { lock (gate) cleanupFailure ??= error; }
+        // A failing cancellation callback must not skip owned process cleanup.
         await Task.WhenAll(pending).ConfigureAwait(false);
         lifetime.Dispose();
         if (cleanupFailure is { } failure) throw new InvalidOperationException("Command process cleanup could not be verified.", failure);

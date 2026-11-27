@@ -16,7 +16,7 @@ All paths in the Rust column are relative to `codex-rs` at the pinned revision.
 | command_exec tests: buffered compatibility, caps, streamed output not duplicated, PTY implies streaming, initial size and resize, pipe writes | Host validates parameters, caps each output stream, reports base64 deltas before the response, delegates stdin/PTY to the owned session. | Synthetic tests, real adapter pending #104 |
 | command_exec tests: connection-scoped process IDs, disconnect terminates process; command without streams can be terminated | Per-connection host; duplicate/foreign IDs rejected; capacity held until adapter cleanup; disconnect waits for cleanup. | Synthetic tests, actual OS descendants pending #104 |
 | command_exec tests: profile selection, managed deny-read, network proxy isolation, project roots use command cwd, local environment disabled | Explicit policy/profile forwarded to trusted adapter, no default executor or unsandboxed fallback. | Enforcement not implemented/certified by SDK; #81, #104 |
-| `app-server-protocol/src/protocol/v2/process.rs`; `app-server/tests/suite/v2/process_exec.rs` (spawn returns before exit, drain timeout, handle release, cap flags, kill) | Separate host process lifecycle is not implemented. Rust host-level process/spawn is not a sandbox fallback. | #101 |
+| `app-server-protocol/src/protocol/v2/process.rs`; `app-server/tests/suite/v2/process_exec.rs` (spawn returns before exit, drain timeout, handle release, cap flags, kill) | `CodexProcessExecution` implements separate process/spawn, writeStdin, resizePty, kill, outputDelta and exited using an explicit contained host adapter and transport response barrier. | Managed lifecycle tests in `CodexProcessExecutionTests`; #101, real adapter pending #104 |
 | `exec`, `exec-server` including process_sandbox_tests, sandbox_integrity, regular_file_tests, no_follow | SDK adapter boundary only; transport, real PTY, process containment and drain semantics still need separate acceptance. | #78, #81, #104 |
 | `app-server-protocol/src/protocol/v2/fs.rs`; `app-server/tests/suite/v2/fs.rs` | Existing `CodexFileSystem`, `CodexFileSystemNative`, `CodexFileSystemWatches`, `CodexFileSystemTests`, `CodexFileSystemWatchTests`. | Existing code mapped, not independently certified here; #79 |
 | `file-system`, `file-watcher/src/file_watcher_tests.rs`, exec-server no_follow and fs_sandbox_windows_tests | Preserve fs/watch behavior; authorization before path-based I/O is not proof of race-free rooted enforcement. | #103 |
@@ -67,3 +67,23 @@ remote-main build/test workflow is required to certify this package. No warning 
 Remaining: effective permission profiles and turn/session grants (#111), server approval/decision RPC
 bridge (#112), durable persistence and dispatch integration (#113). Tool transport integration is
 coordinated with #64; a model response or elicitation event cannot itself grant permission.
+
+## Connection-owned process lifecycle (#101)
+
+`CodexProcessExecution` uses an independent `ICodexProcessAdapter` capability rather than
+routing rejected sandboxed commands to a host process. It reuses the exact-argv, environment,
+PTY and resource-bound validation of command/exec. The authenticated transport supplies a
+response callback that orders the spawn response before any process/outputDelta or process/exited
+notification. Output emitted before the response is bounded and retained per stream, not delivered early.
+After acknowledgment, the process is connection-owned; request cancellation no longer kills it.
+The adapter must enforce actual containment and report drain status. Disconnect waits for disposal;
+a cleanup error fails the host and does not emit a successful exit. Ambiguous output delivery is
+not replayed. Explicit null caps/timeouts are recognized as unbounded requests and rejected by the
+native safety limits, not silently treated as omitted fields. There is no unsandboxed fallback.
+The host reports exit 124 on its execution deadline only after successful cleanup; an unknown
+drain status is omitted rather than invented. Actual sandbox and PTY behavior remain #104.
+
+Local validation on macOS arm64 / .NET 10: 44 tests passed, 0 failed, 0 skipped across
+CodexProcessExecutionTests, CodexCommandExecutionTests and CodexApprovalStoreTests.
+The admitted build receipt is native-20261127-f6f94c90b4734d368d46ccad20784809.
+These tests use synthetic process adapters; they do not certify OS-level isolation.
