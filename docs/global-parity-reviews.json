@@ -6,17 +6,30 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/archive": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 89,
         "scope": "typed-contract-only",
-        "rationale": "Request and empty result metadata; wire-name/parameter test. No Rust server round trip.",
+        "rationale": "Request and empty result metadata; wire-name/parameter test. No Rust server round trip. Mapped credential-free schema and round-trip cases passed at the reviewed revision; this is not real Rust-runtime acceptance.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerMethods.ThreadArchive"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData",
-          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
-        ]
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadIdParams\", definition: \"ThreadArchiveParams\", sent: True)",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerEmpty\", definition: \"ThreadArchiveResponse\", sent: False)"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+          "receipt": "docs/global-parity-evidence/ci-b3f9229-45956495446.json",
+          "receiptSha256": "a86a8999e25aa692e53f20fbe046d1ca27cce4d31715704a4e4da05ef94e4529",
+          "cases": [
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerEmpty\", definition: \"ThreadArchiveResponse\", sent: False)",
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadIdParams\", definition: \"ThreadArchiveParams\", sent: True)",
+            "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData"
+          ]
+        }
       },
       "native-sdk": {
         "status": "missing",
@@ -32,17 +45,30 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/unarchive": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 89,
         "scope": "typed-contract-only",
-        "rationale": "Typed request and restored-thread result metadata; schema test covers declared response. No actual Rust round trip.",
+        "rationale": "Typed request and restored-thread result metadata; schema test covers declared response. No actual Rust round trip. Mapped credential-free schema and round-trip cases passed at the reviewed revision; this is not real Rust-runtime acceptance.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerMethods.ThreadUnarchive"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData",
-          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
-        ]
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadIdParams\", definition: \"ThreadUnarchiveParams\", sent: True)",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadUnarchiveResponse\", definition: \"ThreadUnarchiveResponse\", sent: False)"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+          "receipt": "docs/global-parity-evidence/ci-b3f9229-45956495446.json",
+          "receiptSha256": "a86a8999e25aa692e53f20fbe046d1ca27cce4d31715704a4e4da05ef94e4529",
+          "cases": [
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadIdParams\", definition: \"ThreadUnarchiveParams\", sent: True)",
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadUnarchiveResponse\", definition: \"ThreadUnarchiveResponse\", sent: False)",
+            "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData"
+          ]
+        }
       },
       "native-sdk": {
         "status": "missing",
@@ -58,47 +84,74 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/name/set": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 89,
         "scope": "typed-contract-only",
-        "rationale": "Typed rename parameters and empty result; camel-case wire test, no Rust process.",
+        "rationale": "Typed rename parameters and empty result; camel-case wire test, no Rust process. Mapped credential-free schema and round-trip cases passed at the reviewed revision; this is not real Rust-runtime acceptance.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerMethods.ThreadSetName"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData",
-          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
-        ]
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadSetNameParams\", definition: \"ThreadSetNameParams\", sent: True)",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerEmpty\", definition: \"ThreadSetNameResponse\", sent: False)"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+          "receipt": "docs/global-parity-evidence/ci-b3f9229-45956495446.json",
+          "receiptSha256": "a86a8999e25aa692e53f20fbe046d1ca27cce4d31715704a4e4da05ef94e4529",
+          "cases": [
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerEmpty\", definition: \"ThreadSetNameResponse\", sent: False)",
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadSetNameParams\", definition: \"ThreadSetNameParams\", sent: True)",
+            "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData"
+          ]
+        }
       },
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 68,
         "scope": "native-behavior",
-        "rationale": "Native dispatcher calls CAS-backed SetNameAsync, emits name update, and test verifies persistence across cold host and fork. Revision-bound receipt still required.",
+        "rationale": "The C# test passed in Realtime CI at b3f9229 and verifies persisted name across a cold host and fork, but does not exercise a paginated named-empty thread through a subsequent completed turn after restart. Gap #128; do not accept full native RPC yet.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Metadata.cs::SetNameAsync",
           "src/libs/tryAGI.Codex/CodexThreadStore.Metadata.cs::SetNameAsync"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/thread_name_persistence.rs::named_empty_paginated_thread_resumes_after_restart"
         ]
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/archived": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 89,
         "scope": "typed-contract-only",
-        "rationale": "Typed notification and unknown JSON preservation; synthetic only.",
+        "rationale": "Typed notification and unknown JSON preservation; synthetic only. Mapped credential-free schema and round-trip cases passed at the reviewed revision; this is not real Rust-runtime acceptance.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerNotifications.ThreadArchived"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
-          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
-        ]
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadArchivedNotification\", sent: False)"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+          "receipt": "docs/global-parity-evidence/ci-b3f9229-45956495446.json",
+          "receiptSha256": "a86a8999e25aa692e53f20fbe046d1ca27cce4d31715704a4e4da05ef94e4529",
+          "cases": [
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadArchivedNotification\", sent: False)",
+            "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods"
+          ]
+        }
       },
       "native-sdk": {
         "status": "missing",
@@ -114,17 +167,28 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/unarchived": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 89,
         "scope": "typed-contract-only",
-        "rationale": "Typed notification and unknown JSON preservation; synthetic only.",
+        "rationale": "Typed notification and unknown JSON preservation; synthetic only. Mapped credential-free schema and round-trip cases passed at the reviewed revision; this is not real Rust-runtime acceptance.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerNotifications.ThreadUnarchived"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
-          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
-        ]
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadUnarchivedNotification\", sent: False)"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+          "receipt": "docs/global-parity-evidence/ci-b3f9229-45956495446.json",
+          "receiptSha256": "a86a8999e25aa692e53f20fbe046d1ca27cce4d31715704a4e4da05ef94e4529",
+          "cases": [
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadUnarchivedNotification\", sent: False)",
+            "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods"
+          ]
+        }
       },
       "native-sdk": {
         "status": "missing",
@@ -140,17 +204,28 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/closed": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 89,
         "scope": "typed-contract-only",
-        "rationale": "Typed notification and unknown JSON preservation; synthetic only.",
+        "rationale": "Typed notification and unknown JSON preservation; synthetic only. Mapped credential-free schema and round-trip cases passed at the reviewed revision; this is not real Rust-runtime acceptance.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerNotifications.ThreadClosed"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
-          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
-        ]
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadClosedNotification\", sent: False)"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+          "receipt": "docs/global-parity-evidence/ci-b3f9229-45956495446.json",
+          "receiptSha256": "a86a8999e25aa692e53f20fbe046d1ca27cce4d31715704a4e4da05ef94e4529",
+          "cases": [
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNotification\", definition: \"ThreadClosedNotification\", sent: False)",
+            "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods"
+          ]
+        }
       },
       "native-sdk": {
         "status": "missing",
@@ -166,30 +241,45 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/name/updated": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 89,
         "scope": "typed-contract-only",
-        "rationale": "Typed notification with optional name and extension data; synthetic only.",
+        "rationale": "Typed notification with optional name and extension data; synthetic only. Mapped credential-free schema and round-trip cases passed at the reviewed revision; this is not real Rust-runtime acceptance.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerNotifications.ThreadNameUpdated"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
-          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
-        ]
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNameNotification\", definition: \"ThreadNameUpdatedNotification\", sent: False)"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
+          "receipt": "docs/global-parity-evidence/ci-b3f9229-45956495446.json",
+          "receiptSha256": "a86a8999e25aa692e53f20fbe046d1ca27cce4d31715704a4e4da05ef94e4529",
+          "cases": [
+            "tryAGI.Codex.Tests.AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema(model: \"CodexAppServerThreadNameNotification\", definition: \"ThreadNameUpdatedNotification\", sent: False)",
+            "tryAGI.Codex.Tests.AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods"
+          ]
+        }
       },
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "reviewedCommit": "b3f92295a73bc8f3a028a5bf17d11aff84f1e250",
         "ownerIssue": 68,
         "scope": "native-behavior",
-        "rationale": "Native dispatcher calls CAS-backed SetNameAsync, emits name update, and test verifies persistence across cold host and fork. Revision-bound receipt still required.",
+        "rationale": "Native SetNameAsync emits one exact event observed by the C# fixture, but Rust tests require notification fan-out to both connected clients for loaded and unloaded threads. Host-adapter acceptance remains pending (#128).",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Metadata.cs::SetNameAsync",
           "src/libs/tryAGI.Codex/CodexThreadStore.Metadata.cs::SetNameAsync"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks"
+        ],
+        "upstreamTests": [
+          "codex-rs/app-server/tests/suite/v2/thread_name_websocket.rs::thread_name_updated_broadcasts_for_loaded_threads",
+          "codex-rs/app-server/tests/suite/v2/thread_name_websocket.rs::thread_name_updated_broadcasts_for_not_loaded_threads"
         ]
       }
     }

@@ -69,7 +69,7 @@ def validate_reviews(data, review):
             owner = entry.get("ownerIssue")
             if status not in STATUSES or not HEX40.fullmatch(revision) or not isinstance(rationale, str) or not rationale.strip() or type(owner) is not int or owner < 25:
                 raise ValueError(f"Incomplete review: {rid}/{lane}")
-            if set(entry) - {"status", "reviewedCommit", "rationale", "ownerIssue", "scope", "implementation", "test", "basis", "evidence"}:
+            if set(entry) - {"status", "reviewedCommit", "rationale", "ownerIssue", "scope", "implementation", "test", "basis", "evidence", "testEvidence", "upstreamTests"}:
                 raise ValueError(f"Unknown review field: {rid}/{lane}")
             _, reviewed_tree = source_revision(revision)
             paths = set()
@@ -94,6 +94,14 @@ def validate_reviews(data, review):
             }
             if scope not in allowed_scopes[lane]:
                 raise ValueError(f"Review scope does not match its lane: {rid}/{lane}")
+            upstream_tests = entry.get("upstreamTests", [])
+            if not isinstance(upstream_tests, list) or len(upstream_tests) != len(set(upstream_tests)):
+                raise ValueError("Invalid pinned upstream test references")
+            for reference in upstream_tests:
+                path, sep, symbol = reference.partition("::")
+                candidates_in_source = data["sourceInventory"].get(path, {}).get("testCandidates", [])
+                if not sep or not any(name == symbol for name, _ in candidates_in_source):
+                    raise ValueError(f"Unknown upstream test: {reference}")
             if status == "passed":
                 if lane != "native-sdk" or scope != "native-behavior":
                     raise ValueError("Only native behavior has an offline acceptance verifier; other lanes remain blocked")
@@ -113,6 +121,22 @@ def validate_reviews(data, review):
                     raise ValueError("Receipt source tree differs from reviewed commit")
             elif entry.get("evidence") is not None:
                 raise ValueError("Only a verified pass may carry acceptance evidence")
+            observed = entry.get("testEvidence")
+            if observed is not None:
+                # A passed contract test is a fact about an exact source revision, not
+                # proof that the entire Rust capability or an external runtime passes.
+                if status != "source-reviewed" or lane not in {"native-sdk", "rust-app-server-interop"}:
+                    raise ValueError("Test-only evidence must remain a source-reviewed offline mapping")
+                if not isinstance(observed, dict) or observed.get("lane") != "offline" or observed.get("outcome") != "passed" or observed.get("csharpCommit") != revision:
+                    raise ValueError("Invalid test-only evidence")
+                location = observed.get("receipt", "")
+                if location.startswith("docs/global-parity-evidence/"):
+                    observed_tree = validate_receipt({"lane": "behavior", "test": entry["test"]}, observed,
+                                                     evidence_directory="docs/global-parity-evidence", expected_scope="global")
+                else:
+                    observed_tree = validate_receipt({"lane": "behavior", "test": entry["test"]}, observed)
+                if observed_tree != reviewed_tree:
+                    raise ValueError("Observed test source tree differs from reviewed commit")
             key = (rid, lane)
             reviewed[key] = entry
             # Negative conclusions can be invalidated by a new handler in another file;
@@ -134,12 +158,19 @@ def validate_reviews(data, review):
 def summarize(data, review):
     entries, stale = validate_reviews(data, review)
     result = {}
+    _, current_tree = source_revision()
+    clean = source_is_clean()
     for lane in LANES:
         counts = collections.Counter()
+        test_observed = test_current = 0
         for row in data["rows"]:
             key = (row["id"], lane)
             entry = entries.get(key)
             counts["stale" if key in stale else entry["status"] if entry else "pending"] += 1
+            if entry and entry.get("testEvidence"):
+                test_observed += 1
+                if source_revision(entry["reviewedCommit"])[1] == current_tree and clean:
+                    test_current += 1
         unresolved = counts["pending"] + counts["stale"]
         applicable = sum(counts[s] for s in ("source-reviewed", "missing", "divergent", "passed"))
         result[lane] = {
@@ -147,11 +178,12 @@ def summarize(data, review):
             "sourceReviewed": counts["source-reviewed"], "missing": counts["missing"],
             "divergent": counts["divergent"], "notApplicable": counts["not-applicable"],
             "passed": counts["passed"], "applicableReviewed": applicable,
+            "testOnlyEvidenceObserved": test_observed, "testOnlyEvidenceCurrent": test_current,
             "reviewedDenominator": applicable if review["inventoryReviewed"] and not unresolved else None,
         }
     # Platform, real Rust process and live-provider receipt verifiers must be implemented
     # before those lanes can pass. An incomplete review never releases a package.
-    ready = source_is_clean() and review["inventoryReviewed"] and not stale and all(
+    ready = clean and review["inventoryReviewed"] and not stale and all(
         lane["reviewedDenominator"] is not None and lane["reviewedDenominator"] > 0
         and lane["passed"] == lane["reviewedDenominator"] for lane in result.values())
     return result, ready, len(entries), len(stale)
@@ -176,6 +208,8 @@ def self_test(data, review):
     reject(lambda r: r["rows"][rid][lane].update(scope="host-effect"))
     reject(lambda r: r["rows"][rid][lane].update(status="passed"))
     reject(lambda r: r["rows"][rid][lane].update(evidence={"outcome": "passed"}))
+    reject(lambda r: r["rows"][rid][lane].update(testEvidence={"outcome": "passed"}))
+    reject(lambda r: r["rows"][rid][lane].update(upstreamTests=["unknown::missing"]))
     reject(lambda r: r["rows"][rid].update({"live-provider": {**lanes[lane], "status": "passed"}}))
     assert not summarize(data, review)[1]
     print("Global review self-test: orphan, mutable revision, unjustified or evidence-free pass and wrong lane rejected.")
