@@ -21,6 +21,8 @@ public enum CodexCommandStream
 
 /// <summary>Validated, bounded execution request. The adapter must resolve and enforce the
 /// host's effective permission profile and sandbox; these inputs do not grant authority.</summary>
+/// <param name="ExecutionId">Unique host-generated execution attempt; never reused when a client process ID is reused.</param>
+/// <param name="ProcessId">Client correlation ID, not authority.</param>
 /// <param name="ConnectionId">Authenticated owner supplied by the host.</param>
 /// <param name="Command">Exact argv, including the executable.</param>
 /// <param name="Cwd">Requested absolute working directory, or host default.</param>
@@ -33,7 +35,7 @@ public enum CodexCommandStream
 /// <param name="PermissionProfile">Requested permission profile, if specified.</param>
 /// <param name="OutputBytesCap">Maximum bytes retained per stream.</param>
 /// <param name="Timeout">Maximum operation duration.</param>
-public sealed record CodexCommandRequest(string ConnectionId, IReadOnlyList<string> Command,
+public sealed record CodexCommandRequest(Guid ExecutionId, string? ProcessId, string ConnectionId, IReadOnlyList<string> Command,
     string? Cwd, IReadOnlyDictionary<string, string?> Environment, bool Tty, bool StreamStdin,
     bool StreamStdoutStderr, CodexCommandTerminalSize? Size, JsonElement? SandboxPolicy,
     string? PermissionProfile, int OutputBytesCap, TimeSpan Timeout);
@@ -229,7 +231,7 @@ public sealed class CodexCommandExecution : IAsyncDisposable
             x.Key.Contains('\0') || x.Value?.Contains('\0') == true) ||
             env.Sum(x => (long)x.Key.Length + (x.Value?.Length ?? 0)) > 131072)
             throw Invalid("Invalid or oversized environment.");
-        return new(connectionId, Array.AsReadOnly(input.Command), input.Cwd,
+        return new(Guid.NewGuid(), input.ProcessId, connectionId, Array.AsReadOnly(input.Command), input.Cwd,
             new ReadOnlyDictionary<string, string?>(env), input.Tty, input.Tty || input.StreamStdin,
             input.Tty || input.StreamStdoutStderr, input.Size, input.SandboxPolicy?.Clone(), input.PermissionProfile,
             input.OutputBytesCap ?? 1048576, TimeSpan.FromMilliseconds(input.TimeoutMs ?? 60000));

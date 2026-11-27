@@ -19,6 +19,8 @@ public sealed class CodexCommandExecutionTests
         var run = Exec(host, """{"command":["tool","a b",""],"outputBytesCap":3,"env":{"A":"v","B":null}}""");
         var process = await adapter.Started.Task.WaitAsync(Ct);
         Assert.Equal("owner", adapter.Request!.ConnectionId);
+        Assert.NotEqual(Guid.Empty, adapter.Request.ExecutionId);
+        Assert.Null(adapter.Request.ProcessId);
         Assert.Equal(["tool", "a b", ""], adapter.Request.Command);
         Assert.Equal("v", adapter.Request.Environment["A"]);
         Assert.Null(adapter.Request.Environment["B"]);
@@ -46,6 +48,7 @@ public sealed class CodexCommandExecutionTests
         var run = Exec(host, """{"command":["tool"],"processId":"a","tty":true,"size":{"rows":25,"cols":80},"outputBytesCap":3}""");
         var process = await adapter.Started.Task.WaitAsync(Ct);
         Assert.True(adapter.Request!.StreamStdin);
+        Assert.Equal("a", adapter.Request.ProcessId);
         Assert.True(adapter.Request.StreamStdoutStderr);
         Assert.Equal(new CodexCommandTerminalSize(25, 80), adapter.Request.Size);
         await process.Emit(CodexCommandStream.Stdout, new byte[] { 0, 255 });
