@@ -1,0 +1,883 @@
+{
+  "artifactSha256": "cd99e197c7fa4da44ad6bed930cfc276fcf785100aebf8bf6b2bbc5e6ae0268c",
+  "cases": {
+    "tryAGI.Codex.Tests.CodexObservedUsageTests.DuplicateCompletedEventsAccountOnceAndHeadersDoNotInventOtherWindows": {
+      "method": "tryAGI.Codex.Tests.CodexObservedUsageTests.DuplicateCompletedEventsAccountOnceAndHeadersDoNotInventOtherWindows",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexObservedUsageTests.IncompleteReportedUsageIsNotCompletedBilling": {
+      "method": "tryAGI.Codex.Tests.CodexObservedUsageTests.IncompleteReportedUsageIsNotCompletedBilling",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexObservedUsageTests.RealtimeSessionSnapshotIsNotInferredAsResponseBilling": {
+      "method": "tryAGI.Codex.Tests.CodexObservedUsageTests.RealtimeSessionSnapshotIsNotInferredAsResponseBilling",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexObservedUsageTests.RustTokenCountAndRateLimitFixturesPreserveReportedValues": {
+      "method": "tryAGI.Codex.Tests.CodexObservedUsageTests.RustTokenCountAndRateLimitFixturesPreserveReportedValues",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexObservedUsageTests.SparseAndEvolvingResponsesKeepUnknownDistinctFromZero": {
+      "method": "tryAGI.Codex.Tests.CodexObservedUsageTests.SparseAndEvolvingResponsesKeepUnknownDistinctFromZero",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexObservedUsageTests.WrappedQuotaErrorRetainsTypedResetAndNeverCompletes": {
+      "method": "tryAGI.Codex.Tests.CodexObservedUsageTests.WrappedQuotaErrorRetainsTypedResetAndNeverCompletes",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesRoutingTests.FirstStateIsImmutableAndMetadataCorrelatesTheBackingTurn": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesRoutingTests.FirstStateIsImmutableAndMetadataCorrelatesTheBackingTurn",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesRoutingTests.LateHeadersFromAnOldTurnCannotPoisonTheCurrentTurn": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesRoutingTests.LateHeadersFromAnOldTurnCannotPoisonTheCurrentTurn",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesRoutingTests.MissingOrAmbiguousStateDoesNotBecomeRoutingState": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesRoutingTests.MissingOrAmbiguousStateDoesNotBecomeRoutingState",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesRoutingTests.TurnRouteAndCredentialChangesCannotReplayState": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesRoutingTests.TurnRouteAndCredentialChangesCannotReplayState",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.ChangedPropertiesOrTurnDoNotUsePriorResponseId": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.ChangedPropertiesOrTurnDoNotUsePriorResponseId",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.DisconnectAfterDispatchNeverFallsBack(prewarm: False)": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.DisconnectAfterDispatchNeverFallsBack",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.DisconnectAfterDispatchNeverFallsBack(prewarm: True)": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.DisconnectAfterDispatchNeverFallsBack",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.FailedHandshakeFallsBackBeforeGenerationOnly": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.FailedHandshakeFallsBackBeforeGenerationOnly",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput": {
+      "method": "tryAGI.Codex.Tests.CodexResponsesWebSocketTests.PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.BudgetedMediaLabelsAreKeptOrDroppedAsAGroup": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.BudgetedMediaLabelsAreKeptOrDroppedAsAGroup",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.ExplicitToolExchangeIsAtomicAndRawReceiptsSurvive": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.ExplicitToolExchangeIsAtomicAndRawReceiptsSurvive",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: False, budget: 1, count: 1, images: 0)": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: False, budget: 2, count: 2, images: 1)": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 0, count: 0, images: 0)": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 1844, count: 1, images: 0)": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill(charge: True, budget: 1845, count: 2, images: 1)": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.MixedContentPreservesImagesKindsAndMarksRetainedSourcesIncomplete": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.MixedContentPreservesImagesKindsAndMarksRetainedSourcesIncomplete",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.OriginalDetailPngUsesPatchEstimateAndFileReferenceUsesMaximum": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.OriginalDetailPngUsesPatchEstimateAndFileReferenceUsesMaximum",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.PendingMailRemainsAfterCheckpoint": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.PendingMailRemainsAfterCheckpoint",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice(retainClient: False)": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice(retainClient: True)": {
+      "method": "tryAGI.Codex.Tests.CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.AmbiguousCreateFailureIsNotRetriedOrLeaked": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.AmbiguousCreateFailureIsNotRetriedOrLeaked",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.ChatGptCallUsesV3JsonAndPreservesCredentialsOnlyInHeaders": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.ChatGptCallUsesV3JsonAndPreservesCredentialsOnlyInHeaders",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.CredentialsDoNotPrintOrSerializeSecrets": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.CredentialsDoNotPrintOrSerializeSecrets",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.DelegationRequiresExplicitClientTargetAndPreservesFragments": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.DelegationRequiresExplicitClientTargetAndPreservesFragments",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.FramelessTurnDoneSuppliesCanonicalReplacementText(role: \"assistant\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.FramelessTurnDoneSuppliesCanonicalReplacementText",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.FramelessTurnDoneSuppliesCanonicalReplacementText(role: \"user\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.FramelessTurnDoneSuppliesCanonicalReplacementText",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.HistoricalFunctionIdIsNotReplayedOnAnotherTurn": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.HistoricalFunctionIdIsNotReplayedOnAnotherTurn",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.InvalidCallIdsAreRejected(location: \"../../other\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.InvalidCallIdsAreRejected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.InvalidCallIdsAreRejected(location: \"https://other.example/secret\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.InvalidCallIdsAreRejected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.InvalidCallIdsAreRejected(location: \"rtc_\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.InvalidCallIdsAreRejected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.NativeAgentExecutesOnlyAdvertisedFunctionsAndRetainsReasoning": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.NativeAgentExecutesOnlyAdvertisedFunctionsAndRetainsReasoning",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.NewV3VoicesCannotLeakIntoV1(voice: \"aube\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.NewV3VoicesCannotLeakIntoV1",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.NewV3VoicesCannotLeakIntoV1(voice: \"viola\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.NewV3VoicesCannotLeakIntoV1",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.RepeatedToolIdNeverReexecutesAction": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.RepeatedToolIdNeverReexecutesAction",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.RussianAndEmojiContextChunksRetainTextWithinUpstreamByteLimit": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.RussianAndEmojiContextChunksRetainTextWithinUpstreamByteLimit",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.SseBoundIncludesUnterminatedLines": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.SseBoundIncludesUnterminatedLines",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.SseDecoderHandlesUtf8AcrossEveryByteBoundary": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.SseDecoderHandlesUtf8AcrossEveryByteBoundary",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.TruncatedSseCannotBecomeSuccessfulResponse": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.TruncatedSseCannotBecomeSuccessfulResponse",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.UnadvertisedFunctionNeverReachesHostExecutor": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.UnadvertisedFunctionNeverReachesHostExecutor",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall(voice: \"\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall(voice: \"alloy\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall(voice: \"cedar\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall(voice: \"unknown\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall(voice: \"verse\")": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.V2OrUnknownVoiceIsRejectedBeforeCreatingACall",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.NativeProtocolTests.V3AcceptsThePinnedUpstreamChatGptVoiceCatalog": {
+      "method": "tryAGI.Codex.Tests.NativeProtocolTests.V3AcceptsThePinnedUpstreamChatGptVoiceCatalog",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.AmbiguousApiCallFailureIsNotReplayed": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.AmbiguousApiCallFailureIsNotReplayed",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.ApiSessionCallUsesRustMultipart(protocol: \"v1\", voice: null, expectedVoice: \"cove\", uri: \"https://api.openai.com/v1/realtime/calls?intent=qu\"\u00b7\u00b7\u00b7, alpha: \"quicksilver=v1\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.ApiSessionCallUsesRustMultipart",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.ApiSessionCallUsesRustMultipart(protocol: \"v3\", voice: \"cove\", expectedVoice: \"cove\", uri: \"https://api.openai.com/v1/live\", alpha: \"quicksilver=v2\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.ApiSessionCallUsesRustMultipart",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.ApiSessionCallUsesRustMultipart(protocol: \"v3\", voice: \"marin\", expectedVoice: \"marin\", uri: \"https://api.openai.com/v1/live\", alpha: \"quicksilver=v2\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.ApiSessionCallUsesRustMultipart",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.ApiSessionCallUsesRustMultipart(protocol: \"v3\", voice: null, expectedVoice: \"marin\", uri: \"https://api.openai.com/v1/live\", alpha: \"quicksilver=v2\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.ApiSessionCallUsesRustMultipart",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpAmbiguousCreateIsNotRetried": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpAmbiguousCreateIsNotRetried",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery(api: False, uri: \"https://chatgpt.com/backend-api/codex/realtime/cal\"\u00b7\u00b7\u00b7, location: \"/v1/realtime/calls/calls/rtc_backend_test\", callId: \"rtc_backend_test\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery(api: True, uri: \"https://api.openai.com/v1/realtime/calls\", location: \"/v1/realtime/calls/calls/12345678-abcd-4321-aabc-1\"\u00b7\u00b7\u00b7, callId: \"12345678-abcd-4321-aabc-123456789abc\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery(api: True, uri: \"https://api.openai.com/v1/realtime/calls\", location: \"/v1/realtime/calls/rtc_test\", callId: \"rtc_test\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpCallHasNoSessionOrImplicitLegacyQuery",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpMalformedResponseIsRejectedWithoutReplay(answer: \"invalid SDP\", location: \"/v1/realtime/calls/rtc_test\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpMalformedResponseIsRejectedWithoutReplay",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpMalformedResponseIsRejectedWithoutReplay(answer: \"v=0\\r\\n\", location: \"/v1/realtime/calls/not-a-call-id\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpMalformedResponseIsRejectedWithoutReplay",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpMalformedResponseIsRejectedWithoutReplay(answer: \"v=0\\r\\n\", location: null)": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpMalformedResponseIsRejectedWithoutReplay",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpRejectsWrongDestinationBeforeGettingCredentials": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.RawSdpRejectsWrongDestinationBeforeGettingCredentials",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeApiCallTests.WrongCredentialDomainAndV2CallsAreRejectedBeforeDispatch": {
+      "method": "tryAGI.Codex.Tests.RealtimeApiCallTests.WrongCredentialDomainAndV2CallsAreRejectedBeforeDispatch",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.AccountMismatchRejectedBeforeNetwork": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.AccountMismatchRejectedBeforeNetwork",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.CallerStreamUsesSameParserAndDetachLeavesMediaChannelsOpen(protocol: \"v1\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.CallerStreamUsesSameParserAndDetachLeavesMediaChannelsOpen",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.CallerStreamUsesSameParserAndDetachLeavesMediaChannelsOpen(protocol: \"v2\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.CallerStreamUsesSameParserAndDetachLeavesMediaChannelsOpen",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.CallerStreamUsesSameParserAndDetachLeavesMediaChannelsOpen(protocol: \"v3\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.CallerStreamUsesSameParserAndDetachLeavesMediaChannelsOpen",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.ElapsedDeadlineAndCancellationHaveNoAuthorizationOrTransportEffects": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.ElapsedDeadlineAndCancellationHaveNoAuthorizationOrTransportEffects",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.ExternalHeadersRequireExplicitDestinationAndNeverFetchOAuth": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.ExternalHeadersRequireExplicitDestinationAndNeverFetchOAuth",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.UntrustedDestinationRejectedBeforeCredentials(uri: \"wss://api.openai.com.example.invalid/v1/live\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.UntrustedDestinationRejectedBeforeCredentials",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.UntrustedDestinationRejectedBeforeCredentials(uri: \"wss://api.openai.com/v1/live?redirect=1\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.UntrustedDestinationRejectedBeforeCredentials",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.UntrustedDestinationRejectedBeforeCredentials(uri: \"wss://api.openai.com:444/v1/live\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.UntrustedDestinationRejectedBeforeCredentials",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeAttachmentTests.UntrustedDestinationRejectedBeforeCredentials(uri: \"wss://example.invalid/v1/live\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeAttachmentTests.UntrustedDestinationRejectedBeforeCredentials",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.AudioMetadataMatchesAdapter(protocol: \"v1\", json: \"{\\\"type\\\":\\\"conversation.output_audio.delta\\\",\\\"data\\\":\\\"\"\u00b7\u00b7\u00b7, rate: 16000, channels: 2, itemId: null, samples: 1)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.AudioMetadataMatchesAdapter(protocol: \"v2\", json: \"{\\\"type\\\":\\\"response.audio.delta\\\",\\\"delta\\\":\\\"AQACAA==\\\",\"\u00b7\u00b7\u00b7, rate: 48000, channels: 2, itemId: \"i\", samples: 1)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.AudioMetadataMatchesAdapter(protocol: \"v2\", json: \"{\\\"type\\\":\\\"response.output_audio.delta\\\",\\\"delta\\\":\\\"AQA\"\u00b7\u00b7\u00b7, rate: 24000, channels: 1, itemId: null, samples: null)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.AudioMetadataMatchesAdapter(protocol: \"v3\", json: \"{\\\"type\\\":\\\"output_audio.delta\\\",\\\"audio\\\":\\\"AQACAA==\\\",\\\"s\"\u00b7\u00b7\u00b7, rate: 24000, channels: 1, itemId: null, samples: null)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.AudioMetadataMatchesAdapter",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.ConversationSpeechTurnAndErrorReceiptsPreserveUnknownFields": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.ConversationSpeechTurnAndErrorReceiptsPreserveUnknownFields",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.handoff.requested\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.input_transcript.turn_marked\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.added\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.done\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.comple\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.item.input_audio_transcription.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_audio.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"conversation.output_transcript.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"error\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_audio_transcript.done\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"response.output_text.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v1\", type: \"session.updated\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.added\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.created\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.done\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.input_audio_transcription.comple\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"conversation.item.input_audio_transcription.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"error\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"input_audio_buffer.speech_started\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.audio.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.cancelled\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.created\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.done\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_audio_transcript.done\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_text.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"response.output_text.done\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v2\", type: \"session.updated\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"delegation.created\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"error\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"input_transcript.added\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"output_audio.delta\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"output_transcript.added\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.started\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"session.updated\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved(protocol: \"v3\", type: \"turn.done\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.EveryPinnedParserVariantIsRecognizedAndRawJsonPreserved",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.HandoffNoopAndUnknownFunctionAreDistinct": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.HandoffNoopAndUnknownFunctionAreDistinct",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw(protocol: \"v1\", json: \"{\\\"type\\\":\\\"response.output_audio.delta\\\",\\\"delta\\\":\\\"AQA\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw(protocol: \"v1\", json: \"{\\\"type\\\":\\\"response.output_text.done\\\",\\\"text\\\":\\\"unexpe\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw(protocol: \"v2\", json: \"{\\\"type\\\":\\\"conversation.input_transcript.delta\\\",\\\"del\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw(protocol: \"v2\", json: \"{\\\"type\\\":\\\"conversation.output_audio.delta\\\",\\\"delta\\\":\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw(protocol: \"v3\", json: \"{\\\"type\\\":\\\"response.output_text.delta\\\",\\\"delta\\\":\\\"unex\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.OtherAdapterAudioAndTranscriptEventsRemainRaw",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.ResponseLifecycleIdentityIsOptionalAndNestedIdWins(type: \"response.cancelled\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.ResponseLifecycleIdentityIsOptionalAndNestedIdWins",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.ResponseLifecycleIdentityIsOptionalAndNestedIdWins(type: \"response.created\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.ResponseLifecycleIdentityIsOptionalAndNestedIdWins",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.ResponseLifecycleIdentityIsOptionalAndNestedIdWins(type: \"response.done\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.ResponseLifecycleIdentityIsOptionalAndNestedIdWins",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.SessionIdentityIsRequiredAndOptionalInstructionsAreNotInvented(protocol: \"v1\", json: \"{\\\"type\\\":\\\"session.updated\\\",\\\"session\\\":{\\\"id\\\":\\\"s\\\"}}\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.SessionIdentityIsRequiredAndOptionalInstructionsAreNotInvented",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.SessionIdentityIsRequiredAndOptionalInstructionsAreNotInvented(protocol: \"v2\", json: \"{\\\"type\\\":\\\"session.updated\\\",\\\"session\\\":{\\\"id\\\":\\\"s\\\"}}\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.SessionIdentityIsRequiredAndOptionalInstructionsAreNotInvented",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.SessionIdentityIsRequiredAndOptionalInstructionsAreNotInvented(protocol: \"v3\", json: \"{\\\"type\\\":\\\"session.started\\\",\\\"session\\\":{\\\"id\\\":\\\"s\\\"}}\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.SessionIdentityIsRequiredAndOptionalInstructionsAreNotInvented",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v1\", json: \"{\\\"type\\\":\\\"conversation.input_transcript.delta\\\",\\\"del\"\u00b7\u00b7\u00b7, role: \"user\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v1\", json: \"{\\\"type\\\":\\\"conversation.input_transcript.turn_marked\"\u00b7\u00b7\u00b7, role: \"user\", final: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v1\", json: \"{\\\"type\\\":\\\"conversation.item.input_audio_transcripti\"\u00b7\u00b7\u00b7, role: \"user\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v1\", json: \"{\\\"type\\\":\\\"conversation.output_transcript.delta\\\",\\\"de\"\u00b7\u00b7\u00b7, role: \"assistant\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v1\", json: \"{\\\"type\\\":\\\"response.output_audio_transcript.delta\\\",\\\"\"\u00b7\u00b7\u00b7, role: \"assistant\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v1\", json: \"{\\\"type\\\":\\\"response.output_audio_transcript.done\\\",\\\"t\"\u00b7\u00b7\u00b7, role: \"assistant\", final: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v1\", json: \"{\\\"type\\\":\\\"response.output_text.delta\\\",\\\"delta\\\":\\\"hell\"\u00b7\u00b7\u00b7, role: \"assistant\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v2\", json: \"{\\\"type\\\":\\\"conversation.item.input_audio_transcripti\"\u00b7\u00b7\u00b7, role: \"user\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v2\", json: \"{\\\"type\\\":\\\"conversation.item.input_audio_transcripti\"\u00b7\u00b7\u00b7, role: \"user\", final: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v2\", json: \"{\\\"type\\\":\\\"response.output_audio_transcript.delta\\\",\\\"\"\u00b7\u00b7\u00b7, role: \"assistant\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v2\", json: \"{\\\"type\\\":\\\"response.output_audio_transcript.done\\\",\\\"t\"\u00b7\u00b7\u00b7, role: \"assistant\", final: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v2\", json: \"{\\\"type\\\":\\\"response.output_text.delta\\\",\\\"delta\\\":\\\"hell\"\u00b7\u00b7\u00b7, role: \"assistant\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v2\", json: \"{\\\"type\\\":\\\"response.output_text.done\\\",\\\"text\\\":\\\"hello\\\"\"\u00b7\u00b7\u00b7, role: \"assistant\", final: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v3\", json: \"{\\\"type\\\":\\\"input_transcript.added\\\",\\\"item\\\":{\\\"text\\\":\\\"h\"\u00b7\u00b7\u00b7, role: \"user\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v3\", json: \"{\\\"type\\\":\\\"output_transcript.added\\\",\\\"item\\\":{\\\"text\\\":\\\"\"\u00b7\u00b7\u00b7, role: \"assistant\", final: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected(protocol: \"v3\", json: \"{\\\"type\\\":\\\"turn.done\\\",\\\"turn\\\":{\\\"role\\\":\\\"assistant\\\",\\\"tr\"\u00b7\u00b7\u00b7, role: \"assistant\", final: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.TranscriptAliasesAreProjected",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeEventParityTests.V1RequiresMetadataAndAllAdaptersRetainBoundedAudioValidation": {
+      "method": "tryAGI.Codex.Tests.RealtimeEventParityTests.V1RequiresMetadataAndAllAdaptersRetainBoundedAudioValidation",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.ANewAwakeAdmissionCanReplaceExpiredSuppressedMetadata": {
+      "method": "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.ANewAwakeAdmissionCanReplaceExpiredSuppressedMetadata",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.DistinctPendingInvitationsCannotShareOrOverwriteAnIdentity": {
+      "method": "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.DistinctPendingInvitationsCannotShareOrOverwriteAnIdentity",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.ExistingAppendContextBinarySignatureRemainsAvailable": {
+      "method": "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.ExistingAppendContextBinarySignatureRemainsAvailable",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.ExplicitGaInvitationCarriesItsIdentityOnResponseCreateOnly": {
+      "method": "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.ExplicitGaInvitationCarriesItsIdentityOnResponseCreateOnly",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.PendingResponsePreservesIdentityAcrossUnrelatedToolReceipts": {
+      "method": "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.PendingResponsePreservesIdentityAcrossUnrelatedToolReceipts",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.SleepWakeNeverReplaysCorrelatedPendingSpeech": {
+      "method": "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.SleepWakeNeverReplaysCorrelatedPendingSpeech",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.V3RejectsUnsupportedMetadataBeforeAnyWireWrite": {
+      "method": "tryAGI.Codex.Tests.RealtimeFeedbackCorrelationTests.V3RejectsUnsupportedMetadataBeforeAnyWireWrite",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeHistoryTests.EnrollmentControlsLegacyCarryoverWithoutLosingFrames(mode: Canonical, count: 1)": {
+      "method": "tryAGI.Codex.Tests.RealtimeHistoryTests.EnrollmentControlsLegacyCarryoverWithoutLosingFrames",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeHistoryTests.EnrollmentControlsLegacyCarryoverWithoutLosingFrames(mode: LegacyFlush, count: 1)": {
+      "method": "tryAGI.Codex.Tests.RealtimeHistoryTests.EnrollmentControlsLegacyCarryoverWithoutLosingFrames",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeHistoryTests.EnrollmentControlsLegacyCarryoverWithoutLosingFrames(mode: LegacyNoFlush, count: 0)": {
+      "method": "tryAGI.Codex.Tests.RealtimeHistoryTests.EnrollmentControlsLegacyCarryoverWithoutLosingFrames",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeHistoryTests.NextTurnAtomicallySealsTailAndForkRetainsSavedInputWithoutCallOwnership": {
+      "method": "tryAGI.Codex.Tests.RealtimeHistoryTests.NextTurnAtomicallySealsTailAndForkRetainsSavedInputWithoutCallOwnership",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeHistoryTests.PendingHandoffBlocksTailUntilAdmissionSettles": {
+      "method": "tryAGI.Codex.Tests.RealtimeHistoryTests.PendingHandoffBlocksTailUntilAdmissionSettles",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeHistoryTests.ReconnectRebuildsPendingSpeechAndReplayIsIdempotentAfterLostCommit": {
+      "method": "tryAGI.Codex.Tests.RealtimeHistoryTests.ReconnectRebuildsPendingSpeechAndReplayIsIdempotentAfterLostCommit",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeHistoryTests.VoiceOnlySessionSealsTailBeforeEndAndPreservesInterleavedOrder": {
+      "method": "tryAGI.Codex.Tests.RealtimeHistoryTests.VoiceOnlySessionSealsTailBeforeEndAndPreservesInterleavedOrder",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.LegacySubscriptionProbeUsesReviewedHeaderAndSession": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.LegacySubscriptionProbeUsesReviewedHeaderAndSession",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.RejectionRetainsMachineCodeWithoutProviderTextOrRetry": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.RejectionRetainsMachineCodeWithoutProviderTextOrRetry",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.RouteVersionsAreNotInterchangeable": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.RouteVersionsAreNotInterchangeable",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: False, model: \"gpt-realtime-1.5\", voice: \"cove\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v1\", chatGptCall: True, model: \"gpt-realtime-1.5\", voice: \"cove\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v2\", chatGptCall: False, model: \"gpt-realtime-1.5\", voice: \"marin\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v3\", chatGptCall: False, model: \"gpt-live-1.1-codex\", voice: \"marin\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination(protocol: \"v3\", chatGptCall: True, model: \"gpt-live-1.1-codex\", voice: \"cove\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.RustDefaultsFollowVersionAndDestination",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeModelRouteTests.VoiceCatalogsMatchRust": {
+      "method": "tryAGI.Codex.Tests.RealtimeModelRouteTests.VoiceCatalogsMatchRust",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionJournalTests.FailedWriteAndForkDoNotInventAnAttachment": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionJournalTests.FailedWriteAndForkDoNotInventAnAttachment",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionJournalTests.LostEndReceiptDoesNotAdmitDuplicateEffect": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionJournalTests.LostEndReceiptDoesNotAdmitDuplicateEffect",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionJournalTests.TransportLossRequiresVerifiedHistoryBeforeReattachOrEnd": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionJournalTests.TransportLossRequiresVerifiedHistoryBeforeReattachOrEnd",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionJournalTests.TwoAttachersAreFencedAndOldAttachmentCannotBeReused": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionJournalTests.TwoAttachersAreFencedAndOldAttachmentCannotBeReused",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates(ack: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates(ack: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates(ack: null)": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.FramelessAcknowledgementSettingHasThreeWireStates",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyBooleanInitializerStillWritesExplicitFalse": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyBooleanInitializerStillWritesExplicitFalse",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot(protocol: \"v1\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot(protocol: \"v2\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.LegacyFullSessionHasIdentityButUpdateDoesNot",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.UnsupportedCombinationsAndInstructionLimitsAreChecked": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.UnsupportedCombinationsAndInstructionLimitsAreChecked",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.V2ConversationalWireMatchesRust(modality: Audio, wire: \"audio\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.V2ConversationalWireMatchesRust",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.V2ConversationalWireMatchesRust(modality: Text, wire: \"text\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.V2ConversationalWireMatchesRust",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSessionParityTests.V2TranscriptionUpdateContainsOnlyInputConfiguration": {
+      "method": "tryAGI.Codex.Tests.RealtimeSessionParityTests.V2TranscriptionUpdateContainsOnlyInputConfiguration",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents(protocol: \"v1\", type: \"quicksilver\", audioType: \"input_audio_buffer.append\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents(protocol: \"v2\", type: \"realtime\", audioType: \"input_audio_buffer.append\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents(protocol: \"v3\", type: null, audioType: \"input_audio.append\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.DirectSessionUpdatesImmediatelyAndPreservesEvents",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.RustDirectAndSidebandUris(protocol: \"v1\", direct: \"wss://api.openai.com/v1/realtime?intent=quicksilve\"\u00b7\u00b7\u00b7, sideband: \"wss://api.openai.com/v1/realtime?intent=quicksilve\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.RustDirectAndSidebandUris",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.RustDirectAndSidebandUris(protocol: \"v2\", direct: \"wss://api.openai.com/v1/realtime?model=snapshot\", sideband: \"wss://api.openai.com/v1/realtime?call_id=rtc_test\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.RustDirectAndSidebandUris",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.RustDirectAndSidebandUris(protocol: \"v3\", direct: \"wss://api.openai.com/v1/live?model=snapshot\", sideband: \"wss://api.openai.com/v1/live/rtc_test\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.RustDirectAndSidebandUris",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.RustUriPreservesExistingQuery": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.RustUriPreservesExistingQuery",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.V3ReadinessHasBoundedDeadline": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.V3ReadinessHasBoundedDeadline",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.V3RejectsClosureOrProviderErrorBeforeReady(providerError: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.V3RejectsClosureOrProviderErrorBeforeReady",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeSocketParityTests.V3RejectsClosureOrProviderErrorBeforeReady(providerError: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeSocketParityTests.V3RejectsClosureOrProviderErrorBeforeReady",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.BoundsFailBeforeMutationAndDoNotConsumeIdentity": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.BoundsFailBeforeMutationAndDoNotConsumeIdentity",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.CompletedPrefixUsesUtf8AndKeepsOtherSpeakerAndHandoffDoesNotEchoFlushedUserInput": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.CompletedPrefixUsesUtf8AndKeepsOtherSpeakerAndHandoffDoesNotEchoFlushedUserInput",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.HandoffBetweenDeltasCapturesOnlyOnceAndRetainsNextUtterance": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.HandoffBetweenDeltasCapturesOnlyOnceAndRetainsNextUtterance",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.LegacyAdjacentRunsUseFinalReplacement(protocol: \"v1\", delta: \"conversation.input_transcript.delta\", done: \"conversation.input_transcript.turn_marked\")": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.LegacyAdjacentRunsUseFinalReplacement",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.LegacyAdjacentRunsUseFinalReplacement(protocol: \"v2\", delta: \"conversation.item.input_audio_transcription.delta\", done: \"conversation.item.input_audio_transcription.comple\"\u00b7\u00b7\u00b7)": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.LegacyAdjacentRunsUseFinalReplacement",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.StableObservationIdsSurviveReplayAndRejectConflictsWithoutMutatingState": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.StableObservationIdsSurviveReplayAndRejectConflictsWithoutMutatingState",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.V3InterleavedSpeechReconcilesInEitherFinalOrder(assistantFirst: False)": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.V3InterleavedSpeechReconcilesInEitherFinalOrder",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.V3InterleavedSpeechReconcilesInEitherFinalOrder(assistantFirst: True)": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.V3InterleavedSpeechReconcilesInEitherFinalOrder",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.V3LateFinalPreservesNewDeltasAndRepeatedSpeechWithoutIdentityIsDistinct": {
+      "method": "tryAGI.Codex.Tests.RealtimeTranscriptAccumulatorTests.V3LateFinalPreservesNewDeltasAndRepeatedSpeechWithoutIdentityIsDistinct",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.DifferentialComparatorRejectsMissingFieldsWrongTypesAndArrayReordering": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.DifferentialComparatorRejectsMissingFieldsWrongTypesAndArrayReordering",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockChatGptCallMatchesRustRequestAssertions",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v1-wire\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v2-wire\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire(id: \"v3-wire\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockOutboundFramesMatchRustWire",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockResponsesSseMatchesRustRequestAssertionsAndOpaqueOutput",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-direct-raw\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v1-typed-and-legacy-handoff\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-direct-transcript\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v2-tool-handoff-noop\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-direct-transcript-audio\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents(id: \"v3-sideband-delegation\")": {
+      "method": "tryAGI.Codex.Tests.RustParityFixtureTests.MockWebSocketReplaysPinnedRustEvents",
+      "outcome": "Passed"
+    }
+  },
+  "csharpCommit": "cffe1aef7e0c04181006a927d7617a0fd3b3680f",
+  "exitCode": 0,
+  "lane": "offline",
+  "schemaVersion": 1,
+  "sourceTree": "fe74dbe44fbc44df00548af055bdd6873db0097860ea4bb3edc310b5ee63ade1",
+  "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6"
+}
