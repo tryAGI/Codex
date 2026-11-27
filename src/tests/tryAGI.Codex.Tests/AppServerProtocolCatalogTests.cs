@@ -28,7 +28,8 @@ public sealed class AppServerProtocolCatalogTests
     {
         // Counting through the predicates keeps one source of truth: a method removed or renamed
         // upstream drops the count and fails the drift pull request instead of merging it.
-        Assert.Equal(19, CodexAppServerProtocol.ClientRequests.Count(CodexThreadRpc.Handles));
+        Assert.Equal(20, CodexAppServerProtocol.ClientRequests.Count(CodexThreadRpc.Handles));
+        Assert.True(CodexThreadRpc.Handles("thread/items/read"));
         foreach (var method in new[] { "start", "stop", "list", "listVoices", "appendAudio", "appendText", "appendSpeech" })
         {
             var name = "thread/realtime/" + method;

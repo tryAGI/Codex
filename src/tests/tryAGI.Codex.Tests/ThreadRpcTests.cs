@@ -757,6 +757,48 @@ public sealed class ThreadRpcTests
     }
 
     [Fact]
+    public async Task ItemReadReturnsCanonicalStoredOrderWithoutReplayOrMissingItems()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        var started = await host.InvokeAsync("turn/start", Input(id, "first"), ct);
+        var turn = started.GetProperty("turn").GetProperty("id").GetString();
+        await f.Completed.Task.WaitAsync(Timeout, ct);
+        var cold = f.Host();
+        var listed = await cold.InvokeAsync("thread/items/list", Args(new JsonObject
+        { ["threadId"] = id.ToString(), ["turnId"] = turn }), ct);
+        var rows = listed.GetProperty("data");
+        Assert.Equal(2, rows.GetArrayLength());
+        var firstId = rows[0].GetProperty("item").GetProperty("id").GetString();
+        var secondId = rows[1].GetProperty("item").GetProperty("id").GetString();
+        var before = await f.Store.ReadAsync(id, ct);
+        var read = await cold.InvokeAsync("thread/items/read", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["turnId"] = turn,
+            ["itemIds"] = new JsonArray(secondId, "missing", firstId, firstId)
+        }), ct);
+        Assert.True(JsonElement.DeepEquals(rows, read.GetProperty("data")));
+
+        var excluded = await cold.InvokeAsync("thread/items/read", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["turnId"] = Guid.NewGuid().ToString(),
+            ["itemIds"] = new JsonArray(firstId)
+        }), ct);
+        Assert.Empty(excluded.GetProperty("data").EnumerateArray());
+
+        foreach (var invalid in new[] { new JsonArray(), new JsonArray(JsonValue.Create(1)),
+            new JsonArray(Enumerable.Range(0, 101).Select(i => (JsonNode?)JsonValue.Create(i.ToString())).ToArray()) })
+        {
+            var error = await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/items/read",
+                Args(new JsonObject { ["threadId"] = id.ToString(), ["turnId"] = turn, ["itemIds"] = invalid }), ct));
+            Assert.Equal(-32602, error.Code);
+        }
+        Assert.Equal(before.Revision, (await f.Store.ReadAsync(id, ct)).Revision);
+        Assert.Empty((await cold.InvokeAsync("thread/loaded/list", Json("{}"), ct)).GetProperty("data").EnumerateArray());
+        Assert.Single(f.Provider.Requests);
+    }
+
+    [Fact]
     public async Task StoredReadsDoNotLoadOrExecuteAndPolicyRejectionDoesNotWrite()
     {
         var f = new Fixture(); var id = await Create(f.Host()); var cold = f.Host();
