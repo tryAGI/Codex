@@ -8,8 +8,7 @@ namespace tryAGI.Codex;
 public sealed record CodexCompactionResult(string Model, string ResponseId, JsonElement Item,
     JsonElement? Usage, IReadOnlyList<JsonElement> OriginalHistory, IReadOnlyList<string> ExecutedCallIds)
 {
-    /// <summary>The host chooses retained user/hook and explicitly client-authored developer messages.
-    /// This does not implement Rust's metadata, image or token retention policy. OriginalHistory remains intact.</summary>
+    /// <summary>Compatibility overload for hosts selecting retained messages themselves. OriginalHistory remains intact.</summary>
     public IReadOnlyList<JsonElement> CreatePrompt(IReadOnlyList<JsonElement> retainedMessages)
     {
         if (retainedMessages.Any(item => item.ValueKind != JsonValueKind.Object ||
@@ -17,6 +16,16 @@ public sealed record CodexCompactionResult(string Model, string ResponseId, Json
             CodexRealtimeProtocol.Text(item, "type") is not (null or "message")))
             throw new ArgumentException("Retain only user or explicitly client-authored developer messages.", nameof(retainedMessages));
         return retainedMessages.Select(item => item.Clone()).Append(Item.Clone()).ToArray();
+    }
+
+    /// <summary>Build a retained context projection from original history and optional host metadata.</summary>
+    public CodexRetainedContextSelection SelectRetainedContext(CodexRetainedContextOptions? options = null,
+        IReadOnlyList<JsonElement?>? metadata = null)
+    {
+        if (metadata is not null && metadata.Count != OriginalHistory.Count)
+            throw new ArgumentException("Metadata must correspond exactly to original history.", nameof(metadata));
+        return CodexRetainedContext.Select(OriginalHistory.Select((item, index) =>
+            new CodexRetainedContextEntry(item, metadata?[index])).ToArray(), options);
     }
 }
 
