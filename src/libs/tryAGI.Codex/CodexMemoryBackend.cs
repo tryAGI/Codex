@@ -12,7 +12,7 @@ public sealed record CodexMemoryScope(string AccountId, CodexMemoryVersion Versi
 /// <summary>Authorization request for a single memory operation.</summary>
 /// <param name="Scope">Account and version.</param>
 /// <param name="ThreadId">Authenticated logical thread.</param>
-/// <param name="Operation">list, read, search or add_ad_hoc_note.</param>
+/// <param name="Operation">list, read, search, add_ad_hoc_note or summary.</param>
 /// <param name="Path">Validated relative path, or empty for the root.</param>
 public sealed record CodexMemoryAccess(CodexMemoryScope Scope, Guid ThreadId, string Operation, string Path);
 
@@ -172,6 +172,44 @@ public sealed class CodexMemoryBackend
         this.authorize = authorize;
     }
 
+    /// <summary>Whether the current pinned policy allows dedicated model tools.</summary>
+    public bool DedicatedToolsEnabled
+    {
+        get { var effective = policy(); return effective.Version == scope.Version && effective.AreDedicatedToolsEnabled; }
+    }
+
+    /// <summary>Immutable pipeline namespace selected by the host for this backend.</summary>
+    public CodexMemoryVersion Version => scope.Version;
+
+    internal bool IsBoundTo(CodexThreadDocument thread) => thread.Id == threadId && thread.AccountId == scope.AccountId;
+
+    /// <summary>
+    /// Reads the generated summary once, without listing the namespace. Disabled memory
+    /// performs no storage or authorization calls. Missing or empty summary is normal.
+    /// Permission failures and malformed storage responses are not silently ignored.
+    /// </summary>
+    public async Task<string?> ReadSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var effective = policy();
+        if (!effective.IsReadPathEnabled || effective.Version != scope.Version) return null;
+        const string path = "memory_summary.md";
+        var access = new CodexMemoryAccess(scope, threadId, "summary", path);
+        await authorize(access, cancellationToken).ConfigureAwait(false);
+        CheckPolicy(dedicated: false);
+        try
+        {
+            await using var snapshot = await storage.OpenReadAsync(access, cancellationToken).ConfigureAwait(false);
+            var file = await snapshot.ReadAsync(path, MaximumDocumentBytes, cancellationToken).ConfigureAwait(false);
+            if (file.Path != path) throw new InvalidDataException("Memory summary identity mismatch.");
+            CheckFile(file);
+            CheckPolicy(dedicated: false);
+            var summary = file.Content.Trim();
+            return summary.Length == 0 ? null : Truncate(summary, 2500);
+        }
+        catch (KeyNotFoundException) { return null; }
+    }
+
     /// <summary>Lists a file or immediate directory children without loading their contents.</summary>
     public async Task<CodexMemoryListResult> ListAsync(string? path = null, string? cursor = null,
         int maxResults = 2000, CancellationToken cancellationToken = default)
@@ -317,11 +355,11 @@ public sealed class CodexMemoryBackend
             throw new InvalidOperationException("Memory note already exists.");
     }
 
-    private void CheckPolicy()
+    private void CheckPolicy(bool dedicated = true)
     {
         var effective = policy();
-        if (!effective.AreDedicatedToolsEnabled || effective.Version != scope.Version)
-            throw new UnauthorizedAccessException("Dedicated memory tools are not enabled for this thread.");
+        if (!(dedicated ? effective.AreDedicatedToolsEnabled : effective.IsReadPathEnabled) || effective.Version != scope.Version)
+            throw new UnauthorizedAccessException("Memory access is not enabled for this thread.");
     }
 
     private async ValueTask<CodexMemoryAccess> AuthorizeAsync(string operation, string path, CancellationToken ct)
