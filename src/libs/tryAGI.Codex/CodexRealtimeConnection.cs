@@ -631,6 +631,16 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
             if (outputAudioItemId == outputItem) outputAudioEndMs = (uint)Math.Min(uint.MaxValue, (ulong)outputAudioEndMs + duration);
             else { outputAudioItemId = outputItem; outputAudioEndMs = duration; }
         }
+        else if (item.Noop is { } noop)
+        {
+            if (toolOutputs.Contains(noop.CallId) || retiredFunctions.Contains(noop.CallId)) return;
+            if (toolOutputs.Count >= 4096) throw new CodexProtocolException("GA tool receipt bound exceeded; rotate the connection.");
+            // Rust acknowledges remain_silent with an empty function output and clears
+            // the audio truncation cursor. It never requests a response for this receipt.
+            outputAudioItemId = null; outputAudioEndMs = 0;
+            await SendUnderGateAsync(CodexRealtimeGaProtocol.FunctionOutput(noop.CallId, ""),
+                ct, claimToolOutputId: noop.CallId).ConfigureAwait(false);
+        }
         else
         {
             if (activeResponseId is not null && id is not null && activeResponseId != id ||

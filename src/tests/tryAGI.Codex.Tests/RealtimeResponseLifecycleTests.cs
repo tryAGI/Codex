@@ -40,6 +40,107 @@ public sealed class RealtimeResponseLifecycleTests
 
     private static JsonObject Create() => new() { ["type"] = "response.create" };
 
+    private const string SilentCall = """{"type":"conversation.item.done","response_id":"active","item":{"type":"function_call","name":"remain_silent","call_id":"silent-call","id":"silent-item","arguments":"{}"}}""";
+    private const string Active = """{"type":"response.created","response":{"id":"active"}}""";
+    private const string Finished = """{"type":"response.done","response":{"id":"active","status":"completed"}}""";
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemainSilentSendsExactlyOneEmptyReceiptWithoutCreatingSpeech(bool suppressed)
+    {
+        var socket = new Socket(Active, SilentCall, SilentCall, Finished);
+        await using var connection = new CodexRealtimeConnection(socket, 8192, "v2");
+        var ct = TestContext.Current.CancellationToken;
+        if (suppressed) connection.SetResponseRequestsAllowed(false);
+        var noops = 0;
+        await foreach (var item in connection.ReadEventsAsync(ct))
+        {
+            if (item.Noop is null) continue;
+            noops++;
+            Assert.Null(item.Delegation);
+            Assert.Equal("silent-call", item.Noop.CallId);
+            Assert.Equal(SilentCall, item.Payload.GetRawText());
+        }
+        Assert.Equal(2, noops);
+        var receipt = Assert.Single(socket.Sent);
+        Assert.Equal("conversation.item.create", receipt.GetProperty("type").GetString());
+        var output = receipt.GetProperty("item");
+        Assert.Equal("function_call_output", output.GetProperty("type").GetString());
+        Assert.Equal("silent-call", output.GetProperty("call_id").GetString());
+        Assert.Equal("", output.GetProperty("output").GetString());
+        Assert.Equal(0, socket.Creates);
+    }
+
+    [Fact]
+    public async Task SilentReceiptClearsAudioCursorAndUnblocksOnlyExplicitQueuedResponse()
+    {
+        var socket = new Socket(Active,
+            """{"type":"response.output_audio.delta","response_id":"active","item_id":"audio","delta":"AQACAA==","samples_per_channel":2400}""",
+            """{"type":"response.function_call_arguments.done","response_id":"active","call_id":"silent-call"}""",
+            SilentCall, Finished,
+            """{"type":"input_audio_buffer.speech_started"}""");
+        await using var connection = new CodexRealtimeConnection(socket, 8192, "v2");
+        var ct = TestContext.Current.CancellationToken;
+        await foreach (var item in connection.ReadEventsAsync(ct))
+        {
+            if (item.Noop is not null)
+            {
+                Assert.Equal(0, socket.Creates);
+                await connection.SendEventAsync(Create(), ct);
+                Assert.Equal(0, socket.Creates);
+            }
+        }
+        Assert.Equal(1, socket.Creates);
+        Assert.Equal(2, socket.Sent.Count);
+        Assert.Equal("conversation.item.create", socket.Sent[0].GetProperty("type").GetString());
+        Assert.Equal("response.create", socket.Sent[1].GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public async Task NoopClearsAudioCursorBeforeSpeechStarts()
+    {
+        var socket = new Socket(Active,
+            """{"type":"response.output_audio.delta","response_id":"active","item_id":"audio","delta":"AQACAA==","samples_per_channel":2400}""",
+            SilentCall, """{"type":"input_audio_buffer.speech_started"}""");
+        await using var connection = new CodexRealtimeConnection(socket, 8192, "v2");
+        await foreach (var item in connection.ReadEventsAsync(TestContext.Current.CancellationToken)) { }
+        Assert.Equal("conversation.item.create", Assert.Single(socket.Sent).GetProperty("type").GetString());
+    }
+
+    [Theory]
+    [InlineData("v1")]
+    [InlineData("v3")]
+    [InlineData("v2")]
+    public async Task WrongAdapterStaleOrUnrelatedFunctionDoesNotEmitSilentReceipt(string protocol)
+    {
+        var socket = new Socket(Active,
+            protocol == "v2" ? SilentCall.Replace("active", "stale", StringComparison.Ordinal) : SilentCall,
+            """{"type":"conversation.item.done","response_id":"active","item":{"type":"function_call","name":"unrelated","id":"other"}}""");
+        await using var connection = new CodexRealtimeConnection(socket, 8192, protocol);
+        await foreach (var item in connection.ReadEventsAsync(TestContext.Current.CancellationToken))
+            if (protocol == "v2" && item.Noop is not null) Assert.True(item.StaleForFeedback);
+        Assert.Empty(socket.Sent);
+    }
+
+    [Fact]
+    public async Task AmbiguousSilentReceiptIsNeverAutomaticallyReplayed()
+    {
+        var socket = new Socket(Active, SilentCall, SilentCall)
+        {
+            AfterFirstSend = _ => Task.FromException(new WebSocketException("ambiguous")),
+        };
+        await using var connection = new CodexRealtimeConnection(socket, 8192, "v2");
+        var ct = TestContext.Current.CancellationToken;
+        await Assert.ThrowsAsync<WebSocketException>(async () =>
+        {
+            await foreach (var item in connection.ReadEventsAsync(ct)) { }
+        });
+        await foreach (var item in connection.ReadEventsAsync(ct)) Assert.NotNull(item.Noop);
+        Assert.Single(socket.Sent);
+        Assert.Equal(0, socket.Creates);
+    }
+
     [Theory]
     [InlineData("v1", "user", "input_text")]
     [InlineData("v1", "developer", "input_text")]
