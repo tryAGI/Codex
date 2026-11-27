@@ -149,6 +149,12 @@ public sealed record CodexStoredDispatch(
     /// <summary>Original active goal generation captured when inference was admitted.</summary>
     public CodexGoalInferenceBinding? GoalInference { get; init; }
 
+    /// <summary>Single host-authorized, tool-free budget wrap-up inference.</summary>
+    public CodexStoredGoalWrapUp? GoalWrapUp { get; init; }
+
+    /// <summary>Local goal fence rejection; this tool was never physically dispatched.</summary>
+    public string? GoalToolSuppression { get; init; }
+
     /// <summary>Exact settled native goal tool result, atomically committed with goal state.</summary>
     public CodexStoredGoalToolResult? GoalToolResult { get; init; }
 }

@@ -30,6 +30,7 @@ public sealed class CodexAgentControl : IDisposable
     internal Guid? GoalContinuationId { get; private set; }
     internal CodexGoalToolPolicy? GoalTools { get; set; }
     internal bool GoalSteeringEnabled { get; set; }
+    internal Func<CodexGoalBudgetWrapUpContext, CancellationToken, Task<bool>>? GoalWrapUpAuthority { get; set; }
     internal Guid? DescendantGoalRootThreadId { get; private set; }
     internal CodexDescendantGoalAttribution? CapturedDescendantGoal { get; set; }
 

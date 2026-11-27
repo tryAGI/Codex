@@ -171,12 +171,18 @@ public sealed partial class CodexThreadStore
     }
 
     internal Task<CodexThreadAdmission> AdmitSteeredInferenceAsync(Guid threadId, long revision, Guid turnId, string owner,
-        string callId, JsonElement request, CodexGoalSteeringKey key, CancellationToken ct)
-        => AdmitCoreAsync(threadId, revision, turnId, owner, callId, "inference", request, null, ct, key);
+        string callId, JsonElement request, CodexGoalSteeringKey key, CancellationToken ct, CodexStoredGoalWrapUp? wrapUp = null)
+        => AdmitCoreAsync(threadId, revision, turnId, owner, callId, "inference", request, null, ct, key, wrapUp);
+
+    internal Task<CodexThreadAdmission> AdmitSteeredToolAsync(Guid threadId, long revision, Guid turnId, string owner,
+        CodexToolCall call, CodexGoalSteeringKey key, bool nativeGoal, bool terminalOnly, CancellationToken ct)
+        => AdmitCoreAsync(threadId, revision, turnId, owner, call.Id, "tool", CodexNativeGoalTools.Request(call),
+            nativeGoal ? call.Name : null, ct, key, steeredTool: call, terminalOnly: terminalOnly);
 
     private async Task<CodexThreadAdmission> AdmitCoreAsync(Guid threadId, long expectedRevision, Guid turnId,
         string ownerId, string callId, string kind, JsonElement request, string? nativeGoalTool, CancellationToken cancellationToken,
-        CodexGoalSteeringKey? goalKey = null)
+        CodexGoalSteeringKey? goalKey = null, CodexStoredGoalWrapUp? wrapUp = null,
+        CodexToolCall? steeredTool = null, bool terminalOnly = false)
     {
         Token(callId);
         if (kind is not ("inference" or "tool")) throw new ArgumentException("Invalid dispatch kind.", nameof(kind));
@@ -189,12 +195,21 @@ public sealed partial class CodexThreadStore
             if (prior.Kind != kind || prior.RequestSha256 != hash) throw new InvalidOperationException("Dispatch identity is already bound to different request bytes.");
             return new(false, before);
         }
-        RequireGoalSteeringKey(before, goalKey);
-        RequireGoalContinuationDispatch(before, active, nativeGoalTool);
+        var suppression = steeredTool is not null && goalKey is not null
+            ? SuppressSteeredTool(before, active, goalKey, nativeGoalTool, terminalOnly) : null;
+        if (suppression is null)
+        {
+            if (steeredTool is null) RequireGoalSteeringKey(before, goalKey);
+            if (wrapUp is not null) RequireGoalWrapUp(before, active, request, goalKey, wrapUp);
+            else RequireGoalContinuationDispatch(before, active, nativeGoalTool);
+        }
         var goalNotice = CaptureGoalNotice(before, turnId);
         before = ObserveGoalExecutionTime(before, turnId, true);
-        var dispatch = new CodexStoredDispatch(callId, kind, hash, "dispatching")
-        { GoalInference = CaptureGoalInference(before, active, kind) };
+        var dispatch = suppression is not null
+            ? new CodexStoredDispatch(callId, kind, hash, "failed", SuppressedGoalToolResult(steeredTool!, suppression))
+                { GoalToolSuppression = suppression }
+            : new CodexStoredDispatch(callId, kind, hash, "dispatching")
+                { GoalInference = CaptureGoalInference(before, active, kind, wrapUp is not null), GoalWrapUp = wrapUp };
         var turn = active with { Dispatches = [.. active.Dispatches, dispatch] };
         var next = Replace(before, turn) with { Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow() };
         return new(true, await PublishAsync(before.Revision, next, cancellationToken, goalNotice).ConfigureAwait(false));
@@ -406,6 +421,7 @@ public sealed partial class CodexThreadStore
             ValidateRealtimeModeTransitions(turn);
             ValidateGoalContinuation(turn);
             ValidateGoalSteeringTransitions(turn);
+            ValidateGoalWrapUpAndSuppression(turn);
             ValidateDescendantGoalAttribution(turn);
             if (turn.ClientUserMessageIds is { } clients && (clients.Length > MaximumItems || clients.Any(c => c is not null && !ValidToken(c)))
                 || turn.TurnTrigger is { } trigger && !ValidToken(trigger))

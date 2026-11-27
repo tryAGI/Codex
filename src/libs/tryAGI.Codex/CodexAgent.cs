@@ -20,7 +20,7 @@ public sealed record CodexFunctionCall(string Id, string Name, string ArgumentsJ
 /// <param name="ToolCalls">Tool calls executed.</param>
 public sealed record CodexAgentResult(string Text, IReadOnlyList<JsonElement> History, int Requests, int ToolCalls)
 {
-    /// <summary>The run ended from a tool result through <c>completeAfterSingleTool</c>, without a final model request.</summary>
+    /// <summary>The run ended from a known tool result or native terminal policy without a final model request.</summary>
     public bool CompletedDirectly { get; init; }
     /// <summary>IDs of the calls executed in this run. Pass them back as <c>previouslyExecutedCallIds</c> to never repeat one.</summary>
     public IReadOnlyList<string> ExecutedCallIds { get; init; } = [];
@@ -33,6 +33,9 @@ public sealed class CodexAgent(CodexClient client)
     // world-state fragments; it must never rewrite the original history or call fence.
     internal Func<CodexResponseOptions, List<JsonElement>, CancellationToken, Task<IReadOnlyList<JsonElement>>>? PrepareNativeHistory { get; init; }
     internal Action<CodexResponseOptions, IReadOnlyList<JsonElement>, CodexResponseEvent>? ObserveNativeCompletion { get; init; }
+    internal Func<CodexResponseOptions, CancellationToken, Task<CodexNativeRequestPlan>>? PrepareNativeRequest { get; init; }
+    internal Func<bool>? BeginNativeTerminalToolBatch { get; init; }
+    internal Func<string>? NativeTerminalSummary { get; init; }
 
     /// <summary>Runs one turn with flat function tools until the model answers without calling one.</summary>
     /// <param name="options">Model, instructions and advertised tools.</param>
@@ -122,10 +125,30 @@ public sealed class CodexAgent(CodexClient client)
         var seen = ExecutedIds(history, previouslyExecutedCallIds);
         var calls = 0;
         var advertised = CodexToolCalls.Advertised(options.Tools, allowCustom);
+        CodexAgentResult FinishLocally(string text, int requests)
+        {
+            using var answer = JsonDocument.Parse(new JsonObject { ["role"] = "assistant", ["content"] = text }.ToJsonString());
+            input.Add(answer.RootElement.Clone());
+            return new(text, input, requests, calls) { CompletedDirectly = true, ExecutedCallIds = seen.Order(StringComparer.Ordinal).ToArray() };
+        }
         for (var request = 1; request <= maximumRequests; request++)
         {
             if (control is not null) options = await control.CaptureAsync(options, input, cancellationToken).ConfigureAwait(false);
             var requestOptions = request == 1 ? options : options with { RequiredFirstFunction = null };
+            var terminalRequest = false;
+            if (PrepareNativeRequest is not null)
+            {
+                var plan = await PrepareNativeRequest(requestOptions, cancellationToken).ConfigureAwait(false);
+                if (plan.LocalCompletion is { } local)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (control is not null && !await control.TryFinishAsync(cancellationToken).ConfigureAwait(false))
+                        throw new CodexAgentRequestLimitException(maximumRequests, calls);
+                    return FinishLocally(local, request - 1);
+                }
+                requestOptions = plan.Options;
+                terminalRequest = plan.TerminalRequest;
+            }
             IReadOnlyList<JsonElement>? completedOutput = null;
             CodexResponseDiagnostic? requestDiagnostic = null;
             var wireHistory = PrepareNativeHistory is null ? input :
@@ -175,16 +198,22 @@ public sealed class CodexAgent(CodexClient client)
                 var answer = string.Concat(text);
                 // A live host may accept model-decided silence after a validated terminal response.
                 // Stream, item and tool validation above still applies; no incomplete reply is accepted.
+                if (string.IsNullOrWhiteSpace(answer) && terminalRequest)
+                    return FinishLocally(NativeTerminalSummary!(), request);
                 if (string.IsNullOrWhiteSpace(answer) && !allowSilentCompletion)
                     throw new CodexProtocolException("Completed agent response has no text or tool calls.");
                 return new(answer, input, request, calls) { ExecutedCallIds = seen.Order(StringComparer.Ordinal).ToArray() };
             }
-            if (request == maximumRequests)
+            var terminalBatch = request == maximumRequests && BeginNativeTerminalToolBatch?.Invoke() == true;
+            if (request == maximumRequests && !terminalBatch)
                 throw new CodexAgentRequestLimitException(maximumRequests, calls);
+            var requestAdvertised = CodexToolCalls.Advertised(requestOptions.Tools, allowCustom);
             var validated = new List<CodexToolCall>(functions.Length);
             foreach (var function in functions)
             {
                 var call = CodexToolCalls.Validate(function, advertised, allowCustom);
+                if (!requestAdvertised.TryGetValue((CodexToolCalls.NormalizeNamespace(call.Namespace), call.Name), out var kind) || kind != call.Kind)
+                    throw new CodexProtocolException("Tool was not advertised for this exact request.");
                 if (!seen.Add(call.Id)) throw new CodexProtocolException("Repeated tool call ID; refusing to replay an action.");
                 if (seen.Count > 65536) throw new CodexProtocolException("Executed call IDs exceeded the bound.");
                 validated.Add(call);
@@ -239,6 +268,13 @@ public sealed class CodexAgent(CodexClient client)
                 input.Add(toolOutput.RootElement.Clone());
             }
             calls += validated.Count;
+            if (terminalBatch)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (control is not null && !await control.TryFinishAsync(cancellationToken).ConfigureAwait(false))
+                    throw new CodexAgentRequestLimitException(maximumRequests, calls);
+                return FinishLocally(NativeTerminalSummary!(), request);
+            }
             // A host may finish an explicitly terminal, known result. Never cut a batch short,
             // skip terminal response validation, or swallow accompanying model messages.
             cancellationToken.ThrowIfCancellationRequested();

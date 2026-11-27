@@ -1289,6 +1289,158 @@ public sealed class ThreadRpcTests
         Assert.Empty(f.Provider.Requests);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GoalBudgetWrapUpRequiresAuthorityAndSuppressesSubstantiveTools(bool authorized)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        var approvals = new ConcurrentQueue<CodexGoalBudgetWrapUpContext>();
+        host.EnableThreadGoalBudgetWrapUp((request, _) =>
+        {
+            approvals.Enqueue(request);
+            return Task.FromResult(authorized);
+        });
+        f.Tools = [Json("""{"type":"function","name":"do_work","parameters":{"type":"object","properties":{}}}""")];
+        var executed = 0;
+        f.Tool = (_, _) => { Interlocked.Increment(ref executed); return Task.FromResult(new CodexToolOutput("unexpected")); };
+        var ordinary = f.Provider.Reply;
+        f.Provider.Reply = (n, token) => n == 1
+            ? Task.FromResult(GoalFunction("do_work", "budget-tool", "{}")) : ordinary(n, token);
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = 3
+        }), ct);
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        var turn = Assert.Single(final.Turns);
+        Assert.Equal("completed", turn.Status);
+        Assert.Equal("budgetLimited", final.Goal!.Status);
+        Assert.Equal(authorized ? 6 : 3, final.Goal.TokensUsed);
+        Assert.Equal(0, executed);
+        var suppressed = Assert.Single(turn.Dispatches, item => item.Kind == "tool");
+        Assert.Equal("failed", suppressed.State);
+        Assert.Contains("budget is exhausted", suppressed.GoalToolSuppression);
+        Assert.Contains("not dispatched", GoalToolOutput(suppressed).GetProperty("error").GetString());
+        var approval = Assert.Single(approvals);
+        Assert.Equal(id, approval.ThreadId);
+        Assert.Equal(turn.Id, approval.TurnId);
+        Assert.Equal(final.Goal.Id, approval.GoalId);
+        Assert.Equal(3, approval.TokensUsed);
+        Assert.Equal(3, approval.TokenBudget);
+        var requests = f.Provider.Requests.ToArray();
+        Assert.Equal(authorized ? 2 : 1, requests.Length);
+        if (authorized)
+        {
+            Assert.Empty(requests[1].GetProperty("tools").EnumerateArray());
+            Assert.False(requests[1].GetProperty("parallel_tool_calls").GetBoolean());
+            var context = requests[1].GetProperty("input").EnumerateArray().Last(CodexGoalSteeringContext.IsFragment);
+            Assert.Contains("token budget is exhausted", context.GetProperty("content").GetString());
+            var wrapUp = Assert.Single(turn.Dispatches, item => item.GoalWrapUp is not null);
+            Assert.Equal(approval.ExpectedRevision, wrapUp.GoalWrapUp!.AuthorizedRevision);
+            Assert.Equal(final.Goal.Id, wrapUp.GoalInference!.GoalId);
+            Assert.Contains(final.Goal.UsageReceipts!, receipt => receipt.Id == wrapUp.GoalInference.UsageId);
+        }
+        else
+        {
+            Assert.DoesNotContain(turn.Dispatches, item => item.GoalWrapUp is not null);
+            Assert.Contains("Tokens used: 3 / 3", turn.Output[^1].GetProperty("content").GetString());
+        }
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalBudgetWrapUpCannotDispatchToolsEvenWhenProviderReturnsAnOldTool()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        host.EnableThreadGoalBudgetWrapUp((_, _) => Task.FromResult(true));
+        f.Tools = [Json("""{"type":"function","name":"do_work","parameters":{"type":"object","properties":{}}}""")];
+        var executed = 0;
+        f.Tool = (_, _) => { Interlocked.Increment(ref executed); return Task.FromResult(new CodexToolOutput("unexpected")); };
+        f.Provider.Reply = (n, _) => Task.FromResult(GoalFunction("do_work", "budget-tool-" + n, "{}"));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = 3
+        }), ct);
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        Assert.Equal("failed", final.Turns[^1].Status);
+        Assert.Equal(0, executed);
+        Assert.Equal(2, f.Provider.Requests.Count);
+        Assert.Single(final.Turns[^1].Dispatches, item => item.GoalWrapUp is not null);
+        Assert.Single(final.Turns[^1].Dispatches, item => item.Kind == "tool");
+        Assert.Equal(6, final.Goal!.TokensUsed);
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalBudgetWrapUpApprovalCannotBeReusedAfterObjectiveChange()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        var approvals = 0;
+        host.EnableThreadGoalBudgetWrapUp(async (_, token) =>
+        {
+            Interlocked.Increment(ref approvals);
+            await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+            {
+                ["threadId"] = id.ToString(), ["objective"] = "updated during authorization"
+            }), token);
+            return true;
+        });
+        f.Tools = [Json("""{"type":"function","name":"do_work","parameters":{"type":"object","properties":{}}}""")];
+        f.Provider.Reply = (_, _) => Task.FromResult(GoalFunction("do_work", "budget-tool", "{}"));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = 3
+        }), ct);
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        Assert.Equal("failed", final.Turns[^1].Status);
+        Assert.Equal(1, approvals);
+        Assert.Single(f.Provider.Requests);
+        Assert.DoesNotContain(final.Turns[^1].Dispatches, item => item.GoalWrapUp is not null);
+        Assert.Equal("updated during authorization", final.Goal!.Objective);
+        Assert.Equal(3, final.Goal.TokensUsed);
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalBudgetAtLastRequestFinishesLocallyWithoutNewToolEffectsOrInference()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        var approvals = 0;
+        host.EnableThreadGoalBudgetWrapUp((_, _) => { Interlocked.Increment(ref approvals); return Task.FromResult(true); });
+        f.Tools = [Json("""{"type":"function","name":"do_work","parameters":{"type":"object","properties":{}}}""")];
+        var executed = 0;
+        f.Tool = (_, _) => { Interlocked.Increment(ref executed); return Task.FromResult(new CodexToolOutput("done")); };
+        f.Provider.Reply = (n, _) => Task.FromResult(GoalFunction("do_work", "budget-tool-" + n, "{}"));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = 12
+        }), ct);
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        var turn = Assert.Single(final.Turns);
+        Assert.Equal("completed", turn.Status);
+        Assert.Equal("budgetLimited", final.Goal!.Status);
+        Assert.Equal(12, final.Goal.TokensUsed);
+        Assert.Equal(3, executed);
+        Assert.Equal(0, approvals);
+        Assert.Equal(4, f.Provider.Requests.Count);
+        Assert.Single(turn.Dispatches, item => item.GoalToolSuppression is not null);
+        Assert.DoesNotContain(turn.Dispatches, item => item.GoalWrapUp is not null);
+        Assert.Contains("Tokens used: 12 / 12", turn.Output[^1].GetProperty("content").GetString());
+        await host.StopAsync(ct);
+    }
+
     [Fact]
     public async Task GoalSteeringSamplesUpdatedObjectiveAndRejectsOldGoalCompletion()
     {

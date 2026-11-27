@@ -15,12 +15,12 @@ public sealed record CodexGoalInferenceBinding(Guid OriginThreadId, Guid GoalId,
 
 public sealed partial class CodexThreadStore
 {
-    private static CodexGoalInferenceBinding? CaptureGoalInference(CodexThreadDocument thread, CodexStoredTurn turn, string kind)
+    private static CodexGoalInferenceBinding? CaptureGoalInference(CodexThreadDocument thread, CodexStoredTurn turn, string kind, bool wrapUp = false)
     {
         if (kind != "inference") return null;
         if (turn.DescendantGoal is { } descendant && descendant.OriginThreadId == thread.Id)
             return new(thread.Id, descendant.GoalId, Guid.CreateVersion7()) { GoalThreadId = descendant.RootThreadId };
-        if (thread.Goal is not { Status: "active" } goal) return null;
+        if (thread.Goal is not { } goal || goal.Status != "active" && !(wrapUp && goal.Status == "budgetLimited")) return null;
         if ((goal.UsageReceipts?.Length ?? 0) >= MaximumGoalUsageReceipts)
             throw new InvalidOperationException("Goal accounting receipt capacity exhausted before provider admission.");
         return new(thread.Id, goal.Id, Guid.CreateVersion7());

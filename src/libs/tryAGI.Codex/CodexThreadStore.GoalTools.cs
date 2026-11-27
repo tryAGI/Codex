@@ -93,8 +93,8 @@ public sealed partial class CodexThreadStore
         if (calls.Length == 0) return output;
         var receipts = calls.Select(item => turn.Dispatches.SingleOrDefault(receipt =>
             receipt.CallId == CodexRealtimeProtocol.Text(item, "call_id") && receipt.Kind == "tool")).ToArray();
-        if (!receipts.Any(receipt => receipt?.GoalToolResult is not null) ||
-            receipts.Any(receipt => receipt is not { State: "succeeded", Result: { } }) ||
+        if (!receipts.Any(receipt => receipt?.GoalToolResult is not null || receipt?.GoalToolSuppression is not null) ||
+            receipts.Any(receipt => receipt is not ({ State: "succeeded", Result: { } } or { State: "failed", GoalToolSuppression: not null, Result: { } })) ||
             output.Length - boundary > receipts.Length) return output;
         var results = receipts.Select(receipt => receipt!.Result!.Value).ToArray();
         if (results.Where((item, index) => index < output.Length - boundary &&

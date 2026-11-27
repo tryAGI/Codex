@@ -140,6 +140,7 @@ public sealed partial class CodexThreadRpc
             {
                 running.Control.GoalTools = Volatile.Read(ref goalTools);
                 running.Control.GoalSteeringEnabled = Volatile.Read(ref goalSteeringEnabled);
+                running.Control.GoalWrapUpAuthority = Volatile.Read(ref goalWrapUpAuthority);
             }
             running.Control.BindRealtimeObserver(() => realtimeObservers.TryGetValue(thread.Id, out var coordinator)
                 ? coordinator.CaptureReasoningObserver(running.Id) : null);

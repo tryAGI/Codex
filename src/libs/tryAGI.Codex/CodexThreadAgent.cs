@@ -229,6 +229,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                                 ScheduleBackground(scheduler, candidate, effective, authOwner, context);
                         })
                     : null,
+                PrepareNativeRequest = control?.GoalSteeringEnabled == true ? execution.PrepareGoalRequestAsync : null,
+                BeginNativeTerminalToolBatch = control?.GoalSteeringEnabled == true ? execution.BeginTerminalGoalToolBatch : null,
+                NativeTerminalSummary = control?.GoalSteeringEnabled == true ? execution.GoalTerminalSummary : null,
                 ObserveNativeCompletion = historyTurnLimit is null && journalProjection is null
                     ? execution.ObserveNativeCompletion : null,
             };
@@ -243,6 +246,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 canExecuteConcurrently: call => !(control?.GoalTools is not null && CodexNativeGoalTools.IsGoalCall(call))
                     && canExecuteConcurrently?.Invoke(call) == true,
                 previouslyExecutedCallIds: CodexThreadStore.DispatchedToolCallIds(started), control: control,
+                allowSilentCompletion: control?.GoalSteeringEnabled == true && control.GoalContinuationId is not null,
                 observeAsync: async (item, ct) =>
                 {
                     await execution.ObserveArtifactPreviewAsync(item, ct).ConfigureAwait(false);
@@ -333,6 +337,12 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private CodexGoalSteeringSnapshot? capturedGoal;
         private CodexGoalSteeringCapture? pendingGoalContext;
         private CodexGoalSteeringKey? preparedGoalKey;
+        private long capturedGoalRevision;
+        private bool capturedBudgetLimited;
+        private bool capturedWrapUpAdmitted;
+        private bool capturedAutomaticGoalStopped;
+        private CodexStoredGoalWrapUp? pendingGoalWrapUp;
+        private bool terminalGoalBatch;
         private readonly bool deferModeUntilProjection;
         private CodexStoredRealtimeSession? capturedModeSession;
         private bool modeCapturePending;
@@ -465,7 +475,15 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 var turn = actual.Turns.Single(t => t.Id == turnId);
                 if (turn.OwnerId != owner || turn.Status != "inProgress")
                     throw new InvalidOperationException("Realtime mode capture lost its native turn owner.");
-                if (control?.GoalSteeringEnabled == true) capturedGoal = CodexGoalSteeringSnapshot.From(actual.Goal);
+                if (control?.GoalSteeringEnabled == true)
+                {
+                    capturedGoal = CodexGoalSteeringSnapshot.From(actual.Goal);
+                    capturedGoalRevision = actual.Revision;
+                    capturedBudgetLimited = CodexThreadStore.GoalBudgetLimitedForTurn(actual, turn);
+                    capturedWrapUpAdmitted = turn.Dispatches.Any(receipt => receipt.GoalWrapUp is not null);
+                    capturedAutomaticGoalStopped = turn.GoalContinuation is { } continuation &&
+                        (continuation.OriginThreadId != actual.Id || actual.Goal?.Id != continuation.GoalId || actual.Goal.Status != "active");
+                }
                 if (deferModeUntilProjection)
                 {
                     // Freeze the logical state with the captured steering/input generation.
@@ -480,6 +498,58 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 }
             }
             finally { gate.Release(); }
+        }
+
+        internal async Task<CodexNativeRequestPlan> PrepareGoalRequestAsync(CodexResponseOptions settings, CancellationToken ct)
+        {
+            pendingGoalWrapUp = null;
+            if (capturedWrapUpAdmitted)
+                return new(settings, "The authorized budget wrap-up has ended. Any remaining work requires a new authorized turn.");
+            if (capturedAutomaticGoalStopped && !capturedBudgetLimited)
+                return new(settings, "The original automatic goal is no longer active. No additional substantive work was started.");
+            if (!capturedBudgetLimited || capturedGoal is not { } goal || goal.Key.Id is not { } id || goal.Key.TokenBudget is not { } limit)
+                return new(settings);
+            // The extra request is never implicit. It uses the ordinary provider reservation,
+            // exact generation/usage fence, and no advertised tools or speculative compaction.
+            var summary = GoalSummary(goal);
+            if (control?.GoalWrapUpAuthority is not { } authorize)
+                return new(settings, summary);
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(TimeSpan.FromSeconds(30));
+            bool allowed;
+            try
+            {
+                allowed = await authorize(new(Current.AccountId, Current.Id, turnId, id, capturedGoalRevision,
+                    goal.Key.Objective!, goal.TokensUsed, limit), deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is not OutOfMemoryException && !ct.IsCancellationRequested)
+            {
+                return new(settings, summary);
+            }
+            if (!allowed) return new(settings, summary);
+            pendingGoalWrapUp = new(id, capturedGoalRevision, goal.TokensUsed, goal.Key.Fingerprint);
+            return new(settings with
+            {
+                Tools = [], RequiredFirstFunction = null, ParallelToolCalls = false,
+                AutomaticCompaction = null, PrewarmWebSocket = false
+            }, TerminalRequest: true);
+        }
+
+        internal bool BeginTerminalGoalToolBatch()
+        {
+            terminalGoalBatch = preparedGoalKey is not null && CodexThreadStore.GoalBudgetLimitedForTurn(Current, Turn);
+            return terminalGoalBatch;
+        }
+
+        internal string GoalTerminalSummary() => GoalSummary(CodexGoalSteeringSnapshot.From(Current.Goal));
+
+        private static string GoalSummary(CodexGoalSteeringSnapshot goal)
+        {
+            var tokens = goal.TokensUsed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var budget = goal.Key.TokenBudget is { } limit
+                ? " / " + limit.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+            return "Goal status: " + (goal.Key.Status ?? "cleared") + ". Tokens used: " + tokens + budget +
+                ". No further substantive goal work was started; any remaining work requires a new authorized turn.";
         }
 
         internal void ObserveNativeCompletion(CodexResponseOptions settings, IReadOnlyList<JsonElement> input,
@@ -749,10 +819,11 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                         await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
                     }
                     var admission = await JournalAsync(doc => preparedGoalKey is { } key
-                        ? store.AdmitSteeredInferenceAsync(doc.Id, doc.Revision, turnId, owner, id, request, key, ct)
+                        ? store.AdmitSteeredInferenceAsync(doc.Id, doc.Revision, turnId, owner, id, request, key, ct, pendingGoalWrapUp)
                         : store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, id, "inference", request, ct),
                         result => result.Thread, ct).ConfigureAwait(false);
                     if (!admission.Admitted) throw new CodexProtocolException("Inference identity already dispatched; replay refused.");
+                    pendingGoalWrapUp = null;
                     preparedMailInput = allowMailSampling && input.Any(CodexNativeMailSampling.IsMail) ? input : null;
                     preparedInferenceRequestId = projection is null ? id : null;
                     preparedInferenceOutputCount = Turn.Output.Length;
@@ -903,11 +974,14 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                var admitted = await JournalAsync(doc => nativeGoal
-                    ? store.AdmitGoalToolAsync(doc.Id, doc.Revision, turnId, owner, call, ct)
+                var admitted = await JournalAsync(doc => preparedGoalKey is { } key
+                    ? store.AdmitSteeredToolAsync(doc.Id, doc.Revision, turnId, owner, call, key, nativeGoal, terminalGoalBatch, ct)
+                    : nativeGoal ? store.AdmitGoalToolAsync(doc.Id, doc.Revision, turnId, owner, call, ct)
                     : store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, call.Id, "tool", request, ct),
                     result => result.Thread, ct).ConfigureAwait(false);
                 if (!admitted.Admitted) throw new CodexProtocolException("Tool identity already dispatched; replay refused.");
+                if (Turn.Dispatches.Single(receipt => receipt.CallId == call.Id).GoalToolSuppression is { } suppression)
+                    return CodexNativeGoalTools.Error(suppression);
                 // Do not retain raw public artifact content behind an explicit host redaction
                 // projection. The existing model-output callback remains available unchanged.
                 if (projection is null && !nativeGoal)
@@ -1064,6 +1138,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             {
                 var output = history.Skip(Seed.Count).ToArray();
                 await SynchronizeAsync(output, ct).ConfigureAwait(false);
+                await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
                 CodexStoredContextWindowObservation? snapshot = null;
                 if (observedForegroundCompletion && LastEffectiveSettings is { } settings)
                 {
