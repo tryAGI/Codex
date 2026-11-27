@@ -52,6 +52,29 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         Func<JsonElement, CancellationToken, Task>? validatedItem = null,
         Func<CodexResponseEvent, CancellationToken, Task>? observeAsync = null,
         Func<JsonElement, JsonElement>? journalProjection = null, int? historyTurnLimit = null)
+        => await RunCoreAsync(threadId, expectedRevision, turnId, ownerId, options, input, execute,
+            maximumRequests, observe, observeDiagnostics, canExecuteConcurrently, turnStarted,
+            cancellationToken, control, validatedItem, observeAsync, journalProjection, historyTurnLimit, null).ConfigureAwait(false);
+
+    internal Task<CodexThreadAgentResult> RunRealtimeHandoffAsync(Guid threadId, long expectedRevision, string turnOwnerId,
+        CodexRealtimeHandoffRequest handoff, CodexResponseOptions options, CodexAgentControl control,
+        Func<CodexToolCall, CancellationToken, Task<CodexToolOutput>> execute, int maximumRequests,
+        Func<CodexThreadDocument, CancellationToken, Task>? turnStarted,
+        Func<JsonElement, CancellationToken, Task>? validatedItem,
+        Action<CodexResponseEvent>? observe, CancellationToken ct)
+        => RunCoreAsync(threadId, expectedRevision, handoff.SubmissionId, turnOwnerId, options,
+            [new CodexRealtimeDelegationInput(handoff.ContextualInput, []).ToResponseItem()], execute,
+            maximumRequests, observe, null, null, turnStarted, ct, control, validatedItem, null, null, null, handoff);
+
+    private async Task<CodexThreadAgentResult> RunCoreAsync(Guid threadId, long expectedRevision, Guid turnId,
+        string ownerId, CodexResponseOptions options, IReadOnlyList<JsonElement> input,
+        Func<CodexToolCall, CancellationToken, Task<CodexToolOutput>> execute,
+        int maximumRequests, Action<CodexResponseEvent>? observe, Action<CodexResponseDiagnostic>? observeDiagnostics,
+        Func<CodexToolCall, bool>? canExecuteConcurrently,
+        Func<CodexThreadDocument, CancellationToken, Task>? turnStarted, CancellationToken cancellationToken,
+        CodexAgentControl? control, Func<JsonElement, CancellationToken, Task>? validatedItem,
+        Func<CodexResponseEvent, CancellationToken, Task>? observeAsync,
+        Func<JsonElement, JsonElement>? journalProjection, int? historyTurnLimit, CodexRealtimeHandoffRequest? handoff)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(credentials);
@@ -86,11 +109,22 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             }
         }
         var persistedInput = journalProjection is null ? input : input.Select(journalProjection).ToArray();
-        control?.InitializeInput(input);
-        var started = await store.StartTurnAsync(threadId, expectedRevision, turnId, ownerId, persistedInput,
-            identity.RootTurnId is { } root ? Guid.Parse(root) : turnId, cancellationToken,
-            control?.ClientIds, control?.TurnTrigger).ConfigureAwait(false);
+        control?.InitializeInput(input, handoff?.SubmissionId.ToString(), handoff is null ? null : "realtime");
+        CodexThreadDocument started;
+        if (handoff is null)
+            started = await store.StartTurnAsync(threadId, expectedRevision, turnId, ownerId, persistedInput,
+                identity.RootTurnId is { } root ? Guid.Parse(root) : turnId, cancellationToken,
+                control?.ClientIds, control?.TurnTrigger).ConfigureAwait(false);
+        else
+        {
+            var accepted = await store.AdmitRealtimeHandoffAsync(threadId, expectedRevision, handoff.SessionId,
+                handoff.OwnerId, handoff.AttachmentId, handoff.HandoffId, handoff.SubmissionId, null,
+                ownerId, handoff.ContextualInput, cancellationToken).ConfigureAwait(false);
+            if (!accepted.Admitted) throw new InvalidOperationException("Realtime handoff already committed; runner replay refused.");
+            started = accepted.Thread;
+        }
         using var execution = new Execution(store, started, turnId, ownerId, budget, input, journalProjection, historyTurnLimit, control, options);
+        control?.BindRealtimeAdmission(execution.AdmitRealtimeSteerAsync);
         try
         {
             // The host may publish pending after the durable turn exists, before any
@@ -160,6 +194,60 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 settings.Model, CodexThreadCompaction.ScopeHash(settings), current.Turns.Length, firstTurnIndex, turnId, currentInput);
         }
 
+        // Only independent realtime journal writes may advance the revision behind this executor.
+        // Any change to turn input, output, settings, ownership or dispatches remains a hard fence.
+        private async Task<T> JournalAsync<T>(Func<CodexThreadDocument, Task<T>> mutate,
+            Func<T, CodexThreadDocument> snapshot, CancellationToken ct)
+        {
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    var result = await mutate(Current).ConfigureAwait(false);
+                    Current = snapshot(result);
+                    return result;
+                }
+                catch (CodexThreadConflictException) when (attempt < 3)
+                {
+                    var actual = await store.ReadAsync(Current.Id, ct).ConfigureAwait(false);
+                    if (actual.RealtimeSessions is null ||
+                        !JsonElement.DeepEquals(CodexThreadStore.Encode(Current with
+                        { RealtimeSessions = null, Revision = 1, UpdatedAt = default }),
+                        CodexThreadStore.Encode(actual with
+                        { RealtimeSessions = null, Revision = 1, UpdatedAt = default })))
+                        throw;
+                    Current = actual;
+                }
+            }
+        }
+
+        private Task<CodexThreadDocument> JournalAsync(Func<CodexThreadDocument, Task<CodexThreadDocument>> mutate, CancellationToken ct)
+            => JournalAsync(mutate, snapshot => snapshot, ct);
+
+        private async Task RecordCapturedClientsAsync(CancellationToken ct)
+        {
+            if (control?.ClientIds is not { } clients) return;
+            var persisted = Turn.ClientUserMessageIds ?? [];
+            // A durable steering admission can be waiting for the next provider capture.
+            if (persisted.Take(clients.Length).SequenceEqual(clients)) return;
+            if (!clients.Take(persisted.Length).SequenceEqual(persisted))
+                throw new InvalidOperationException("Realtime steering and captured user identities disagree.");
+            await JournalAsync(doc => store.RecordInputClientsAsync(doc.Id, doc.Revision, turnId, owner, clients, ct), ct).ConfigureAwait(false);
+        }
+
+        internal async Task<CodexRealtimeHandoffAdmission> AdmitRealtimeSteerAsync(CodexRealtimeHandoffRequest handoff, CancellationToken ct)
+        {
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
+                return await JournalAsync(doc => store.AdmitRealtimeHandoffAsync(doc.Id, doc.Revision,
+                    handoff.SessionId, handoff.OwnerId, handoff.AttachmentId, handoff.HandoffId,
+                    handoff.SubmissionId, turnId, owner, handoff.ContextualInput, ct), result => result.Thread, ct).ConfigureAwait(false);
+            }
+            finally { gate.Release(); }
+        }
+
         public Task ReserveAsync(string requestId, string model, CancellationToken ct) => budget.ReserveAsync(requestId, model, ct);
         public Task<CodexResponsesIdentity?> ReserveWithIdentityAsync(string requestId, string model, CancellationToken ct) =>
             budget.ReserveWithIdentityAsync(requestId, model, ct);
@@ -173,10 +261,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             try
             {
                 await SynchronizeAsync(input.Skip(Seed.Count).ToArray(), ct).ConfigureAwait(false);
-                if (control?.ClientIds is { } clients && !(Turn.ClientUserMessageIds ?? []).SequenceEqual(clients))
-                    Current = await store.RecordInputClientsAsync(Current.Id, Current.Revision, turnId, owner, clients, ct).ConfigureAwait(false);
-                var admission = await store.AdmitAsync(Current.Id, Current.Revision, turnId, owner, id, "inference", request, ct).ConfigureAwait(false);
-                Current = admission.Thread;
+                await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
+                var admission = await JournalAsync(doc => store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, id,
+                    "inference", request, ct), result => result.Thread, ct).ConfigureAwait(false);
                 if (!admission.Admitted) throw new CodexProtocolException("Inference identity already dispatched; replay refused.");
             }
             finally { gate.Release(); }
@@ -225,9 +312,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 if (prior is null || prior.State is "succeeded" or "failed") return;
                 var result = observed.GetValueOrDefault(id);
                 var known = result.ValueKind != JsonValueKind.Undefined;
-                Current = await store.SettleAsync(Current.Id, Current.Revision, turnId, owner, id,
+                await JournalAsync(doc => store.SettleAsync(doc.Id, doc.Revision, turnId, owner, id,
                     known ? "succeeded" : notDispatched ? "failed" : "unknown",
-                    known ? result : notDispatched ? Json(new JsonObject { ["notDispatched"] = true }) : null, ct).ConfigureAwait(false);
+                    known ? result : notDispatched ? Json(new JsonObject { ["notDispatched"] = true }) : null, ct), ct).ConfigureAwait(false);
             }
             finally { gate.Release(); }
         }
@@ -241,8 +328,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                var admitted = await store.AdmitAsync(Current.Id, Current.Revision, turnId, owner, call.Id, "tool", request, ct).ConfigureAwait(false);
-                Current = admitted.Thread;
+                var admitted = await JournalAsync(doc => store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, call.Id,
+                    "tool", request, ct), result => result.Thread, ct).ConfigureAwait(false);
                 if (!admitted.Admitted) throw new CodexProtocolException("Tool identity already dispatched; replay refused.");
             }
             finally { gate.Release(); }
@@ -277,7 +364,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         {
             if (projection is not null) output = output.Select(projection).ToArray();
             if (output.Count == Turn.Output.Length && !output.Where((item, i) => !JsonElement.DeepEquals(item, Turn.Output[i])).Any()) return;
-            Current = await store.SynchronizeOutputAsync(Current.Id, Current.Revision, turnId, owner, output, ct).ConfigureAwait(false);
+            await JournalAsync(doc => store.SynchronizeOutputAsync(doc.Id, doc.Revision, turnId, owner, output, ct), ct).ConfigureAwait(false);
         }
         internal async Task FinishAsync(IReadOnlyList<JsonElement> history, CancellationToken ct)
         {
@@ -286,7 +373,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             {
                 var output = history.Skip(Seed.Count).ToArray();
                 await SynchronizeAsync(output, ct).ConfigureAwait(false);
-                Current = await store.CompleteAsync(Current.Id, Current.Revision, turnId, owner, "completed", Turn.Output, ct).ConfigureAwait(false);
+                await JournalAsync(doc => store.CompleteAsync(doc.Id, doc.Revision, turnId, owner, "completed", Turn.Output, ct), ct).ConfigureAwait(false);
             }
             finally { gate.Release(); }
         }
@@ -298,8 +385,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             if (Turn.Status != "inProgress") return;
             foreach (var id in Turn.Dispatches.Where(d => d.State is "dispatching" or "unknown").Select(d => d.CallId).ToArray())
                 await SettleAsync(id, false, timeout.Token).ConfigureAwait(false);
-            Current = await store.CompleteAsync(Current.Id, Current.Revision, turnId, owner,
-                interrupted ? "interrupted" : "failed", Turn.Output, timeout.Token).ConfigureAwait(false);
+            await JournalAsync(doc => store.CompleteAsync(doc.Id, doc.Revision, turnId, owner,
+                interrupted ? "interrupted" : "failed", Turn.Output, timeout.Token), timeout.Token).ConfigureAwait(false);
         }
         public void Dispose() => gate.Dispose();
     }

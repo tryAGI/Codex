@@ -119,7 +119,7 @@ public sealed class CodexAgent(CodexClient client)
         var advertised = CodexToolCalls.Advertised(options.Tools, allowCustom);
         for (var request = 1; request <= maximumRequests; request++)
         {
-            options = control?.Capture(options, input) ?? options;
+            if (control is not null) options = await control.CaptureAsync(options, input, cancellationToken).ConfigureAwait(false);
             var requestOptions = request == 1 ? options : options with { RequiredFirstFunction = null };
             JsonElement? result = null;
             CodexResponseDiagnostic? requestDiagnostic = null;
@@ -176,7 +176,7 @@ public sealed class CodexAgent(CodexClient client)
             if (functions.Length > 16) throw new CodexProtocolException("Response exceeded the tool call limit.");
             if (functions.Length == 0)
             {
-                if (control is not null && !control.TryFinish())
+                if (control is not null && !await control.TryFinishAsync(cancellationToken).ConfigureAwait(false))
                 {
                     if (request == maximumRequests) throw new CodexAgentRequestLimitException(maximumRequests, calls);
                     continue;

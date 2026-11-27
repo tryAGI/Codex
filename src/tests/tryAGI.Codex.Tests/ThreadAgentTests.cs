@@ -275,4 +275,63 @@ public sealed class ThreadAgentTests
         await run;
         Assert.Equal("hello", server.Requests.Single().GetProperty("input")[0].GetProperty("content").GetString());
     }
+
+    [Fact]
+    public async Task DurableRealtimeSteeringDuringToolRetainsExactlyOneOrderedInputAfterReload()
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "rtc_call", "v3", "voice-owner", Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "voice-owner", attachment, Ct);
+        async Task<CodexThreadDocument> Observe(CodexThreadDocument current, string id)
+        {
+            var item = RealtimeHistoryTests.Event($$$"""{"type":"delegation.created","item":{"type":"delegation","target":"client","id":"{{{id}}}","content":[{"type":"input_text","text":"task {{{id}}}"}]}}""");
+            return (await store.RecordRealtimeObservationAsync(current.Id, current.Revision, "voice", "voice-owner", attachment, "obs-" + id, item, Ct)).Thread;
+        }
+        thread = await Observe(thread, "one");
+        var firstId = Guid.NewGuid();
+        var firstText = CodexThreadStore.PrepareRealtimeHandoffInput(thread.RealtimeSessions!.Single(), "one")!.Text;
+        var first = new CodexRealtimeHandoffRequest("voice", "voice-owner", attachment, "one", firstId, firstText);
+        var toolStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseTool = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        server.Replies.Enqueue(Call("read_realtime", "key"));
+        server.Replies.Enqueue(Text("finished"));
+        server.Replies.Enqueue(Text("continued"));
+        using var control = new CodexAgentControl();
+        var agent = Agent(store, auth, budget, server);
+        var run = agent.RunRealtimeHandoffAsync(thread.Id, thread.Revision, "runner", first, Options(thread.Id, firstId), control,
+            async (_, ct) =>
+            {
+                toolStarted.TrySetResult();
+                await releaseTool.Task.WaitAsync(ct);
+                return new CodexToolOutput("result");
+            }, 8, null, null, null, Ct);
+        try
+        {
+            await toolStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), Ct);
+            var active = await store.ReadAsync(thread.Id, Ct);
+            active = await Observe(active, "two");
+            var secondText = CodexThreadStore.PrepareRealtimeHandoffInput(active.RealtimeSessions!.Single(), "two")!.Text;
+            var second = new CodexRealtimeHandoffRequest("voice", "voice-owner", attachment, "two", Guid.NewGuid(), secondText);
+            var admitted = await control.SteerRealtimeAsync(second, Ct);
+            Assert.True(admitted.Admitted);
+            Assert.Single(server.Requests);
+            Assert.False((await control.SteerRealtimeAsync(second, Ct)).Admitted);
+            Assert.Equal(2, admitted.Thread.Turns.Single().Input.Length);
+        }
+        finally { releaseTool.TrySetResult(); }
+        var result = await run;
+        Assert.Equal("completed", result.Thread.Turns.Single().Status);
+        var next = await store.ReadAsync(thread.Id, Ct);
+        var nextId = Guid.NewGuid();
+        await agent.RunAsync(next.Id, next.Revision, nextId, "next", Options(next.Id, nextId), [Input("continue")], NoTools,
+            cancellationToken: Ct);
+        Assert.Equal(3, server.Requests.Count);
+        var history = server.Requests[2].GetProperty("input").EnumerateArray().ToArray();
+        var user = history.Where(x => CodexRealtimeProtocol.Text(x, "role") == "user").ToArray();
+        Assert.Equal(3, user.Length);
+        Assert.Contains("task two", user[1].GetProperty("content").GetString());
+        Assert.True(Array.FindIndex(history, x => CodexRealtimeProtocol.Text(x, "type") == "function_call_output") <
+            Array.FindIndex(history, x => JsonElement.DeepEquals(x, user[1])));
+    }
 }

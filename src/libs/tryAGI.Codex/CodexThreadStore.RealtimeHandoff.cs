@@ -19,6 +19,9 @@ public sealed record CodexStoredRealtimeHandoffAdmission(
 public sealed record CodexRealtimeHandoffAdmission(bool Admitted, CodexThreadDocument Thread,
     CodexStoredRealtimeHandoffAdmission Receipt);
 
+internal sealed record CodexRealtimeHandoffRequest(string SessionId, string OwnerId, Guid AttachmentId,
+    string HandoffId, Guid SubmissionId, string ContextualInput);
+
 public sealed partial class CodexThreadStore
 {
     /// <summary>Read the canonical contextual user input from the exact persisted capture.
@@ -108,7 +111,8 @@ public sealed partial class CodexThreadStore
                 var ids = active.ClientUserMessageIds ?? active.Input
                     .Where(x => CodexRealtimeProtocol.Text(x, "role") == "user").Select(_ => (string?)null).ToArray();
                 next = Replace(before, active with { Input = [.. active.Input, item],
-                    ClientUserMessageIds = [.. ids, submissionId.ToString()] });
+                    ClientUserMessageIds = [.. ids, submissionId.ToString()],
+                    RealtimeSteeringInputIndices = [.. active.RealtimeSteeringInputIndices ?? [], inputIndex.Value] });
                 receivingTurn = target;
                 state = "steer";
             }
@@ -137,6 +141,52 @@ public sealed partial class CodexThreadStore
             Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
         }, ct).ConfigureAwait(false);
         return new(true, committed, receipt);
+    }
+
+    internal static IEnumerable<JsonElement> RealtimeTimeline(CodexStoredTurn turn, bool includeUncaptured)
+    {
+        if (turn.RealtimeSteeringInputIndices is not { Length: > 0 } steering)
+            return turn.Input.Concat(turn.Output);
+        var indices = steering.ToHashSet();
+        var initial = turn.Input.Where((_, index) => !indices.Contains(index));
+        var missing = new List<JsonElement>();
+        var position = 0;
+        foreach (var item in turn.Output)
+            if (position < steering.Length && JsonElement.DeepEquals(item, turn.Input[steering[position]])) position++;
+        if (includeUncaptured)
+            for (; position < steering.Length; position++) missing.Add(turn.Input[steering[position]]);
+        return initial.Concat(turn.Output).Concat(missing);
+    }
+
+    private static void ValidateRealtimeHandoffTurnInputs(CodexThreadDocument document)
+    {
+        foreach (var turn in document.Turns)
+        {
+            if (turn.RealtimeSteeringInputIndices is not { } indices) continue;
+            if (indices.Length > MaximumItems || !indices.SequenceEqual(indices.Distinct().Order()) ||
+                indices.Any(i => i < 0 || i >= turn.Input.Length ||
+                    CodexRealtimeProtocol.Text(turn.Input[i], "role") != "user"))
+                throw new InvalidDataException("Invalid durable realtime steering indices.");
+            if (turn.Status == "completed")
+            {
+                var position = 0;
+                foreach (var item in turn.Output)
+                    if (position < indices.Length && JsonElement.DeepEquals(item, turn.Input[indices[position]])) position++;
+                if (position != indices.Length)
+                    throw new InvalidDataException("Completed turn omitted an admitted realtime steering input.");
+            }
+        }
+        foreach (var receipt in (document.RealtimeSessions ?? []).SelectMany(s => s.HandoffAdmissions ?? []))
+        {
+            if (receipt.TurnId is not { } target || receipt.InputIndex is not { } index) continue;
+            var turn = document.Turns.SingleOrDefault(t => t.Id == target);
+            if (turn is null || index >= turn.Input.Length ||
+                CodexRealtimeProtocol.Text(turn.Input[index], "role") != "user" ||
+                CodexRealtimeProtocol.Text(turn.Input[index], "content") is not { } content ||
+                HandoffDigest(content) != receipt.InputSha256 ||
+                receipt.State == "steer" && !(turn.RealtimeSteeringInputIndices ?? []).Contains(index))
+                throw new InvalidDataException("Realtime handoff receipt does not bind its stored reasoning input.");
+        }
     }
 
     private static string HandoffDigest(string text)

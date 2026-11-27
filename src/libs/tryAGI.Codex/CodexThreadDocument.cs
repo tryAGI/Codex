@@ -71,7 +71,11 @@ public sealed record CodexStoredTurn(
     [property: JsonRequired] JsonElement[] Input,
     [property: JsonRequired] JsonElement[] Output,
     [property: JsonRequired] CodexStoredDispatch[] Dispatches,
-    DateTimeOffset? CompletedAt = null, string?[]? ClientUserMessageIds = null, string? TurnTrigger = null);
+    DateTimeOffset? CompletedAt = null, string?[]? ClientUserMessageIds = null, string? TurnTrigger = null)
+{
+    /// <summary>Durable steering inputs subsequently interleaved with model output in the turn timeline.</summary>
+    public int[]? RealtimeSteeringInputIndices { get; init; }
+}
 
 /// <summary>Request digest binds a call ID to its exact input bytes. Unknown outcomes remain
 /// non-dispatchable, including after fork; this is not a provider billing or rollback receipt.</summary>

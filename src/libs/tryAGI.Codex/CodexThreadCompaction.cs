@@ -164,9 +164,11 @@ public static class CodexThreadCompaction
         {
             var turn = document.Turns[index];
             history.AddRange(CodexThreadStore.RealtimeCarryoverBeforeTurn(document, index));
-            history.AddRange((turn.Id == currentTurnId && currentInput is not null ? currentInput : turn.Input).Select(item => item.Clone()));
-            if (turn.Status == "completed") history.AddRange(turn.Output.Select(item => item.Clone()));
-            else if (turn.Id != currentTurnId)
+            if (turn.Status == "completed")
+                history.AddRange(CodexThreadStore.RealtimeTimeline(turn, false).Select(item => item.Clone()));
+            else
+                history.AddRange((turn.Id == currentTurnId && currentInput is not null ? currentInput : turn.Input).Select(item => item.Clone()));
+            if (turn.Status != "completed" && turn.Id != currentTurnId)
             {
                 // An incomplete turn's dispatch receipts are untrusted observations, never executable calls.
                 var facts = new JsonObject

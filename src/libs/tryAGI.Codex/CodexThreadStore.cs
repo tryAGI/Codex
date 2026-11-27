@@ -307,6 +307,7 @@ public sealed partial class CodexThreadStore
                     throw new InvalidDataException("Native dispatch history is invalid.");
             }
         }
+        ValidateRealtimeHandoffTurnInputs(value);
         if (value.CompactionCheckpoint is { } checkpoint) CodexThreadCompaction.Validate(value, checkpoint);
         return value;
     }

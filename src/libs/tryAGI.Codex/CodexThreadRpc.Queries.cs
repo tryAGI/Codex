@@ -195,7 +195,7 @@ public sealed partial class CodexThreadRpc
     private static JsonObject[] Items(CodexStoredTurn turn)
     {
         var result = new List<JsonObject>(); var index = 0; var userIndex = 0;
-        foreach (var item in turn.Input.Concat(turn.Output))
+        foreach (var item in CodexThreadStore.RealtimeTimeline(turn, true))
         {
             var id = Text(item, "id") ?? turn.Id + ":" + index; index++;
             var type = Text(item, "type"); var role = Text(item, "role");

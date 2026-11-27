@@ -7,7 +7,10 @@ namespace tryAGI.Codex;
 public sealed class CodexAgentControl : IDisposable
 {
     private readonly object gate = new();
-    private sealed record PendingInput(JsonElement Item, string? ClientId);
+    private sealed record PendingInput(JsonElement Item, string? ClientId, bool Durable = false);
+    private readonly SemaphoreSlim realtimeGate = new(1, 1);
+    private Func<CodexRealtimeHandoffRequest, CancellationToken, Task<CodexRealtimeHandoffAdmission>>? realtimeAdmission;
+    private bool reservingRealtime;
     private readonly Queue<PendingInput> input = new();
     private readonly List<string?> clientIds = [];
     private bool inputInitialized;
@@ -43,6 +46,7 @@ public sealed class CodexAgentControl : IDisposable
         lock (gate)
         {
             if (closed || interrupted) throw new InvalidOperationException("Turn no longer accepts input.");
+            if (reservingRealtime) throw new InvalidOperationException("A durable realtime steering admission is in progress.");
             if (input.Count + items.Count > 128 || queuedBytes + bytes > 1_048_576)
                 throw new ArgumentException("Pending steering exceeds its bound.");
             foreach (var item in items) input.Enqueue(new(item.Clone(), clientUserMessageId));
@@ -62,6 +66,63 @@ public sealed class CodexAgentControl : IDisposable
             next = update(next ?? initial);
             return true;
         }
+    }
+
+    internal void BindRealtimeAdmission(Func<CodexRealtimeHandoffRequest, CancellationToken, Task<CodexRealtimeHandoffAdmission>> admit)
+    {
+        lock (gate) realtimeAdmission = admit;
+    }
+
+    internal async Task<CodexRealtimeHandoffAdmission> SteerRealtimeAsync(CodexRealtimeHandoffRequest request,
+        CancellationToken ct)
+    {
+        await realtimeGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            Func<CodexRealtimeHandoffRequest, CancellationToken, Task<CodexRealtimeHandoffAdmission>> admit;
+            var item = new CodexRealtimeDelegationInput(request.ContextualInput, []).ToResponseItem();
+            var bytes = System.Text.Encoding.UTF8.GetByteCount(item.GetRawText());
+            lock (gate)
+            {
+                if (closed || interrupted) throw new InvalidOperationException("Turn no longer accepts input.");
+                if (input.Any(i => !i.Durable))
+                    throw new InvalidOperationException("Ordinary pending steering must be captured before durable realtime steering.");
+                if (input.Count >= 128 || bytes > 1_048_576 - queuedBytes)
+                    throw new InvalidOperationException("Pending steering exceeds its bound.");
+                admit = realtimeAdmission ?? throw new InvalidOperationException("This turn has no native durable steering executor.");
+                reservingRealtime = true;
+            }
+            var receipt = await admit(request, ct).ConfigureAwait(false);
+            lock (gate)
+            {
+                // The receipt remains durable if interruption wins before the next capture.
+                if (receipt.Admitted && !closed && !interrupted)
+                {
+                    input.Enqueue(new(item, request.SubmissionId.ToString(), true));
+                    queuedBytes += bytes;
+                }
+            }
+            return receipt;
+        }
+        finally
+        {
+            lock (gate) reservingRealtime = false;
+            realtimeGate.Release();
+        }
+    }
+
+    internal async Task<CodexResponseOptions> CaptureAsync(CodexResponseOptions initial, List<JsonElement> history, CancellationToken ct)
+    {
+        await realtimeGate.WaitAsync(ct).ConfigureAwait(false);
+        try { return Capture(initial, history); }
+        finally { realtimeGate.Release(); }
+    }
+
+    internal async Task<bool> TryFinishAsync(CancellationToken ct)
+    {
+        await realtimeGate.WaitAsync(ct).ConfigureAwait(false);
+        try { return TryFinish(); }
+        finally { realtimeGate.Release(); }
     }
 
     internal CodexResponseOptions Capture(CodexResponseOptions initial, List<JsonElement> history)
