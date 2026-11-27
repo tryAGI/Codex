@@ -40,7 +40,7 @@ public sealed record CodexRealtimeHandoffSnapshot(string Id, string InputTranscr
 /// <summary>Session-scoped transcript reducer matching Rust's V1/V2 adjacent speaker runs and
 /// V3 interleaved utterances. Retain this instance across transport reconnects. This is an
 /// in-memory reducer; durable history and admission belong to the native thread journal.</summary>
-public sealed class CodexRealtimeTranscriptAccumulator
+public sealed partial class CodexRealtimeTranscriptAccumulator
 {
     /// <summary>Default V3 completed transcript extraction threshold, measured in UTF-8 bytes.</summary>
     public const int DefaultCompletedThreshold = 4 * 1024;

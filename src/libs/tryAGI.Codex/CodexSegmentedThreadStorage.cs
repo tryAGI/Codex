@@ -38,6 +38,7 @@ public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
     private readonly ICodexThreadSegmentStorage pages;
     private readonly string accountId;
     private readonly bool indexHistory;
+    private readonly bool enableRealtimeCheckpoints;
 
     /// <summary>Bind one account's manifest CAS and immutable page store.
     /// The caller must prevent older inline-only writers from accessing these roots after migration.</summary>
@@ -48,6 +49,12 @@ public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
     /// manifest reader and writer before enabling this option; version-1 roots remain readable.</summary>
     public CodexSegmentedThreadStorage(ICodexThreadStorage roots, ICodexThreadSegmentStorage pages, string accountId,
         bool indexHistory)
+        : this(roots, pages, accountId, indexHistory, enableRealtimeCheckpoints: false) { }
+
+    /// <summary>Optionally enroll in version-3 realtime reducer scope indexes. Version 3
+    /// implies semantic history indexing. Upgrade all manifest readers before enabling it.</summary>
+    public CodexSegmentedThreadStorage(ICodexThreadStorage roots, ICodexThreadSegmentStorage pages, string accountId,
+        bool indexHistory, bool enableRealtimeCheckpoints)
     {
         ArgumentNullException.ThrowIfNull(roots);
         ArgumentNullException.ThrowIfNull(pages);
@@ -56,7 +63,8 @@ public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
         this.roots = roots;
         this.pages = pages;
         this.accountId = accountId;
-        this.indexHistory = indexHistory;
+        this.indexHistory = indexHistory || enableRealtimeCheckpoints;
+        this.enableRealtimeCheckpoints = enableRealtimeCheckpoints;
     }
 
     /// <inheritdoc />
@@ -99,6 +107,8 @@ public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
                 throw new InvalidDataException("Native thread journal manifest revision does not match its document.");
             if (manifest.HistoryIndex is { } index && !SameHistoryIndex(index, BuildHistoryIndex(bytes)))
                 throw new InvalidDataException("Native thread journal history index does not match its document.");
+            if (manifest.ReductionScopes is not null && ScopeDigest(BuildReductionScopes(value)) != manifest.ReductionScopesSha256)
+                throw new InvalidDataException("Realtime reducer scope index does not match its document.");
             return value.Clone();
         }
         catch (JsonException error)
@@ -136,19 +146,25 @@ public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
             staged.TryAdd(sha, (offset, length));
             references.Add(new(sha, length));
         }
-        var indexed = indexHistory || header?.Manifest?.Version == 2;
+        var checkpointed = enableRealtimeCheckpoints || header?.Manifest?.Version == 3;
+        var indexed = checkpointed || indexHistory || header?.Manifest?.Version == 2;
         var index = indexed ? BuildHistoryIndex(bytes) : null;
-        var manifest = new CodexThreadSegmentManifest(ManifestKind, indexed ? 2 : 1, threadId, accountId, revision,
+        var scopes = checkpointed && index is not null ? BuildReductionScopes(document) : null;
+        var manifest = new CodexThreadSegmentManifest(ManifestKind, checkpointed ? 3 : indexed ? 2 : 1, threadId, accountId, revision,
             bytes.Length, Digest(bytes), references.ToArray())
         {
             HistoryIndex = index, HistoryIndexSha256 = index is null ? null : HistoryIndexDigest(index),
+            ReductionScopes = scopes, ReductionScopesSha256 = scopes is null ? null : ScopeDigest(scopes),
         };
         var candidate = JsonSerializer.SerializeToElement(manifest, CodexThreadSegmentJson.Default.CodexThreadSegmentManifest);
         if (indexed && Encoding.UTF8.GetByteCount(candidate.GetRawText()) > MaximumIndexedManifestBytes)
         {
             // Indexing must never make an otherwise valid journal impossible to close.
-            // Keep v2 enrollment and fall back to an ordinary verified full read.
-            manifest = manifest with { HistoryIndex = null, HistoryIndexSha256 = null };
+            // Keep version enrollment and fall back to an ordinary verified full read.
+            manifest = manifest with
+            {
+                HistoryIndex = null, HistoryIndexSha256 = null, ReductionScopes = null, ReductionScopesSha256 = null,
+            };
             candidate = JsonSerializer.SerializeToElement(manifest, CodexThreadSegmentJson.Default.CodexThreadSegmentManifest);
         }
         ValidateManifest(threadId, candidate, manifest);
@@ -188,8 +204,11 @@ public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
 
     private void ValidateManifest(Guid threadId, JsonElement raw, CodexThreadSegmentManifest manifest)
     {
-        if (manifest.Kind != ManifestKind || manifest.Version is not (1 or 2) ||
+        if (manifest.Kind != ManifestKind || manifest.Version is not (1 or 2 or 3) ||
             manifest.Version == 1 && manifest.HistoryIndex is not null ||
+            manifest.Version < 3 && manifest.ReductionScopes is not null ||
+            (manifest.ReductionScopes is null) != (manifest.ReductionScopesSha256 is null) ||
+            manifest.Version == 3 && (manifest.HistoryIndex is null) != (manifest.ReductionScopes is null) ||
             (manifest.HistoryIndex is null) != (manifest.HistoryIndexSha256 is null) || manifest.Id != threadId ||
             manifest.AccountId != accountId || manifest.Revision < 1 ||
             manifest.Length is <= 0 or > CodexThreadStore.MaximumDocumentBytes ||
@@ -215,6 +234,8 @@ public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
             if (!ValidDigest(manifest.HistoryIndexSha256) || HistoryIndexDigest(index) != manifest.HistoryIndexSha256)
                 throw new InvalidDataException("Native history index digest mismatch.");
         }
+        if (manifest.ReductionScopes is { } scopes)
+            ValidateReductionScopes(raw.GetProperty("reductionScopes"), scopes, manifest);
     }
 
     private long ReadDocumentRevision(Guid threadId, JsonElement value)
@@ -304,6 +325,12 @@ internal sealed record CodexThreadSegmentManifest(
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? HistoryIndexSha256 { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CodexRealtimeReductionScope[]? ReductionScopes { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReductionScopesSha256 { get; init; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

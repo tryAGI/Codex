@@ -60,6 +60,24 @@ Version 2 can add `historyIndex` and its canonical SHA-256 digest in the same ro
 
 The host must persist the prefix together with its applied reducer state atomically, and only after processing the returned items. A changed/truncated prefix, rollback, wrong scope, same-revision hash mismatch or unavailable index requires explicit verified full replay. The proof is not itself a serialized reducer state, an authority token, or proof of unread page integrity. This API provides the read-side foundation for persistent reducer checkpoints; it does not yet replace the existing reducer or full-document writer.
 
+## Stage 2c: persistent derived realtime reducer checkpoints
+
+After upgrading every manifest reader/writer, opt in to version 3:
+
+```csharp
+var storage = new CodexSegmentedThreadStorage(rootStore, segmentStore, accountId,
+    indexHistory: true, enableRealtimeCheckpoints: true);
+var projection = await storage.ReadRealtimeProjectionAsync(threadId, sessionId, savedCheckpoint,
+    cancellationToken: ct);
+// Atomically persist projection.Checkpoint in trusted account-scoped host storage.
+```
+
+The v3 root binds the existing observation index to the reducer's session scope (protocol, call/owner identity, history enrollment, transport kind and attachment generations). Full reads verify the scope index against the original document. Version enrollment is sticky, and older v1/v2/inline roots are still readable. A v3 root whose directory exceeds the manifest budget omits both indexes and requires full replay.
+
+The opaque checkpoint includes the exact consumed-prefix proof, reducer version, scope and actual derived state in one bounded serialized envelope. It retains open transcript entries and original raw fragment text, provider/observation receipts, flushed transcript hashes, presentation prefixes, captured handoffs, sealed frames, carryover and ordering/publication state. The existing canonical reducer applies only the new verified events, including promotion, settlement and seal boundaries; this is not a parallel implementation. The returned projection can be partial (`HasMore`), and `AppliedRecords` reports the number newly reduced. Old attachment generations must remain a prefix of the current generation list.
+
+The checkpoint is an optional trusted read-side cache, not an authorization token or a replacement for authoritative history validation. Store its base64 state and SHA-256 together atomically; a host must protect the cache against malicious substitution, since a digest is not authentication. The API never installs the checkpoint in the authoritative store, emits notifications or dispatches effects. Corrupt/unsupported/oversized checkpoint data, changed scope or source prefix require explicit verified full replay. The encoded reducer state retains a separate 16 MiB decoded bound; no automatic persistence, eviction, or cross-account cache is introduced.
+
 ## Next stages
 
-Move the existing host history/item query surface to the bounded index API. Persist the actual reducer state atomically with the verified observation prefix, coordinate with the native realtime reduction and Rust rollout work, and support page-aware compaction, forks and deletion. Only then retire the full-document ceiling for a page-aware store, keeping bounded pages, context windows, manifests and explicit recovery. The Advantage consumer migration remains outside this SDK change.
+Move the host history/item and presentation queries to the bounded index/checkpoint APIs, add host-owned atomic cache persistence and invalidation, and support page-aware writes, compaction, forks and deletion. Only then retire the full-document ceiling for a page-aware store, keeping bounded pages, context windows, manifests and explicit recovery. The Advantage consumer migration remains outside this SDK change.

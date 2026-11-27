@@ -11,7 +11,8 @@ public sealed partial class CodexThreadStore
 
     private sealed class RealtimeHistoryReduction(Action<CodexStoredRealtimeHistoryEvent> apply,
         Func<CodexStoredRealtimeHistoryEvent[], CodexStoredRealtimeHistory> snapshot,
-        List<RealtimeHistoryEmission> emissions)
+        List<RealtimeHistoryEmission> emissions,
+        Func<CodexRealtimeReducerState> capture)
     {
         private readonly List<CodexStoredRealtimeHistoryEvent> events = [];
         private readonly List<(CodexStoredRealtimeHistoryEvent Header, string? Payload)> exactPrefix = [];
@@ -47,6 +48,7 @@ public sealed partial class CodexThreadStore
         }
 
         internal CodexStoredRealtimeHistory Snapshot() => snapshot(events.ToArray());
+        internal CodexRealtimeReducerState CaptureCheckpoint() => capture();
 
         internal void Emit(Action<CodexStoredRealtimeFrame, CodexStoredRealtimeHistoryEvent>? frame,
             Action<CodexStoredRealtimeCarryover, CodexStoredRealtimeHistoryEvent>? saved,

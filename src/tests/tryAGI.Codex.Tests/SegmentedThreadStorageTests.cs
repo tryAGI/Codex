@@ -646,6 +646,139 @@ public sealed class SegmentedThreadStorageTests
     }
 
     [Fact]
+    public async Task PersistentProjectionRestoresOpenPrefixesHandoffReceiptsAndReconnects()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        CodexSegmentedThreadStorage Restart() => new(roots, pages, "account", indexHistory: true, enableRealtimeCheckpoints: true);
+        var storage = Restart();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("large", Payload()), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_projection", "v3", "owner", Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "request", "inference", Json("{}"), Ct)).Thread;
+        await Observe("u1", """{"type":"input_transcript.added","event_id":"e-u1","item":{"text":"first "}}""");
+        await Observe("a1", """{"type":"output_transcript.added","item":{"text":"answer "}}""");
+        var artifact = new CodexRealtimeArtifactCandidate("preview", new("request", "::codex-realtime-inline{}\nStart"));
+        thread = await store.RecordRealtimeArtifactPreviewFromSnapshotAsync(thread, turn, "runner", artifact, Ct);
+
+        var projected = await storage.ReadRealtimeProjectionAsync(thread.Id, "session", pageSize: 1, cancellationToken: Ct);
+        Assert.True(projected.HasMore);
+        Assert.Equal(1, projected.AppliedRecords);
+        while (projected.HasMore)
+            projected = await storage.ReadRealtimeProjectionAsync(thread.Id, "session", projected.Checkpoint, 1, Ct);
+        Assert.Equal(3, projected.ProcessedRecords);
+        MatchFullProjection(projected);
+
+        // Restore only the persisted envelope after a simulated process restart.
+        var persisted = projected.Checkpoint;
+        storage = Restart();
+        store = new CodexThreadStore(storage, "account");
+        await Observe("u2", """{"type":"input_transcript.added","item":{"text":"second"}}""");
+        await Observe("u-final", """{"type":"turn.done","turn":{"role":"user","transcript":"first second!"}}""");
+        await Observe("a-final", """{"type":"turn.done","turn":{"role":"assistant","transcript":"answer done"}}""");
+        await Observe("handoff", """{"type":"delegation.created","item":{"id":"delegate","type":"delegation","target":"client","content":[]}}""");
+        var reads = pages.Reads;
+        projected = await storage.ReadRealtimeProjectionAsync(thread.Id, "session", persisted, cancellationToken: Ct);
+        Assert.False(projected.HasMore);
+        Assert.Equal(4, projected.AppliedRecords);
+        Assert.Equal(7, projected.ProcessedRecords);
+        Assert.InRange(pages.Reads - reads, 1, Hashes(roots.Snapshot(thread.Id)).Length - 1);
+        Assert.Equal("pending", Assert.Single(projected.Handoffs).State);
+        MatchFullProjection(projected);
+
+        // Retire the pending capture and restore a different transport generation.
+        thread = await store.DetachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        await Observe("duplicate-handoff", """{"type":"delegation.created","item":{"id":"delegate","type":"delegation","target":"client","content":[]}}""");
+        await Observe("duplicate-speech", """{"type":"input_transcript.added","event_id":"e-u1","item":{"text":"first "}}""");
+        await Observe("last", """{"type":"input_transcript.added","item":{"text":"last words"}}""");
+        var operation = Guid.NewGuid();
+        var admitted = await store.BeginRealtimeEndAsync(thread.Id, thread.Revision, "session", "owner", attachment, operation, Ct);
+        thread = await store.CompleteRealtimeEndAsync(thread.Id, admitted.Thread.Revision, "session", "owner", operation, Ct);
+        projected = await storage.ReadRealtimeProjectionAsync(thread.Id, "session", projected.Checkpoint, cancellationToken: Ct);
+        Assert.False(projected.HasMore);
+        Assert.Equal("rejected", Assert.Single(projected.Handoffs).State);
+        MatchFullProjection(projected);
+
+        var writes = roots.Publications;
+        var idle = await storage.ReadRealtimeProjectionAsync(thread.Id, "session", projected.Checkpoint, cancellationToken: Ct);
+        Assert.Equal(0, idle.AppliedRecords);
+        MatchFullProjection(idle);
+        Assert.Equal(writes, roots.Publications);
+
+        async Task Observe(string id, string wire) =>
+            thread = await RealtimeHistoryTests.Observe(store, thread, attachment, id, wire);
+
+        void MatchFullProjection(CodexRealtimeProjectionRead read)
+        {
+            var canonical = CodexThreadStore.RecoverRealtimeHistory(RealtimeHistoryTests.Session(thread)) with { Events = [] };
+            var restored = new CodexStoredRealtimeHistory(read.Mode, [], read.Frames, read.Handoffs, read.Carryover);
+            Assert.True(JsonElement.DeepEquals(
+                JsonSerializer.SerializeToElement(canonical, CodexThreadJson.Default.CodexStoredRealtimeHistory),
+                JsonSerializer.SerializeToElement(restored, CodexThreadJson.Default.CodexStoredRealtimeHistory)));
+        }
+    }
+
+    [Fact]
+    public async Task PersistentProjectionRejectsCorruptionChangedScopeAndLegacyRoots()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var legacy = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var store = new CodexThreadStore(legacy, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("legacy"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_scope", "v3", "owner", Ct);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => legacy.ReadRealtimeProjectionAsync(thread.Id, "session", cancellationToken: Ct));
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true, enableRealtimeCheckpoints: true);
+        store = new CodexThreadStore(storage, "account");
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "a",
+            """{"type":"input_transcript.added","item":{"text":"hello"}}""");
+        var projected = await storage.ReadRealtimeProjectionAsync(thread.Id, "session", cancellationToken: Ct);
+        Assert.Equal(3, roots.Snapshot(thread.Id).GetProperty("version").GetInt32());
+        var reads = pages.Reads;
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadRealtimeProjectionAsync(thread.Id, "session",
+            projected.Checkpoint with { StateSha256 = new string('0', 64) }, cancellationToken: Ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => storage.ReadRealtimeProjectionAsync(thread.Id, "other",
+            projected.Checkpoint, cancellationToken: Ct));
+        Assert.Equal(reads, pages.Reads);
+        // The original v2-writing constructor must not downgrade an already-enrolled root.
+        var candidate = JsonNode.Parse(CodexThreadStore.Encode(thread).GetRawText())!.AsObject();
+        candidate["revision"] = thread.Revision + 1;
+        candidate["realtimeSessions"]![0]!["ownerId"] = "different-owner";
+        Assert.True(await legacy.CompareExchangeAsync(thread.Id, thread.Revision, Json(candidate.ToJsonString()), Ct));
+        Assert.Equal(3, roots.Snapshot(thread.Id).GetProperty("version").GetInt32());
+        reads = pages.Reads;
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => storage.ReadRealtimeProjectionAsync(thread.Id, "session",
+            projected.Checkpoint, cancellationToken: Ct));
+        Assert.Equal(reads, pages.Reads);
+    }
+
+    [Fact]
+    public async Task TamperedReductionScopeIndexFailsBeforeReadingPages()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true, enableRealtimeCheckpoints: true);
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_scope", "v3", "owner", Ct);
+        var root = JsonNode.Parse(roots.Snapshot(thread.Id).GetRawText())!.AsObject();
+        root["reductionScopes"]![0]!["ownerId"] = "tampered";
+        roots.ReplaceForFaultInjection(thread.Id, Json(root.ToJsonString()));
+        var reads = pages.Reads;
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadRealtimeProjectionAsync(thread.Id, "session", cancellationToken: Ct));
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadAsync(thread.Id, Ct));
+        Assert.Equal(reads, pages.Reads);
+    }
+
+    [Fact]
     public async Task ReaderOfAnOlderManifestRemainsConsistentDuringConcurrentPublication()
     {
         var roots = new Roots();

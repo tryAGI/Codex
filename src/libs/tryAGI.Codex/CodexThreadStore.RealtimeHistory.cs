@@ -490,7 +490,7 @@ public sealed partial class CodexThreadStore
     }
 
     private static RealtimeHistoryReduction CreateRealtimeHistoryReduction(CodexStoredRealtimeSession session,
-        CodexRealtimeHistoryMode mode)
+        CodexRealtimeHistoryMode mode, CodexRealtimeReducerState? checkpoint = null)
     {
         // Retain only the fields that influence reduction; never hold an entire thread or
         // a previously materialized history through a cached closure.
@@ -511,6 +511,23 @@ public sealed partial class CodexThreadStore
         var publishedFrames = new HashSet<string>(StringComparer.Ordinal);
         int previousTurnCount = 0;
         long sequence = 0;
+        string? lastId = null;
+        if (checkpoint is not null)
+        {
+            accumulator.RestoreCheckpoint(checkpoint.Accumulator);
+            foreach (var frame in checkpoint.Frames) frames.Add(frame.Id, frame);
+            foreach (var handoff in checkpoint.Handoffs) handoffs.Add(handoff.HandoffId, handoff);
+            carryover.AddRange(checkpoint.Carryover);
+            foreach (var position in checkpoint.Observed) observed.Add(position.Id, (position.Sequence, position.Timestamp));
+            ids.UnionWith(checkpoint.EventIds);
+            splitFrames.AddRange(checkpoint.SplitFrames);
+            publishedFrames.UnionWith(checkpoint.PublishedFrames);
+            previousTimestamp = checkpoint.PreviousTimestamp;
+            previousRevision = checkpoint.PreviousRevision;
+            previousTurnCount = checkpoint.PreviousTurnCount;
+            sequence = checkpoint.Sequence;
+            lastId = checkpoint.LastId;
+        }
 
         CodexStoredRealtimeFrame Frame(CodexRealtimeTranscriptEntry entry, bool sealedFrame,
             CodexStoredRealtimeHistoryEvent boundary, string? handoffId = null)
@@ -652,15 +669,17 @@ public sealed partial class CodexThreadStore
                 }
                 default: throw new InvalidDataException("Unknown realtime history event kind.");
             }
+            lastId = item.Id;
         }
         CodexStoredRealtimeHistory Snapshot(CodexStoredRealtimeHistoryEvent[] events)
         {
             var active = new List<CodexStoredRealtimeFrame>();
             var activeIds = new HashSet<string>(StringComparer.Ordinal);
-            if (events.LastOrDefault() is { } last)
+            if (lastId is { } boundaryId)
                 foreach (var entry in accumulator.Snapshot())
                 {
-                    var frame = Frame(entry, entry.Final, last);
+                    // Only the boundary identity is used as a fallback for synthetic entries.
+                    var frame = Frame(entry, entry.Final, new(boundaryId, "checkpoint", previousTimestamp, previousTurnCount));
                     if (frames.ContainsKey(frame.Id) || !activeIds.Add(frame.Id))
                         throw new InvalidDataException("Active realtime transcript frame identity collided.");
                     active.Add(frame);
@@ -673,7 +692,12 @@ public sealed partial class CodexThreadStore
                 carryover.Select(c => c with { SourceFrameIds = c.SourceFrameIds.ToArray() }).ToArray());
         }
 
-        return new(Apply, Snapshot, emissions);
+        CodexRealtimeReducerState Capture() => new(sequence, previousTimestamp, previousRevision, previousTurnCount,
+            lastId, accumulator.CaptureCheckpoint(), frames.Values.ToArray(), handoffs.Values.ToArray(), carryover.ToArray(),
+            observed.Select(p => new CodexRealtimeReducerPosition(p.Key, p.Value.Sequence, p.Value.Timestamp)).ToArray(),
+            ids.ToArray(), splitFrames.ToArray(), publishedFrames.ToArray());
+
+        return new(Apply, Snapshot, emissions, Capture);
     }
 
     private const string RealtimeEndInstruction = "The user just ended their realtime session. Here is the remaining handoff/transcript tail. You probably do not have to do anything; acknowledge the handoff unless the transcript itself asks for something.";

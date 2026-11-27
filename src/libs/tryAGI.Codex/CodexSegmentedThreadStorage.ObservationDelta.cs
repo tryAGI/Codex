@@ -35,6 +35,18 @@ public sealed partial class CodexSegmentedThreadStorage
         CodexRealtimeObservationPrefix? checkpoint = null, int pageSize = 64,
         CancellationToken cancellationToken = default)
     {
+        ValidateObservationDeltaRequest(threadId, sessionId, checkpoint, pageSize);
+        cancellationToken.ThrowIfCancellationRequested();
+        var root = await roots.ReadAsync(threadId, cancellationToken).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException("Native thread not found.");
+        var (revision, manifest) = ReadRoot(threadId, root);
+        return await ReadCapturedObservationDeltaAsync(threadId, sessionId, checkpoint, pageSize, revision,
+            manifest, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void ValidateObservationDeltaRequest(Guid threadId, string sessionId,
+        CodexRealtimeObservationPrefix? checkpoint, int pageSize)
+    {
         RequireThreadId(threadId);
         if (!ValidCollection(CodexThreadHistoryCollection.RealtimeObservations, sessionId))
             throw new ArgumentException("Invalid realtime observation scope.", nameof(sessionId));
@@ -44,11 +56,12 @@ public sealed partial class CodexSegmentedThreadStorage
             checkpoint.Revision < 1 || checkpoint.NextOrdinal < 0 ||
             !ValidDigest(checkpoint.DocumentSha256) || !ValidDigest(checkpoint.PrefixSha256)))
             throw new ArgumentException("Invalid realtime observation prefix.", nameof(checkpoint));
+    }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        var root = await roots.ReadAsync(threadId, cancellationToken).ConfigureAwait(false)
-            ?? throw new KeyNotFoundException("Native thread not found.");
-        var (revision, manifest) = ReadRoot(threadId, root);
+    private async Task<CodexRealtimeObservationDelta> ReadCapturedObservationDeltaAsync(Guid threadId, string sessionId,
+        CodexRealtimeObservationPrefix? checkpoint, int pageSize, long revision, CodexThreadSegmentManifest? manifest,
+        CancellationToken cancellationToken)
+    {
         if (manifest is not { HistoryIndex: { } index })
             throw new InvalidOperationException("Realtime observation index is unavailable; verified full replay is required.");
         if (checkpoint is not null && (revision < checkpoint.Revision ||
