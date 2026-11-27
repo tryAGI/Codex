@@ -4,6 +4,19 @@ namespace tryAGI.Codex;
 
 public sealed partial class CodexThreadStore
 {
+    internal static JsonObject ProjectRealtimeFrame(CodexStoredRealtimeSession session, CodexStoredRealtimeFrame frame)
+    {
+        var transcript = new JsonObject { ["role"] = frame.Role, ["text"] = frame.Text };
+        var item = session.History?.Mode == CodexRealtimeHistoryMode.LegacyFlush ||
+            session.History?.Mode == CodexRealtimeHistoryMode.LegacyNoFlush
+            ? new JsonObject { ["type"] = "transcriptSegment", ["role"] = frame.Role, ["text"] = frame.Text }
+            : new JsonObject { ["type"] = "frame", ["channels"] = new JsonObject { ["voice_transcript"] = transcript } };
+        item["id"] = frame.Id;
+        item["realtimeSessionId"] = session.SessionId;
+        item["observedAtMs"] = frame.ObservedAtMs;
+        return item;
+    }
+
     // Replay in commit order rather than sorting current frames by their first observation.
     // A late sealed frame can have an earlier observation time but must never move a
     // previously returned position in an immutable snapshot.
@@ -29,11 +42,7 @@ public sealed partial class CodexThreadStore
                 _ = ReplayRealtimeHistory(session, history.Mode, history.Events,
                     (frame, boundary) =>
                     {
-                        var transcript = new JsonObject { ["role"] = frame.Role, ["text"] = frame.Text };
-                        var item = history.Mode == CodexRealtimeHistoryMode.Canonical
-                            ? new JsonObject { ["type"] = "frame", ["channels"] = new JsonObject { ["voice_transcript"] = transcript } }
-                            : new JsonObject { ["type"] = "transcriptSegment", ["role"] = frame.Role, ["text"] = frame.Text };
-                        Add(item, frame.Id, frame.ObservedAtMs, boundary.CommitRevision);
+                        Add(ProjectRealtimeFrame(session, frame), frame.Id, frame.ObservedAtMs, boundary.CommitRevision);
                     },
                     (saved, boundary) => Add(new JsonObject
                     {

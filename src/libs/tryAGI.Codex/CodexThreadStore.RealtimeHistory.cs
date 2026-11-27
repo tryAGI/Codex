@@ -30,7 +30,8 @@ public sealed record CodexStoredRealtimeHistoryEvent(
     string? HandoffId = null,
     Guid? TurnId = null,
     long? CommitRevision = null,
-    CodexStoredRealtimePromotion? Promotion = null);
+    CodexStoredRealtimePromotion? Promotion = null,
+    bool? PublishFinalTranscript = null);
 
 /// <summary>A reconciled transcript frame, ordered by its first observation rather than final arrival.</summary>
 public sealed record CodexStoredRealtimeFrame(
@@ -135,12 +136,14 @@ public sealed partial class CodexThreadStore
             if (prior.Kind != "observation" || prior.EventType != source.Type ||
                 prior.Payload is not { } payload || payload.GetRawText() != source.Payload.GetRawText())
                 throw new InvalidOperationException("Realtime observation ID was reused for different content.");
+            NotifyReconciledRealtimeSnapshot(before);
             return new(false, before);
         }
         var item = new CodexStoredRealtimeHistoryEvent(observationId, "observation",
             NextRealtimeObservationTime(history), before.Turns.Length, attachmentId,
             source.Type, source.Payload.Clone(), source.ReceivedAfterConnectMs,
-            CommitRevision: checked(before.Revision + 1));
+            CommitRevision: checked(before.Revision + 1),
+            PublishFinalTranscript: session.Protocol == "v3" && source.Transcript?.Final == true ? true : null);
         var next = ReplaceRealtimeSession(before, session with
         {
             History = AppendRealtimeHistory(session, history, item),
@@ -324,6 +327,7 @@ public sealed partial class CodexThreadStore
         long previousTimestamp = 0;
         long previousRevision = 0;
         var splitFrames = new List<string>();
+        var publishedFrames = new HashSet<string>(StringComparer.Ordinal);
         int previousTurnCount = 0;
         long sequence = 0;
 
@@ -347,7 +351,7 @@ public sealed partial class CodexThreadStore
                 var frame = Frame(entry, true, boundary, handoffId);
                 if (!frames.TryAdd(frame.Id, frame))
                     throw new InvalidDataException("Realtime transcript frame identity collided.");
-                frameCommitted?.Invoke(frame, boundary);
+                if (publishedFrames.Add(frame.Id)) frameCommitted?.Invoke(frame, boundary);
             }
         }
 
@@ -396,6 +400,22 @@ public sealed partial class CodexThreadStore
                     if (!IsRealtimeHistoryEvent(source)) throw new InvalidDataException("Unexpected realtime history event type.");
                     observed.Add(item.Id, (sequence, item.ObservedAtMs));
                     var handoff = accumulator.Observe(source, item.Id);
+                    // Presentation completion is distinct from consuming transcript carryover.
+                    // Only newly enrolled final observations publish immediately; old snapshots
+                    // retain their existing commit positions across an SDK upgrade.
+                    if (item.PublishFinalTranscript is not null)
+                    {
+                        if (item.PublishFinalTranscript != true || session.Protocol != "v3" ||
+                            source.Transcript?.Final != true || item.CommitRevision is null)
+                            throw new InvalidDataException("Invalid realtime final presentation receipt.");
+                        if (frameCommitted is not null)
+                            foreach (var entry in accumulator.Snapshot().Where(e => e.Final &&
+                                e.Fragments.Any(f => f.ObservationId == item.Id)))
+                            {
+                                var frame = Frame(entry, true, item);
+                                if (publishedFrames.Add(frame.Id)) frameCommitted(frame, item);
+                            }
+                    }
                     if (handoff is { IsNew: true })
                     {
                         AddFrames(handoff.Entries, item, handoff.Id);

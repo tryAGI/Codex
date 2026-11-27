@@ -369,7 +369,32 @@ public sealed class ThreadAgentTests
             Assert.Equal("AAAAAA==", notice.Body.GetProperty("audio").GetProperty("data").GetString());
             break;
         }
-        server.Replies.Enqueue(Text("native direct answer"));
+        async Task<JsonElement> NextNotice(string method, Func<JsonElement, bool>? predicate = null)
+        {
+            while (true)
+            {
+                var notice = await notices.Reader.ReadAsync(token);
+                if (notice.Method == method && (predicate?.Invoke(notice.Body) ?? true)) return notice.Body;
+            }
+        }
+        await incoming.Writer.WriteAsync("""{"type":"input_transcript.added","item":{"text":"live "}}""", token);
+        var frameStart = (await NextNotice("thread/realtime/item/started")).GetProperty("item");
+        var frameId = frameStart.GetProperty("id").GetString();
+        Assert.Equal("", frameStart.GetProperty("channels").GetProperty("voice_transcript").GetProperty("text").GetString());
+        var delta = await NextNotice("thread/realtime/item/transcript/delta");
+        Assert.Equal(frameId, delta.GetProperty("itemId").GetString());
+        Assert.Equal("live ", delta.GetProperty("delta").GetString());
+        await incoming.Writer.WriteAsync("""{"type":"turn.done","turn":{"role":"user","transcript":"live transcript"}}""", token);
+        var suffix = await NextNotice("thread/realtime/item/transcript/delta");
+        Assert.Equal(frameId, suffix.GetProperty("itemId").GetString());
+        Assert.Equal("transcript", suffix.GetProperty("delta").GetString());
+        var completedFrame = (await NextNotice("thread/realtime/item/completed",
+            value => value.GetProperty("item").GetProperty("id").GetString() == frameId)).GetProperty("item");
+        var livePage = await Invoke("list", new() { ["order"] = "position" });
+        var listed = Assert.Single(livePage.GetProperty("data").EnumerateArray()
+            .Select(x => x.GetProperty("item")).Where(x => x.GetProperty("id").GetString() == frameId));
+        Assert.True(JsonElement.DeepEquals(completedFrame, listed));
+        server.Replies.Enqueue(Text("::codex-realtime-inline{}\nnative direct answer"));
         await incoming.Writer.WriteAsync("""
             {"type":"delegation.created","item":{"type":"delegation","target":"client","id":"direct-handoff","content":[{"type":"input_text","text":"answer using backing model"}]}}
             """, token);
@@ -388,10 +413,19 @@ public sealed class ThreadAgentTests
             await Task.Delay(10, token);
         }
         Assert.Single(server.Requests);
+        var promoted = (await NextNotice("thread/realtime/item/completed", value =>
+            value.GetProperty("item").GetProperty("type").GetString() == "bemItemPromoted")).GetProperty("item");
+        Assert.Equal("inlineMarkdown", promoted.GetProperty("presentation").GetProperty("type").GetString());
         await Invoke("stop");
+        var closed = (await NextNotice("thread/realtime/item/completed", value =>
+            value.GetProperty("item").GetProperty("type").GetString() == "realtimeSessionClosed")).GetProperty("item");
         var end = await Invoke("list", new() { ["order"] = "position" });
         var data = end.GetProperty("data").EnumerateArray().ToArray();
         Assert.Equal("realtimeSessionClosed", data[^1].GetProperty("item").GetProperty("type").GetString());
+        Assert.True(JsonElement.DeepEquals(closed, data[^1].GetProperty("item")));
+        Assert.Single(data.Where(x => x.GetProperty("item").GetProperty("id").GetString() == frameId));
+        Assert.True(JsonElement.DeepEquals(promoted, Assert.Single(data.Select(x => x.GetProperty("item"))
+            .Where(x => x.GetProperty("id").GetString() == promoted.GetProperty("id").GetString()))));
         Assert.Contains("last speech before close", end.GetRawText());
         Assert.Equal(1, Volatile.Read(ref socket.CloseCommands));
         var old = await Invoke("list", new() { ["order"] = "position", ["snapshotEnd"] = snapshot });

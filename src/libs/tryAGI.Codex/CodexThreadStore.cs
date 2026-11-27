@@ -281,6 +281,7 @@ public sealed partial class CodexThreadStore
         }
         if (!await storage.CompareExchangeAsync(value.Id, expected, body, ct).ConfigureAwait(false))
             throw new CodexThreadConflictException();
+        NotifyRealtimeCommit(next, body);
         return next;
     }
     /// <summary>Serializes a thread document, enforcing <see cref="MaximumDocumentBytes"/>.</summary>

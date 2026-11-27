@@ -34,6 +34,7 @@ public sealed partial class CodexThreadRpc
         ArgumentNullException.ThrowIfNull(factory);
         if (Interlocked.CompareExchange(ref realtimeFactory, factory, null) is not null)
             throw new InvalidOperationException("Native realtime transport factory is already installed.");
+        store.RealtimeHistoryCommitted += OfferRealtimeCommit;
     }
 
     /// <summary>Install the native transport and an explicit owner-scoped startup context provider.
@@ -197,6 +198,7 @@ public sealed partial class CodexThreadRpc
                 ["realtimeSessionId"] = coordinator.SessionId, ["version"] = coordinator.Protocol }).ConfigureAwait(false);
             if (binding.AnswerSdp is { } sdp)
                 await EmitAsync("thread/realtime/sdp", new JsonObject { ["threadId"] = id.ToString(), ["sdp"] = sdp }).ConfigureAwait(false);
+            await StartRealtimeNoticesAsync(request.Thread, ct).ConfigureAwait(false);
             run.Pump = RunRealtimePumpAsync(id, run);
             await Task.WhenAny(coordinator.PumpReady, run.Pump).WaitAsync(ct).ConfigureAwait(false);
             if (!coordinator.PumpReady.IsCompletedSuccessfully) throw Invalid("Realtime pump did not start.");
@@ -293,6 +295,8 @@ public sealed partial class CodexThreadRpc
             var ended = await run.Binding.Coordinator.EndAsync(run.EndId, run.Binding.EndProvider, ct).ConfigureAwait(false);
             if (ended != CodexRealtimeLifecycleStatus.Ended)
                 throw Invalid("Realtime history recovery required before acknowledging stop.");
+            ReconcileRealtimeNotices(await store.ReadAsync(id, CancellationToken.None).ConfigureAwait(false));
+            await FlushRealtimeNoticesAsync(id, ct).ConfigureAwait(false);
             realtime.TryRemove(id, out _);
             await run.Binding.Coordinator.DisposeAsync().ConfigureAwait(false);
             return Json("{}");
@@ -312,7 +316,7 @@ public sealed partial class CodexThreadRpc
                 realtime.TryRemove(entry.Key, out _);
             }
         }
-        finally { realtimeAdmission.Release(); }
+        finally { StopRealtimeNotices(); realtimeAdmission.Release(); }
     }
 
     private async Task<JsonElement> ListRealtimeAsync(JsonElement p, CancellationToken ct)
