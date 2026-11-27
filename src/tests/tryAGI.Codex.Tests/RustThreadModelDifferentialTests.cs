@@ -16,6 +16,7 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
     private readonly Storage storage = new();
     private CodexAppServerClient? rust;
     private CodexThreadRpc? native;
+    internal RustSyntheticTurnProvider? SyntheticTurns { get; private set; }
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     internal const string Recommended = "parity-recommended";
@@ -97,7 +98,7 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
         codexHome = root.CreateSubdirectory("codex-home").FullName;
     }
 
-    internal static async Task<RustThreadModelDifferentialFixture> CreateAsync()
+    internal static async Task<RustThreadModelDifferentialFixture> CreateAsync(bool enableSyntheticTurns = false)
     {
         Assert.SkipUnless(Environment.GetEnvironmentVariable("CODEX_RUST_DIFFERENTIAL") == "1",
             "Use the explicit isolated Rust differential runner.");
@@ -118,6 +119,17 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
         var f = new RustThreadModelDifferentialFixture(root, executable);
         try
         {
+            if (enableSyntheticTurns) f.SyntheticTurns = new RustSyntheticTurnProvider();
+            var providerSelection = f.SyntheticTurns is null ? "" : "model_provider = \"mock_provider\"";
+            var providerConfig = f.SyntheticTurns is not { } provider ? "" : $"""
+                [model_providers.mock_provider]
+                name = "Synthetic local fixture"
+                base_url = "{provider.BaseUrl}"
+                wire_api = "responses"
+                request_max_retries = 0
+                stream_max_retries = 0
+                supports_websockets = false
+                """;
             var catalogPath = Path.Combine(f.codexHome, "models.json");
             await File.WriteAllTextAsync(catalogPath, Catalog().GetRawText(), Ct);
             // TOML string quoting is safe here: the generated path is a Linux
@@ -128,9 +140,12 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
                 approval_policy = "never"
                 sandbox_mode = "read-only"
                 cli_auth_credentials_store = "file"
+                {providerSelection}
 
                 [analytics]
                 enabled = false
+
+                {providerConfig}
                 """, Ct);
             await f.RestartAsync();
             return f;
@@ -144,6 +159,7 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
 
     internal async Task RestartAsync()
     {
+        if (SyntheticTurns is not null && native is not null) await native.StopAsync(Ct);
         if (rust is not null)
         {
             await rust.DisposeAsync();
@@ -156,7 +172,9 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
             ["approvalPolicy"] = "never", ["sandbox"] = "read-only", ["approvalsReviewer"] = "user",
         }.ToJsonString());
         native = new CodexThreadRpc(store, ct => storage.ListAsync(store, ct), defaults,
-            (_, _, _) => throw new InvalidOperationException("No provider or turn execution is allowed in this fixture."),
+            (run, started, ct) => SyntheticTurns is { } provider
+                ? provider.RunNativeAsync(store, run, started, ct)
+                : throw new InvalidOperationException("No provider or turn execution is allowed in this fixture."),
             (method, value) =>
             {
                 NativeNotifications.Enqueue((method, value.Clone()));
@@ -207,8 +225,16 @@ internal sealed class RustThreadModelDifferentialFixture : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        try { if (rust is not null) await rust.DisposeAsync(); }
-        finally { root.Delete(recursive: true); }
+        try
+        {
+            if (SyntheticTurns is not null && native is not null) await native.StopAsync(CancellationToken.None);
+            if (rust is not null) await rust.DisposeAsync();
+        }
+        finally
+        {
+            try { if (SyntheticTurns is not null) await SyntheticTurns.DisposeAsync(); }
+            finally { root.Delete(recursive: true); }
+        }
     }
 }
 
