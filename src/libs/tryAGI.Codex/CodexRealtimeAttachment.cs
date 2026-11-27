@@ -49,7 +49,13 @@ public sealed class CodexRealtimeAttachmentOptions
 /// <summary>A caller-owned stream carrying complete JSON wire events and requests.</summary>
 /// <param name="Incoming">Provider events. The SDK never completes this channel.</param>
 /// <param name="Outgoing">Client requests. The SDK never completes this channel.</param>
-public sealed record CodexRealtimeAttachmentStream(ChannelReader<string> Incoming, ChannelWriter<string> Outgoing);
+public sealed record CodexRealtimeAttachmentStream(ChannelReader<string> Incoming, ChannelWriter<string> Outgoing)
+{
+    /// <summary>Optional host signal that the peer no longer consumes outgoing commands.
+    /// The host must stop producing incoming events before signaling. Already queued incoming
+    /// events are delivered before the attachment ends. Neither host channel is completed.</summary>
+    public CancellationToken PeerOutputClosed { get; init; }
+}
 
 /// <summary>An attachment owns its sideband connection, not the existing media call.</summary>
 public sealed class CodexRealtimeAttachedCall : IAsyncDisposable
@@ -257,6 +263,7 @@ internal sealed class CodexAttachmentChannelSocket(CodexRealtimeAttachmentStream
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly CancellationTokenSource lifetime = new();
+    private readonly CancellationTokenSource failedOutput = new();
     private byte[]? current;
     private int offset;
     private int state = (int)WebSocketState.Open;
@@ -293,15 +300,28 @@ internal sealed class CodexAttachmentChannelSocket(CodexRealtimeAttachmentStream
         linked.Token.ThrowIfCancellationRequested();
         if (current is null)
         {
-            string value;
-            try { value = await stream.Incoming.ReadAsync(linked.Token).ConfigureAwait(false); }
-            catch (ChannelClosedException e) when (e.InnerException is null)
+            // Drain accepted input before reporting a peer half-close, even when both
+            // halves close at once. A caller-owned channel cannot report reader disposal
+            // through its writer, so an idle output peer uses the explicit host signal.
+            if (!stream.Incoming.TryRead(out var value))
             {
-                Interlocked.Exchange(ref state, (int)WebSocketState.CloseReceived);
-                return new(0, WebSocketMessageType.Close, true, WebSocketCloseStatus.NormalClosure, null);
+                using var wait = CancellationTokenSource.CreateLinkedTokenSource(
+                    linked.Token, failedOutput.Token, stream.PeerOutputClosed);
+                try { value = await stream.Incoming.ReadAsync(wait.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) when (!linked.IsCancellationRequested &&
+                    (failedOutput.IsCancellationRequested || stream.PeerOutputClosed.IsCancellationRequested))
+                {
+                    if (!stream.Incoming.TryRead(out value)) return EndInput();
+                }
+                catch (ChannelClosedException e) when (e.InnerException is null) { return EndInput(); }
+                catch (ChannelClosedException) { Abort(); throw; }
             }
+            linked.Token.ThrowIfCancellationRequested();
             if (Utf8.GetByteCount(value) > maximumBytes)
+            {
+                Abort();
                 throw new CodexProtocolException("Inbound sideband message exceeded the configured bound.");
+            }
             current = Utf8.GetBytes(value);
             offset = 0;
         }
@@ -317,9 +337,21 @@ internal sealed class CodexAttachmentChannelSocket(CodexRealtimeAttachmentStream
         bool endOfMessage, CancellationToken cancellationToken)
     {
         if (messageType != WebSocketMessageType.Text || !endOfMessage || buffer.Count > maximumBytes)
+        {
+            Abort();
             throw new CodexProtocolException("Invalid outbound attachment message.");
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
+        }
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, lifetime.Token, failedOutput.Token, stream.PeerOutputClosed);
         linked.Token.ThrowIfCancellationRequested();
-        await stream.Outgoing.WriteAsync(Utf8.GetString(buffer.AsSpan()), linked.Token).ConfigureAwait(false);
+        try { await stream.Outgoing.WriteAsync(Utf8.GetString(buffer.AsSpan()), linked.Token).ConfigureAwait(false); }
+        catch (ChannelClosedException) { failedOutput.Cancel(); throw; }
+    }
+
+    private WebSocketReceiveResult EndInput()
+    {
+        Interlocked.CompareExchange(ref state, (int)WebSocketState.CloseReceived, (int)WebSocketState.Open);
+        lifetime.Cancel();
+        return new(0, WebSocketMessageType.Close, true, WebSocketCloseStatus.NormalClosure, null);
     }
 }

@@ -376,6 +376,13 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
     /// so a frontend-owned (WebRTC) call keeps running. Dispose the connection afterwards.</summary>
     public async Task CloseTransportAsync(CancellationToken cancellationToken = default)
     {
+        // A caller-owned channel has no WebSocket close handshake. Cancel its stalled
+        // writes directly rather than waiting for the write gate held by backpressure.
+        if (socket is CodexAttachmentChannelSocket)
+        {
+            await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", cancellationToken).ConfigureAwait(false);
+            return;
+        }
         await writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -653,7 +660,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
         if (protocol == "v2" && message["item"] is JsonObject output && output["type"]?.GetValue<string>() == "function_call_output" &&
             output["call_id"]?.GetValue<string>() is { } staleCall && retiredFunctions.Contains(staleCall)) return false;
         var bytes = Encoding.UTF8.GetBytes(message.ToJsonString());
-        if (bytes.Length > maximumBytes) throw new CodexProtocolException("Outbound sideband message exceeded the configured bound.");
+        EnsureOutboundBound(bytes.Length);
         // Prepare both legal wire forms before the admission lock. Sleep must never wait
         // for serialization or a network write, including when a multipart append is active.
         byte[]? quietBytes = null;
@@ -684,7 +691,7 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                 var permitted = responseAdmission.Allowed &&
                     (requestedAdmission is null || ReferenceEquals(responseAdmission, requestedAdmission));
                 var selected = permitted ? bytes : quietBytes;
-                if (selected.Length > maximumBytes) throw new CodexProtocolException("Outbound sideband message exceeded the configured bound.");
+                EnsureOutboundBound(selected.Length);
                 write = socket.SendAsync(selected.AsMemory(), WebSocketMessageType.Text, true, ct);
             }
         }
@@ -716,6 +723,14 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
             if (claimToolOutputId is not null) toolOutputs.Add(claimToolOutputId);
             return socket.SendAsync(frame.AsMemory(), WebSocketMessageType.Text, true, ct);
         }
+    }
+
+    private void EnsureOutboundBound(int length)
+    {
+        if (length <= maximumBytes) return;
+        // Invalid caller-sideband frames terminate the attachment, not the host media call.
+        if (socket is CodexAttachmentChannelSocket) socket.Abort();
+        throw new CodexProtocolException("Outbound sideband message exceeded the configured bound.");
     }
 
     /// <inheritdoc />

@@ -52,6 +52,150 @@ public sealed class RealtimeAttachmentTests
         Assert.Equal("session.updated", nextReader.Current.Type);
     }
 
+    private static readonly TimeSpan TestDeadline = TimeSpan.FromSeconds(5);
+
+    private static JsonObject Command(string text) => new() { ["type"] = "test.request", ["text"] = text };
+
+    [Fact]
+    public async Task StalledOutputDoesNotBlockInputAndDetachCancelsTheWrite()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = new CodexClient(new OAuth());
+        var incoming = Channel.CreateBounded<string>(1);
+        var outgoing = Channel.CreateBounded<string>(1);
+        await using var call = await client.AttachExistingRealtimeCallAsync("rtc_test",
+            new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), cancellationToken: ct);
+        await call.Connection.SendEventAsync(Command("first"), ct);
+        var blocked = call.Connection.SendEventAsync(Command("second"), ct);
+        await incoming.Writer.WriteAsync("""{"type":"session.started","session":{"id":"call"}}""", ct);
+        await using var reader = call.Connection.ReadEventsAsync(ct).GetAsyncEnumerator(ct);
+        Assert.True(await reader.MoveNextAsync().AsTask().WaitAsync(TestDeadline, ct));
+        Assert.Equal("session.started", reader.Current.Type);
+        Assert.False(blocked.IsCompleted);
+        await call.DetachAsync(ct).WaitAsync(TestDeadline, ct);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => blocked.WaitAsync(TestDeadline, ct));
+        Assert.True(outgoing.Reader.TryRead(out var first));
+        Assert.Contains("first", first);
+        Assert.False(outgoing.Reader.TryRead(out _));
+        Assert.True(outgoing.Writer.TryWrite("caller still owns output"));
+        Assert.True(incoming.Writer.TryWrite("caller still owns input"));
+    }
+
+    [Fact]
+    public async Task InputHalfCloseCancelsBlockedAndLateCommands()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = new CodexClient(new OAuth());
+        var incoming = Channel.CreateBounded<string>(1);
+        var outgoing = Channel.CreateBounded<string>(1);
+        await using var call = await client.AttachExistingRealtimeCallAsync("rtc_test",
+            new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), cancellationToken: ct);
+        await call.Connection.SendEventAsync(Command("first"), ct);
+        var blocked = call.Connection.SendEventAsync(Command("second"), ct);
+        incoming.Writer.Complete();
+        await using var reader = call.Connection.ReadEventsAsync(ct).GetAsyncEnumerator(ct);
+        Assert.False(await reader.MoveNextAsync().AsTask().WaitAsync(TestDeadline, ct));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => blocked.WaitAsync(TestDeadline, ct));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.Connection.SendEventAsync(Command("late"), ct));
+        Assert.True(outgoing.Reader.TryRead(out _));
+        Assert.False(outgoing.Reader.TryRead(out _));
+        Assert.True(outgoing.Writer.TryWrite("caller still owns output"));
+        Assert.Equal("remote_close", call.Connection.Closure?.End);
+    }
+
+    [Fact]
+    public async Task ExplicitOutputPeerCloseReleasesAnIdleReader()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = new CodexClient(new OAuth());
+        using var peer = new CancellationTokenSource();
+        var incoming = Channel.CreateBounded<string>(1);
+        var outgoing = Channel.CreateBounded<string>(1);
+        await using var call = await client.AttachExistingRealtimeCallAsync("rtc_test",
+            new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer) { PeerOutputClosed = peer.Token }, cancellationToken: ct);
+        await using var reader = call.Connection.ReadEventsAsync(ct).GetAsyncEnumerator(ct);
+        var waiting = reader.MoveNextAsync().AsTask();
+        Assert.False(waiting.IsCompleted);
+        peer.Cancel();
+        Assert.False(await waiting.WaitAsync(TestDeadline, ct));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.Connection.SendEventAsync(Command("late"), ct));
+        Assert.True(incoming.Writer.TryWrite("caller still owns input"));
+        Assert.True(outgoing.Writer.TryWrite("caller still owns output"));
+    }
+
+    [Fact]
+    public async Task QueuedTranscriptSurvivesBothPeerHalvesClosing()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = new CodexClient(new OAuth());
+        using var peer = new CancellationTokenSource();
+        var incoming = Channel.CreateBounded<string>(2);
+        var outgoing = Channel.CreateBounded<string>(1);
+        await using var call = await client.AttachExistingRealtimeCallAsync("rtc_test",
+            new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer) { PeerOutputClosed = peer.Token }, cancellationToken: ct);
+        Assert.True(incoming.Writer.TryWrite("""{"type":"input_transcript.added","item":{"text":"last words"}}"""));
+        Assert.True(incoming.Writer.TryWrite("""{"type":"input_transcript.added","item":{"text":" again"}}"""));
+        incoming.Writer.Complete();
+        peer.Cancel();
+        await using var reader = call.Connection.ReadEventsAsync(ct).GetAsyncEnumerator(ct);
+        Assert.True(await reader.MoveNextAsync().AsTask().WaitAsync(TestDeadline, ct));
+        Assert.Equal("input_transcript.added", reader.Current.Type);
+        Assert.Equal("last words", reader.Current.Payload.GetProperty("item").GetProperty("text").GetString());
+        Assert.True(await reader.MoveNextAsync().AsTask().WaitAsync(TestDeadline, ct));
+        Assert.Equal(" again", reader.Current.Payload.GetProperty("item").GetProperty("text").GetString());
+        Assert.False(await reader.MoveNextAsync().AsTask().WaitAsync(TestDeadline, ct));
+        Assert.False(outgoing.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task CompletedOutputUnblocksReaderAndPreservesQueuedInput()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = new CodexClient(new OAuth());
+        var incoming = Channel.CreateBounded<string>(1);
+        var outgoing = Channel.CreateBounded<string>(1);
+        await using var call = await client.AttachExistingRealtimeCallAsync("rtc_test",
+            new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), cancellationToken: ct);
+        await call.Connection.SendEventAsync(Command("first"), ct);
+        var blocked = call.Connection.SendEventAsync(Command("second"), ct);
+        Assert.True(incoming.Writer.TryWrite("""{"type":"input_transcript.added","item":{"text":"queued"}}"""));
+        outgoing.Writer.Complete();
+        await Assert.ThrowsAsync<ChannelClosedException>(() => blocked.WaitAsync(TestDeadline, ct));
+        await using var reader = call.Connection.ReadEventsAsync(ct).GetAsyncEnumerator(ct);
+        Assert.True(await reader.MoveNextAsync().AsTask().WaitAsync(TestDeadline, ct));
+        Assert.Equal("queued", reader.Current.Payload.GetProperty("item").GetProperty("text").GetString());
+        Assert.False(await reader.MoveNextAsync().AsTask().WaitAsync(TestDeadline, ct));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task OversizeFaultTerminatesAttachmentWithoutCompletingHostChannels(bool inbound)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = new CodexClient(new OAuth(), new CodexEndpointOptions { MaximumMessageBytes = 1024 });
+        var incoming = Channel.CreateBounded<string>(1);
+        var outgoing = Channel.CreateBounded<string>(1);
+        await using var call = await client.AttachExistingRealtimeCallAsync("rtc_test",
+            new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), cancellationToken: ct);
+        await using var reader = call.Connection.ReadEventsAsync(ct).GetAsyncEnumerator(ct);
+        if (inbound)
+        {
+            Assert.True(incoming.Writer.TryWrite(new string('x', 1025)));
+            await Assert.ThrowsAsync<CodexProtocolException>(() => reader.MoveNextAsync().AsTask().WaitAsync(TestDeadline, ct));
+        }
+        else
+        {
+            var waiting = reader.MoveNextAsync().AsTask();
+            await Assert.ThrowsAsync<CodexProtocolException>(() => call.Connection.SendEventAsync(Command(new string('x', 1025)), ct));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiting.WaitAsync(TestDeadline, ct));
+        }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.Connection.SendEventAsync(Command("late"), ct));
+        Assert.False(outgoing.Reader.TryRead(out _));
+        Assert.True(incoming.Writer.TryWrite("caller still owns input"));
+        Assert.True(outgoing.Writer.TryWrite("caller still owns output"));
+    }
+
     [Theory]
     [InlineData("wss://example.invalid/v1/live")]
     [InlineData("wss://api.openai.com.example.invalid/v1/live")]
