@@ -59,6 +59,40 @@ public sealed class CodexResponsesIdentityTests
         Assert.Equal(new[] { "reserve", "complete" }, observer.Events);
     }
 
+    [Theory]
+    [InlineData(null, true, false)]
+    [InlineData("none", true, false)]
+    [InlineData("auto", false, false)]
+    [InlineData("auto", true, true)]
+    public async Task OpenAiSummaryDeliveryRequiresExplicitFeatureAndSummary(string? summary, bool enabled, bool expected)
+    {
+        var identity = new CodexResponsesIdentity("session", "thread", "turn");
+        await using var session = new CodexResponsesWebSocketSession((request, _) =>
+        {
+            using var metadata = JsonDocument.Parse(Assert.Single(request.Headers.GetValues("x-codex-turn-metadata")));
+            Assert.Equal("prewarm", metadata.RootElement.GetProperty("request_kind").GetString());
+            return Task.FromResult<CodexResponsesWebSocketSession.Connection?>(null);
+        });
+        var handler = new Handler(async request =>
+        {
+            using var header = JsonDocument.Parse(Assert.Single(request.Headers.GetValues("x-codex-turn-metadata")));
+            Assert.Equal("turn", header.RootElement.GetProperty("request_kind").GetString());
+            using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            using var bodyMetadata = JsonDocument.Parse(doc.RootElement.GetProperty("client_metadata").GetProperty("x-codex-turn-metadata").GetString()!);
+            Assert.Equal("turn", bodyMetadata.RootElement.GetProperty("request_kind").GetString());
+            Assert.Equal(expected, doc.RootElement.TryGetProperty("stream_options", out var stream));
+            if (expected) Assert.Equal("sequential_cutoff", stream.GetProperty("reasoning_summary_delivery").GetString());
+        });
+        using var client = new CodexClient(new Credentials(), handler: handler);
+        var settings = new CodexResponseOptions("model", "instructions")
+        {
+            Identity = identity, WebSocketSession = session, PrewarmWebSocket = true,
+            ReasoningSummary = summary, ConcurrentReasoningSummaries = enabled,
+        };
+        await foreach (var _ in client.StreamResponseAsync(settings, [], TestContext.Current.CancellationToken)) { }
+        Assert.Equal(1, handler.Calls);
+    }
+
     [Fact]
     public async Task ConflictingIdentityReleasesReservationWithoutDispatch()
     {

@@ -32,6 +32,10 @@ public sealed record CodexResponseOptions(string Model, string Instructions)
     public string? Verbosity { get; init; }
     /// <summary>Reasoning summary mode, for example <c>auto</c>.</summary>
     public string? ReasoningSummary { get; init; }
+    /// <summary>Opt into OpenAI sequential-cutoff delivery when the selected model supports reasoning summaries.
+    /// Ignored if no reasoning summary is requested. The host must know provider/model feature support.</summary>
+    public bool ConcurrentReasoningSummaries { get; init; }
+    internal string RequestKind { get; init; } = "turn";
     /// <summary>Service tier, for example <c>priority</c>.</summary>
     public string? ServiceTier { get; init; }
     /// <summary>Correlation identity sent as client metadata.</summary>
@@ -112,9 +116,13 @@ public sealed partial class CodexClient
             ["store"] = false, ["stream"] = true,
             ["include"] = new JsonArray("reasoning.encrypted_content"),
         };
-        if (identity is not null) body["client_metadata"] = identity.ClientMetadata();
+        if (identity is not null) body["client_metadata"] = identity.ClientMetadata(settings.RequestKind);
         if (settings.ReasoningSummary is { } summary && body["reasoning"] is JsonObject reasoning)
+        {
             reasoning["summary"] = summary;
+            if (settings.ConcurrentReasoningSummaries && summary != "none")
+                body["stream_options"] = new JsonObject { ["reasoning_summary_delivery"] = "sequential_cutoff" };
+        }
         if (settings.ServiceTier is { } tier) body["service_tier"] = tier;
         if (settings.OutputSchema is not null || settings.Verbosity is not null)
         {
@@ -137,7 +145,7 @@ public sealed partial class CodexClient
         deadline.CancelAfter(options.RequestTimeout);
         requestCancellation = deadline.Token;
         using var request = await RequestAsync("responses", body, deadline.Token).ConfigureAwait(false);
-        identity?.ApplyHeaders(request);
+        identity?.ApplyHeaders(request, settings.RequestKind);
         var routingGeneration = responsesRouting.Prepare(request, identity);
         request.Headers.Accept.ParseAdd("text/event-stream");
         diagnostics.RequestBytes = request.Content?.Headers.ContentLength;
@@ -150,7 +158,7 @@ public sealed partial class CodexClient
         var started = Stopwatch.GetTimestamp();
         deadline.Token.ThrowIfCancellationRequested();
         using var ws = settings.WebSocketSession is { } session
-            ? await session.OpenAsync(request, responsesRouting, routingGeneration, options.MaximumMessageBytes, deadline.Token).ConfigureAwait(false)
+            ? await session.OpenAsync(request, responsesRouting, routingGeneration, options.MaximumMessageBytes, deadline.Token, settings.PrewarmWebSocket).ConfigureAwait(false)
             : null;
         diagnostics.ObserveQuotas(ws?.Quotas);
         if (settings.WebSocketSession is not null && ws is null) diagnostics.Mark("transport.websocket_fallback_sse");

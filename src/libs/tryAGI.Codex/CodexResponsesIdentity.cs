@@ -42,7 +42,7 @@ public sealed record CodexResponsesIdentity(string SessionId, string ThreadId, s
         if (string.IsNullOrWhiteSpace(value) || value.Length > 128 || value.Any(c => c < '!' || c > '~'))
             throw new ArgumentException("Responses identity must be bounded visible ASCII without whitespace.");
     }
-    internal JsonObject ClientMetadata()
+    internal JsonObject ClientMetadata(string requestKind = "turn")
     {
         var result = new JsonObject { ["session_id"] = SessionId, ["thread_id"] = ThreadId, ["turn_id"] = TurnId };
         if (ParentThreadId is not null) result["x-codex-parent-thread-id"] = ParentThreadId;
@@ -51,14 +51,17 @@ public sealed record CodexResponsesIdentity(string SessionId, string ThreadId, s
         if (Subagent is not null) result["x-openai-subagent"] = Subagent;
         if (InstallationId is not null) result["x-codex-installation-id"] = InstallationId;
         if (WindowId is not null) result["x-codex-window-id"] = WindowId;
-        if (TurnMetadata() is { } metadata) result["x-codex-turn-metadata"] = metadata;
+        result["x-codex-turn-metadata"] = TurnMetadata(requestKind);
         return result;
     }
-    private string? TurnMetadata()
+    private string TurnMetadata(string requestKind)
     {
         // Match the upstream compatibility blob without manufacturing absent metadata.
-        if (InstallationId is null && WindowId is null && ContextWindowId is null) return null;
-        var metadata = new JsonObject { ["session_id"] = SessionId, ["thread_id"] = ThreadId, ["turn_id"] = TurnId };
+        var metadata = new JsonObject
+        {
+            ["session_id"] = SessionId, ["thread_id"] = ThreadId, ["turn_id"] = TurnId,
+            ["request_kind"] = requestKind,
+        };
         if (InstallationId is not null) metadata["installation_id"] = InstallationId;
         if (WindowId is not null) metadata["window_id"] = WindowId;
         if (ContextWindowId is not null) metadata["context_window_id"] = ContextWindowId;
@@ -68,7 +71,14 @@ public sealed record CodexResponsesIdentity(string SessionId, string ThreadId, s
         return metadata.ToJsonString();
     }
 
-    internal void ApplyHeaders(HttpRequestMessage request)
+    internal static string WithRequestKind(string metadata, string requestKind)
+    {
+        var value = JsonNode.Parse(metadata)?.AsObject() ?? throw new CodexProtocolException("Invalid turn metadata.");
+        value["request_kind"] = requestKind;
+        return value.ToJsonString();
+    }
+
+    internal void ApplyHeaders(HttpRequestMessage request, string requestKind = "turn")
     {
         request.Headers.Add("session-id", SessionId);
         request.Headers.Add("thread-id", ThreadId);
@@ -77,7 +87,7 @@ public sealed record CodexResponsesIdentity(string SessionId, string ThreadId, s
         if (ParentThreadId is not null) request.Headers.Add("x-codex-parent-thread-id", ParentThreadId);
         if (Subagent is not null) request.Headers.Add("x-openai-subagent", Subagent);
         if (WindowId is not null) request.Headers.Add("x-codex-window-id", WindowId);
-        if (TurnMetadata() is { } metadata) request.Headers.Add("x-codex-turn-metadata", metadata);
+        request.Headers.Add("x-codex-turn-metadata", TurnMetadata(requestKind));
         if (RoutingHint is not null) request.Headers.Add("x-codex-routing-hint", RoutingHint);
         if (BetaFeatures is not null) request.Headers.Add("x-codex-beta-features", BetaFeatures);
     }

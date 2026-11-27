@@ -132,6 +132,41 @@ public sealed class CodexResponsesWebSocketTests
     }
 
     [Fact]
+    public async Task RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation()
+    {
+        var socket = new Socket(Completed("warm"), Completed("first"), Completed("second"));
+        await using var session = new CodexResponsesWebSocketSession((request, _) =>
+        {
+            using var metadata = JsonDocument.Parse(Assert.Single(request.Headers.GetValues("x-codex-turn-metadata")));
+            Assert.Equal("prewarm", metadata.RootElement.GetProperty("request_kind").GetString());
+            return Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket));
+        });
+        using var client = new CodexClient(new Credentials(), handler: new Handler());
+        var settings = new CodexResponseOptions("model", "instructions")
+        {
+            Identity = Identity, WebSocketSession = session, PrewarmWebSocket = true,
+            ReasoningSummary = "auto", ConcurrentReasoningSummaries = true,
+        };
+        await Read(client, settings, User);
+        await Read(client, settings with { ConcurrentReasoningSummaries = false }, User, Tool);
+        Assert.Equal(3, socket.Frames.Count);
+        for (var i = 0; i < socket.Frames.Count; i++)
+        {
+            var frame = socket.Frames[i];
+            using var metadata = JsonDocument.Parse(frame["client_metadata"]!["x-codex-turn-metadata"]!.GetValue<string>());
+            Assert.Equal(i == 0 ? "prewarm" : "turn", metadata.RootElement.GetProperty("request_kind").GetString());
+            Assert.Equal(Identity.TurnId, metadata.RootElement.GetProperty("turn_id").GetString());
+            if (i < 2) Assert.Equal("sequential_cutoff", frame["stream_options"]!["reasoning_summary_delivery"]!.GetValue<string>());
+            else Assert.Null(frame["stream_options"]);
+        }
+        Assert.False(socket.Frames[0]["generate"]!.GetValue<bool>());
+        Assert.Equal("warm", socket.Frames[1]["previous_response_id"]!.GetValue<string>());
+        Assert.Empty(socket.Frames[1]["input"]!.AsArray());
+        Assert.Equal("first", socket.Frames[2]["previous_response_id"]!.GetValue<string>());
+        Assert.Single(socket.Frames[2]["input"]!.AsArray());
+    }
+
+    [Fact]
     public async Task PrewarmAndContinuationUseExactPrefixAndKeepEncryptedOutput()
     {
         var socket = new Socket(Completed("warm"), Completed("first", "[" + Reasoning.GetRawText() + "]"), Completed("second"));

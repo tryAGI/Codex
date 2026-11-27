@@ -33,7 +33,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
         IReadOnlyList<CodexObservedQuota>? Quotas = null);
 
     internal async Task<Lease?> OpenAsync(HttpRequestMessage request, CodexResponsesRouting routing, object generation,
-        int maximumBytes, CancellationToken ct)
+        int maximumBytes, CancellationToken ct, bool prewarm = false)
     {
         await gate.WaitAsync(ct).ConfigureAwait(false);
         var handedOff = false;
@@ -51,7 +51,25 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
             if (socket?.State != WebSocketState.Open || completedResponses.Count >= MaximumCompletedResponses)
             {
                 Reset();
-                var connection = await connect(request, ct).ConfigureAwait(false);
+                // A prewarm handshake carries the prewarm kind, but an HTTP fallback still carries the turn kind.
+                const string metadataHeader = "x-codex-turn-metadata";
+                var metadata = prewarm && request.Headers.TryGetValues(metadataHeader, out var values)
+                    ? values.SingleOrDefault() : null;
+                if (metadata is not null)
+                {
+                    request.Headers.Remove(metadataHeader);
+                    request.Headers.Add(metadataHeader, CodexResponsesIdentity.WithRequestKind(metadata, "prewarm"));
+                }
+                Connection? connection;
+                try { connection = await connect(request, ct).ConfigureAwait(false); }
+                finally
+                {
+                    if (metadata is not null)
+                    {
+                        request.Headers.Remove(metadataHeader);
+                        request.Headers.Add(metadataHeader, metadata);
+                    }
+                }
                 if (connection is null)
                 {
                     fallback = true;
@@ -118,7 +136,13 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
             frame["input"] = suffix;
             frame["previous_response_id"] = responseId;
         }
-        if (prewarm) frame["generate"] = false;
+        if (prewarm)
+        {
+            frame["generate"] = false;
+            if (frame["client_metadata"] is JsonObject prewarmMetadata &&
+                prewarmMetadata["x-codex-turn-metadata"]?.GetValue<string>() is { } turnMetadata)
+                prewarmMetadata["x-codex-turn-metadata"] = CodexResponsesIdentity.WithRequestKind(turnMetadata, "prewarm");
+        }
         if (turnState is not null)
         {
             if (frame["client_metadata"] is not JsonObject metadata)
@@ -138,8 +162,13 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
         // Exact equality is intentionally conservative for opaque and unknown provider fields.
         var oldProperties = (JsonObject)previous.DeepClone();
         var newProperties = (JsonObject)current.DeepClone();
-        oldProperties.Remove("input");
-        newProperties.Remove("input");
+        // Rust excludes per-response delivery options and client metadata from context equality.
+        // The connection's authenticated turn scope is fenced separately.
+        foreach (var key in new[] { "input", "stream_options", "client_metadata" })
+        {
+            oldProperties.Remove(key);
+            newProperties.Remove(key);
+        }
         if (!JsonNode.DeepEquals(oldProperties, newProperties)) return null;
         for (var i = 0; i < oldInput.Count; i++)
             if (!JsonNode.DeepEquals(oldInput[i], input[i])) return null;

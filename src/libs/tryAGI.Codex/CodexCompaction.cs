@@ -51,7 +51,10 @@ public sealed partial class CodexClient
         JsonElement? terminal = null;
         // Rust retains the current model/tools/instructions, enables parallel tool calls,
         // and disables the ordinary final-answer schema for this request.
-        var options = settings with { ParallelToolCalls = true, OutputSchema = null };
+        var options = settings with
+        {
+            ParallelToolCalls = true, OutputSchema = null, RequestKind = "compaction", PrewarmWebSocket = false,
+        };
         using var activity = ActivitySource.StartActivity("codex.responses.compact");
         await foreach (var response in StreamResponseAsync(options, input, cancellationToken, observeDiagnostics).ConfigureAwait(false))
         {

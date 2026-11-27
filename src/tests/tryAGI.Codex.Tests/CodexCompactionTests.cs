@@ -105,6 +105,19 @@ public sealed class CodexCompactionTests
     }
 
     [Fact]
+    public async Task CompactionMetadataIsNotReportedAsOrdinaryTurn()
+    {
+        using var client = new CodexClient(new Credentials(), handler: new Handler(body =>
+        {
+            using var metadata = JsonDocument.Parse(body.GetProperty("client_metadata").GetProperty("x-codex-turn-metadata").GetString()!);
+            Assert.Equal("compaction", metadata.RootElement.GetProperty("request_kind").GetString());
+            return Complete(Checkpoint);
+        }));
+        var options = new CodexResponseOptions("test", "test") { Identity = new("session", "thread", "turn") };
+        await client.CompactAsync(options, [], TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task SparseProviderTerminalRetainsEncryptedCompactionCheckpoint()
     {
         var stream = "data: {\"type\":\"response.output_item.done\",\"item\":" + Checkpoint +
