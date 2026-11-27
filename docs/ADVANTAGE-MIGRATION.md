@@ -31,7 +31,7 @@ Identify code that is purely duplicated separately from real host effects. Never
 
 - Verified package and combined release gate: #53 and #91, including upstream drift and exact-revision SDK, host, Rust interop and live evidence.
 - One consumer dependency graph and API/serialization contract audit, no accidental duplicated runtime.
-- Native storage migration with account/tenant isolation, compare-and-swap, recovery, unknown fields and durable call/usage receipts.
+- Native storage migration with account/tenant isolation, compare-and-swap, recovery, unknown fields and durable call/usage receipts. #131 tracks the optional exact-observed-version mutation adapter needed to preserve a single authenticated read and original physical preimage across database retries; do not replace it with an additional read or logical-revision-only migration.
 - Consent/credential/account/usage boundaries: rejection, revocation, refresh races, unknown commit, cross-account denial, no duplicate charges or side effects.
 - Realtime media ownership, transcript recovery, handoff/feedback ordering, explicit client playback and device routing, no transport fallback.
 - Automation, thread history, tool/process/file/sandbox and optional App Server integrations with credential-free and applicable platform fixtures.

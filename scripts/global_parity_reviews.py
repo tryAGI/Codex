@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 from realtime_parity_evidence import source_revision, source_is_clean, validate_receipt
+from global_parity_runtime import validate_runtime_observation
 
 ROOT = Path(__file__).resolve().parent.parent
 REVIEWS = ROOT / "docs/global-parity-reviews.json"
@@ -69,7 +70,7 @@ def validate_reviews(data, review):
             owner = entry.get("ownerIssue")
             if status not in STATUSES or not HEX40.fullmatch(revision) or not isinstance(rationale, str) or not rationale.strip() or type(owner) is not int or owner < 25:
                 raise ValueError(f"Incomplete review: {rid}/{lane}")
-            if set(entry) - {"status", "reviewedCommit", "rationale", "ownerIssue", "scope", "implementation", "test", "basis", "evidence", "testEvidence", "upstreamTests"}:
+            if set(entry) - {"status", "reviewedCommit", "rationale", "ownerIssue", "scope", "implementation", "test", "basis", "evidence", "testEvidence", "upstreamTests", "runtimeEvidence"}:
                 raise ValueError(f"Unknown review field: {rid}/{lane}")
             _, reviewed_tree = source_revision(revision)
             paths = set()
@@ -137,6 +138,12 @@ def validate_reviews(data, review):
                     observed_tree = validate_receipt({"lane": "behavior", "test": entry["test"]}, observed)
                 if observed_tree != reviewed_tree:
                     raise ValueError("Observed test source tree differs from reviewed commit")
+            runtime = entry.get("runtimeEvidence")
+            if runtime is not None:
+                if status != "source-reviewed" or lane != "rust-app-server-interop" or scope != "rust-runtime":
+                    raise ValueError("Runtime observations must remain narrow interop evidence")
+                if validate_runtime_observation(candidates[rid], entry, runtime) != reviewed_tree:
+                    raise ValueError("Runtime evidence source tree differs from review")
             key = (rid, lane)
             reviewed[key] = entry
             # Negative conclusions can be invalidated by a new handler in another file;
@@ -162,7 +169,7 @@ def summarize(data, review):
     clean = source_is_clean()
     for lane in LANES:
         counts = collections.Counter()
-        test_observed = test_current = 0
+        test_observed = test_current = runtime_observed = runtime_current = 0
         for row in data["rows"]:
             key = (row["id"], lane)
             entry = entries.get(key)
@@ -171,6 +178,10 @@ def summarize(data, review):
                 test_observed += 1
                 if source_revision(entry["reviewedCommit"])[1] == current_tree and clean:
                     test_current += 1
+            if entry and entry.get("runtimeEvidence"):
+                runtime_observed += 1
+                if source_revision(entry["reviewedCommit"])[1] == current_tree and clean:
+                    runtime_current += 1
         unresolved = counts["pending"] + counts["stale"]
         applicable = sum(counts[s] for s in ("source-reviewed", "missing", "divergent", "passed"))
         result[lane] = {
@@ -179,10 +190,11 @@ def summarize(data, review):
             "divergent": counts["divergent"], "notApplicable": counts["not-applicable"],
             "passed": counts["passed"], "applicableReviewed": applicable,
             "testOnlyEvidenceObserved": test_observed, "testOnlyEvidenceCurrent": test_current,
+            "runtimeEvidenceObserved": runtime_observed, "runtimeEvidenceCurrent": runtime_current,
             "reviewedDenominator": applicable if review["inventoryReviewed"] and not unresolved else None,
         }
-    # Platform, real Rust process and live-provider receipt verifiers must be implemented
-    # before those lanes can pass. An incomplete review never releases a package.
+    # Narrow runtime observations do not certify complete RPCs. Full platform,
+    # Rust-runtime and live-provider acceptance still require their own verifiers.
     ready = clean and review["inventoryReviewed"] and not stale and all(
         lane["reviewedDenominator"] is not None and lane["reviewedDenominator"] > 0
         and lane["passed"] == lane["reviewedDenominator"] for lane in result.values())
@@ -211,5 +223,14 @@ def self_test(data, review):
     reject(lambda r: r["rows"][rid][lane].update(testEvidence={"outcome": "passed"}))
     reject(lambda r: r["rows"][rid][lane].update(upstreamTests=["unknown::missing"]))
     reject(lambda r: r["rows"][rid].update({"live-provider": {**lanes[lane], "status": "passed"}}))
+    runtime_row = next((key for key, value in review["rows"].items()
+                        if value.get("rust-app-server-interop", {}).get("runtimeEvidence")), None)
+    if runtime_row is not None:
+        def runtime_entry(r):
+            return r["rows"][runtime_row]["rust-app-server-interop"]
+        reject(lambda r: runtime_entry(r)["runtimeEvidence"].update(receiptSha256="0" * 64))
+        reject(lambda r: runtime_entry(r)["runtimeEvidence"].update(cases=[]))
+        reject(lambda r: runtime_entry(r).update(scope="typed-contract-only"))
+        reject(lambda r: runtime_entry(r).update(status="passed"))
     assert not summarize(data, review)[1]
     print("Global review self-test: orphan, mutable revision, unjustified or evidence-free pass and wrong lane rejected.")

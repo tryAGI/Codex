@@ -1,0 +1,44 @@
+{
+  "acceptanceEligible": true,
+  "artifactSha256": "e5f1184d1c34a33543460c46ea7fd2184ab165daf8eaa6c00b80c9a78e422417",
+  "cases": {
+    "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.BinaryWriteReadAndOverwriteMatchRust": {
+      "method": "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.BinaryWriteReadAndOverwriteMatchRust",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.CopyAndRemoveHaveMatchingEffects": {
+      "method": "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.CopyAndRemoveHaveMatchingEffects",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.DirectoryAndMetadataProjectionMatchRust": {
+      "method": "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.DirectoryAndMetadataProjectionMatchRust",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.InvalidBase64PreservesExistingFileAndMatchesRustError": {
+      "method": "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.InvalidBase64PreservesExistingFileAndMatchesRustError",
+      "outcome": "Passed"
+    },
+    "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.RelativePathsAreRejectedWithMatchingError": {
+      "method": "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.RelativePathsAreRejectedWithMatchingError",
+      "outcome": "Passed"
+    }
+  },
+  "csharpCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+  "diagnostic": null,
+  "exitCode": 0,
+  "lane": "rust-runtime-differential",
+  "networkNamespaceIsolated": true,
+  "platform": "linux-x64",
+  "releaseAsset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
+  "releaseAssetSha256": "63e3b00065ed7f62166d0522e17f663cb866a31d80d03e63365482ed34a1d991",
+  "rustExecutableSha256": "ad83b94c093f0cdd8176a6bc8005a461bdf23a759863e157d40f562b8a9d664d",
+  "rustVersion": "codex-cli 0.172.0",
+  "schemaVersion": 1,
+  "scope": "filesystem",
+  "sourceCleanAtEnd": true,
+  "sourceCleanAtStart": true,
+  "sourceTree": "b8428ba6f6384cb92759560c61a0201815551d89521f21387b06aa352508eae7",
+  "sourceTreeAtEnd": "b8428ba6f6384cb92759560c61a0201815551d89521f21387b06aa352508eae7",
+  "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+  "upstreamRelease": "rust-v0.172.0"
+}

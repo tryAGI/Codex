@@ -414,6 +414,32 @@
             "tryAGI.Codex.Tests.CodexFileSystemTests.ReadRejectsDirectoryAndOversizedSparseFileWithoutPartialSuccess"
           ]
         }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Actual pinned Rust CLI over stdio and native C# handler compared in isolated Linux x64 environment; the listed scenarios passed. This is a narrow runtime observation, not complete RPC parity, platform or host-authorization acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.BinaryWriteReadAndOverwriteMatchRust",
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.RelativePathsAreRejectedWithMatchingError"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+          "receipt": "docs/global-parity-evidence/rust-fs-eb8bf2e-45958822314.json",
+          "receiptSha256": "48b9397e6ffbac8edac5acb4caab9f6c30b2a2d9878b5b755332cd18757abccf",
+          "cases": [
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.BinaryWriteReadAndOverwriteMatchRust",
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.RelativePathsAreRejectedWithMatchingError"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/writeFile": {
@@ -454,6 +480,32 @@
             "tryAGI.Codex.Tests.CodexFileSystemTests.WriteDoesNotCreateParentsAndFollowsFinalSymlink"
           ]
         }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Actual pinned Rust CLI over stdio and native C# handler compared in isolated Linux x64 environment; the listed scenarios passed. This is a narrow runtime observation, not complete RPC parity, platform or host-authorization acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.BinaryWriteReadAndOverwriteMatchRust",
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.InvalidBase64PreservesExistingFileAndMatchesRustError"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+          "receipt": "docs/global-parity-evidence/rust-fs-eb8bf2e-45958822314.json",
+          "receiptSha256": "48b9397e6ffbac8edac5acb4caab9f6c30b2a2d9878b5b755332cd18757abccf",
+          "cases": [
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.BinaryWriteReadAndOverwriteMatchRust",
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.InvalidBase64PreservesExistingFileAndMatchesRustError"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/createDirectory": {
@@ -480,6 +532,30 @@
           "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
           "cases": [
             "tryAGI.Codex.Tests.CodexFileSystemTests.RecursiveDefaultsAndExclusiveSingleDirectoryMatchRust"
+          ]
+        }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Actual pinned Rust CLI over stdio and native C# handler compared in isolated Linux x64 environment; the listed scenarios passed. This is a narrow runtime observation, not complete RPC parity, platform or host-authorization acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.DirectoryAndMetadataProjectionMatchRust"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+          "receipt": "docs/global-parity-evidence/rust-fs-eb8bf2e-45958822314.json",
+          "receiptSha256": "48b9397e6ffbac8edac5acb4caab9f6c30b2a2d9878b5b755332cd18757abccf",
+          "cases": [
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.DirectoryAndMetadataProjectionMatchRust"
           ]
         }
       }
@@ -511,6 +587,30 @@
             "tryAGI.Codex.Tests.CodexFileSystemTests.MetadataAndListingFollowTargetsButRetainLinkIdentity"
           ]
         }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Actual pinned Rust CLI over stdio and native C# handler compared in isolated Linux x64 environment; the listed scenarios passed. This is a narrow runtime observation, not complete RPC parity, platform or host-authorization acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.DirectoryAndMetadataProjectionMatchRust"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+          "receipt": "docs/global-parity-evidence/rust-fs-eb8bf2e-45958822314.json",
+          "receiptSha256": "48b9397e6ffbac8edac5acb4caab9f6c30b2a2d9878b5b755332cd18757abccf",
+          "cases": [
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.DirectoryAndMetadataProjectionMatchRust"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/readDirectory": {
@@ -537,6 +637,30 @@
           "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
           "cases": [
             "tryAGI.Codex.Tests.CodexFileSystemTests.MetadataAndListingFollowTargetsButRetainLinkIdentity"
+          ]
+        }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Actual pinned Rust CLI over stdio and native C# handler compared in isolated Linux x64 environment; the listed scenarios passed. This is a narrow runtime observation, not complete RPC parity, platform or host-authorization acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.DirectoryAndMetadataProjectionMatchRust"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+          "receipt": "docs/global-parity-evidence/rust-fs-eb8bf2e-45958822314.json",
+          "receiptSha256": "48b9397e6ffbac8edac5acb4caab9f6c30b2a2d9878b5b755332cd18757abccf",
+          "cases": [
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.DirectoryAndMetadataProjectionMatchRust"
           ]
         }
       }
@@ -571,6 +695,30 @@
             "tryAGI.Codex.Tests.CodexFileSystemTests.DirectoryCopyMergesPreservesLinksAndRejectsResolvedDescendants"
           ]
         }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Actual pinned Rust CLI over stdio and native C# handler compared in isolated Linux x64 environment; the listed scenarios passed. This is a narrow runtime observation, not complete RPC parity, platform or host-authorization acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.CopyAndRemoveHaveMatchingEffects"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+          "receipt": "docs/global-parity-evidence/rust-fs-eb8bf2e-45958822314.json",
+          "receiptSha256": "48b9397e6ffbac8edac5acb4caab9f6c30b2a2d9878b5b755332cd18757abccf",
+          "cases": [
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.CopyAndRemoveHaveMatchingEffects"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:fs/remove": {
@@ -597,6 +745,30 @@
           "receiptSha256": "1c844319ddee6a5e0a6fbd24911a8bccc853b76b4d40c37513e8c56754d81780",
           "cases": [
             "tryAGI.Codex.Tests.CodexFileSystemTests.RemoveDefaultsIgnoreOnlyMissingAndNeverTraverseFinalDirectoryLink"
+          ]
+        }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+        "ownerIssue": 90,
+        "scope": "rust-runtime",
+        "rationale": "Actual pinned Rust CLI over stdio and native C# handler compared in isolated Linux x64 environment; the listed scenarios passed. This is a narrow runtime observation, not complete RPC parity, platform or host-authorization acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexFileSystem.cs::HandleAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustFileSystemDifferentialTests.cs::RustFileSystemDifferentialTests.CopyAndRemoveHaveMatchingEffects"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "eb8bf2ed40f24a3296ac9c77cf5f30a58532dfd6",
+          "receipt": "docs/global-parity-evidence/rust-fs-eb8bf2e-45958822314.json",
+          "receiptSha256": "48b9397e6ffbac8edac5acb4caab9f6c30b2a2d9878b5b755332cd18757abccf",
+          "cases": [
+            "tryAGI.Codex.Tests.RustFileSystemDifferentialTests.CopyAndRemoveHaveMatchingEffects"
           ]
         }
       }
