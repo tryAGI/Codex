@@ -20,7 +20,7 @@ All paths in the Rust column are relative to `codex-rs` at the pinned revision.
 | `exec`, `exec-server` including process_sandbox_tests, sandbox_integrity, regular_file_tests, no_follow | SDK adapter boundary only; transport, real PTY, process containment and drain semantics still need separate acceptance. | #78, #81, #104 |
 | `app-server-protocol/src/protocol/v2/fs.rs`; `app-server/tests/suite/v2/fs.rs` | Existing `CodexFileSystem`, `CodexFileSystemNative`, `CodexFileSystemWatches`, `CodexFileSystemTests`, `CodexFileSystemWatchTests`. | Existing code mapped, not independently certified here; #79 |
 | `file-system`, `file-watcher/src/file_watcher_tests.rs`, exec-server no_follow and fs_sandbox_windows_tests | Preserve fs/watch behavior; authorization before path-based I/O is not proof of race-free rooted enforcement. | #103 |
-| Rust file-search and App Server search contracts | No native file-search session handler identified. | #102 |
+| `file-search/src/lib.rs`, `snapshot.rs`, `matcher_tests.rs`; `app-server/tests/suite/fuzzy_file_search.rs` | `CodexFileSearch` implements one-shot search and connection-scoped sessions, cancellation and top-50 notifications; `CodexStableDirectoryFileSearchSource` uses a host-protected rooted traversal. Exact Nucleo scores and ignore/snapshot behavior remain separate. | #102, #136, #137 |
 | `apply-patch/src/lib.rs`, `apply-patch/src/file_update_tests.rs`, `apply-patch/tests/suite`; command_exec apply_patch line endings test | Existing `CodexPatch`, `CodexPatchUpdate`, `CodexWorkspacePatch`, `CodexWorkspacePatchTransport` and related tests; preconditions and plan digest already represented. | Preserve; differential coverage and authorization integration pending #79, #80 |
 | `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. Compiled enforcement, scoped grants, legacy routing and actual dispatch remain separate. | #80, #111–#113; coordinate #64 |
 | `execpolicy`, `sandboxing`, `network-proxy`; sandboxing platform tests, network-proxy authorization_path_tests and host_policy_tests | `CodexMacOsLeafCommandAdapter` provides actual deny-default Seatbelt for a restricted macOS single-process lane (no fork, no PTY, no direct network, approved stable workspace). General OS and network policy compilation and tree containment remain open. | #81, #104, #132; coordinate #86 and #98 |
@@ -177,3 +177,30 @@ Admitted build receipt: native-20261127-4d3ce0e7b85d444596b6b6a351b5b41b.
 The tests use the real native thread/approval stores against CAS test doubles and a synthetic
 review adapter. Actual review runner, durable review history and notification mapping are
 tracked in #129 and #130; no live Guardian or confidential reviewer implementation is claimed.
+
+## Bounded file search (#102)
+
+`CodexFileSearch` implements fuzzyFileSearch, sessionStart, sessionUpdate, sessionStop,
+sessionUpdated and sessionCompleted. Result fields preserve the pinned snake_case
+file_name and match_type wire contract alongside camelCase session parameters.
+The explicit source checks authorization before admitting a session and again on each
+search. Per-connection job identities, cancellation-token replacement, generation draining,
+bounded top-50 matches and scan/path-memory/time budgets limit retained work. An empty
+query sends an empty snapshot; source or delivery failure does not send completion.
+No implicit filesystem access is installed. The local stable-directory source requires a
+trusted root lease and host ignore predicate; it skips symlinks/reparse points and .git metadata.
+It never reads file contents for matching and cannot certify arbitrary mutable root traversal.
+
+The native matcher is a deterministic approximation with basename priority, grapheme
+indices and stable UTF-8 scalar order; it does not claim exact Nucleo scores or full fuzzy atom
+semantics. It rechecks current root authorization and re-enumerates edited queries rather
+than retaining unverified snapshots. Exact ranking and differential receipts remain #136;
+full ignore processing, safe link/alias traversal and incremental snapshots remain #137/#103.
+
+Local validation on macOS arm64 / .NET 10: 10 focused file search tests passed, 0 failed,
+0 skipped; 36 combined search/filesystem/watch tests passed, 0 failed, 0 skipped.
+Admitted receipt native-20261127-92f99fa6ab094cec9c40ac34ceaf7831.
+Real fixture traversal, explicit root lease and ignore filtering, relative path validation,
+top-50 ranking, Unicode indices, session isolation, revocation, query replacement,
+one-shot cancellation and notification draining were checked. No real mutable-root or
+exact Rust matcher acceptance is claimed.
