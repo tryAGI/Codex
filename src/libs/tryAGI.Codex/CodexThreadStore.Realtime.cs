@@ -24,6 +24,9 @@ public sealed record CodexStoredRealtimeSession(
 {
     /// <summary>All previously admitted attachment IDs; prevents reusing a retired transport token.</summary>
     public Guid[]? UsedAttachmentIds { get; init; }
+
+    /// <summary>Durable speech frames, observation identities and backing reasoning carryover.</summary>
+    public CodexStoredRealtimeHistory? History { get; init; }
 }
 
 public sealed partial class CodexThreadStore
@@ -85,11 +88,16 @@ public sealed partial class CodexThreadStore
     /// uncertain end intents cannot be reopened or replayed.</summary>
     public Task<CodexThreadDocument> ConfirmRealtimeHistoryRecoveryAsync(Guid threadId, long expectedRevision,
         string sessionId, string ownerId, bool verifiedEnded, CancellationToken cancellationToken = default)
-        => ChangeRealtimeAsync(threadId, expectedRevision, sessionId, ownerId, session =>
+        => ChangeAsync(threadId, expectedRevision, document =>
         {
+            var session = FindRealtimeSession(document, sessionId, ownerId);
             if (session.State != "recoveryRequired" || (!verifiedEnded && session.EndOperationId is not null))
                 throw new InvalidOperationException("Realtime history remains uncertain.");
-            return session with { State = verifiedEnded ? "ended" : "detached" };
+            _ = RecoverRealtimeHistory(session);
+            if (verifiedEnded)
+                document = SealRealtimeHistory(document, session, "recovery-end:" + expectedRevision, "sessionEnd");
+            var recovered = FindRealtimeSession(document, sessionId, ownerId);
+            return ReplaceRealtimeSession(document, recovered with { State = verifiedEnded ? "ended" : "detached" });
         }, cancellationToken);
 
     /// <summary>Records an end intent before any external effect, including after a clean detach.
@@ -104,7 +112,9 @@ public sealed partial class CodexThreadStore
         if (session.State == "ending" && session.EndOperationId == endOperationId) return new(false, before);
         if (session.State is not ("attached" or "detached") || session.AttachmentId != expectedAttachmentId)
             throw new InvalidOperationException("Realtime end is fenced by another attachment, end intent or history recovery.");
-        var next = ReplaceRealtimeSession(before, session with { State = "ending", AttachmentId = null, EndOperationId = endOperationId });
+        var sealedThread = SealRealtimeHistory(before, session, "end:" + endOperationId.ToString("N"), "sessionEnd");
+        var sealedSession = FindRealtimeSession(sealedThread, sessionId, ownerId);
+        var next = ReplaceRealtimeSession(sealedThread, sealedSession with { State = "ending", AttachmentId = null, EndOperationId = endOperationId });
         return new(true, await PublishAsync(before.Revision, next with
         {
             Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),

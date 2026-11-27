@@ -42,6 +42,9 @@ public sealed record CodexThreadDocument(
 {
     /// <summary>Optional durable logical realtime sessions; absent in older thread documents.</summary>
     public CodexStoredRealtimeSession[]? RealtimeSessions { get; init; }
+
+    /// <summary>Saved model history inherited by a fork without inheriting live call ownership.</summary>
+    public CodexStoredRealtimeCarryover[]? InheritedRealtimeCarryover { get; init; }
 }
 
 /// <summary>One stored turn.</summary>

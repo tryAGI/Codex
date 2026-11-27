@@ -71,6 +71,7 @@ public sealed partial class CodexThreadStore
             Id(turnId); Token(ownerId);
             if (document.Turns.Any(t => t.Id == turnId) || document.Turns.LastOrDefault()?.Status == "inProgress")
                 throw new InvalidOperationException("Thread already has this turn or another active turn.");
+            document = SealRealtimeBeforeTurn(document, turnId);
             var turn = new CodexStoredTurn(turnId, rootTurnId ?? turnId, ownerId, "inProgress", time.GetUtcNow(),
                 Items(input), [], [], ClientUserMessageIds: clientUserMessageIds?.ToArray(), TurnTrigger: turnTrigger);
             return document with { Turns = [.. document.Turns, turn] };
@@ -202,6 +203,7 @@ public sealed partial class CodexThreadStore
         var now = time.GetUtcNow();
         return await PublishAsync(null, source with { Id = destinationId, Revision = 1, CreatedAt = now, UpdatedAt = now,
             ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected, RealtimeSessions = null,
+            InheritedRealtimeCarryover = ForkRealtimeCarryover(source, count, cutoff is null),
             Settings = effectiveSettings?.Clone() ?? source.Settings }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -279,6 +281,7 @@ public sealed partial class CodexThreadStore
             (value.ForkedFromId is null) != (value.ForkedFromRevision is null) || value.ForkedFromRevision is < 1)
             throw new InvalidDataException("Native thread identity, revision or history is invalid.");
         ValidateRealtimeSessions(value.RealtimeSessions);
+        ValidateRealtimeHistoryProjection(value);
         var turnIds = new HashSet<Guid>(); var callIds = new HashSet<string>(StringComparer.Ordinal); var active = false;
         foreach (var turn in value.Turns)
         {

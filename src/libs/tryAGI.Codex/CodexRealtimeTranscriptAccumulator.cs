@@ -43,7 +43,7 @@ public sealed record CodexRealtimeHandoffSnapshot(string Id, string InputTranscr
 public sealed class CodexRealtimeTranscriptAccumulator
 {
     /// <summary>Default V3 completed transcript extraction threshold, measured in UTF-8 bytes.</summary>
-    public const int DefaultCompletedThreshold = 32768;
+    public const int DefaultCompletedThreshold = 4 * 1024;
     private const int MaximumReceipts = 32768;
     private const int MaximumHandoffs = 1024;
     private const int MaximumHandoffBytes = 16_777_216;

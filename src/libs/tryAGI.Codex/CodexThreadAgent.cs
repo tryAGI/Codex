@@ -136,8 +136,11 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         {
             this.store = store; Current = current; this.turnId = turnId; this.owner = owner; this.budget = budget; this.projection = projection; this.control = control;
             var history = new List<JsonElement>();
-            foreach (var turn in current.Turns.TakeLast(historyTurnLimit ?? current.Turns.Length))
+            var firstTurnIndex = Math.Max(0, current.Turns.Length - (historyTurnLimit ?? current.Turns.Length));
+            for (var turnIndex = firstTurnIndex; turnIndex < current.Turns.Length; turnIndex++)
             {
+                var turn = current.Turns[turnIndex];
+                history.AddRange(CodexThreadStore.RealtimeCarryoverBeforeTurn(current, turnIndex));
                 history.AddRange((turn.Id == turnId ? currentInput : turn.Input).Select(x => x.Clone()));
                 if (turn.Status == "completed") history.AddRange(turn.Output.Select(x => x.Clone()));
                 else if (turn.Id != turnId)
