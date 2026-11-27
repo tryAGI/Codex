@@ -93,9 +93,23 @@ public sealed partial class CodexThreadStore
     /// <summary>CAS-commit an observation before delivering it to downstream observers. Reuse the
     /// same observation ID after a lost write receipt; duplicate IDs with changed payloads fail closed.
     /// A failed/uncertain write does not consume the event from caller-owned pending storage.</summary>
-    public async Task<CodexThreadAdmission> RecordRealtimeObservationAsync(Guid threadId, long expectedRevision,
+    public Task<CodexThreadAdmission> RecordRealtimeObservationAsync(Guid threadId, long expectedRevision,
         string sessionId, string ownerId, Guid attachmentId, string observationId, CodexRealtimeEvent source,
         CancellationToken cancellationToken = default)
+        => RecordRealtimeObservationCoreAsync(threadId, expectedRevision, sessionId, ownerId, attachmentId,
+            observationId, source, false, cancellationToken);
+
+    /// <summary>Reconcile an exact retained observation after the last transport has been fenced
+    /// for recovery. Requires proof from the host that the original attachment is gone.</summary>
+    public Task<CodexThreadAdmission> RecoverRealtimeObservationAsync(Guid threadId, long expectedRevision,
+        string sessionId, string ownerId, Guid lostAttachmentId, string observationId, CodexRealtimeEvent source,
+        CancellationToken cancellationToken = default)
+        => RecordRealtimeObservationCoreAsync(threadId, expectedRevision, sessionId, ownerId, lostAttachmentId,
+            observationId, source, true, cancellationToken);
+
+    private async Task<CodexThreadAdmission> RecordRealtimeObservationCoreAsync(Guid threadId, long expectedRevision,
+        string sessionId, string ownerId, Guid attachmentId, string observationId, CodexRealtimeEvent source,
+        bool recovery, CancellationToken cancellationToken)
     {
         Token(observationId);
         ArgumentNullException.ThrowIfNull(source);
@@ -105,7 +119,14 @@ public sealed partial class CodexThreadStore
             throw new ArgumentException("Invalid or unrelated realtime history observation.", nameof(source));
         var before = await CurrentAsync(threadId, expectedRevision, cancellationToken).ConfigureAwait(false);
         var session = FindRealtimeSession(before, sessionId, ownerId);
-        RequireRealtimeAttachment(session, attachmentId);
+        if (recovery)
+        {
+            Id(attachmentId);
+            if (session.State != "recoveryRequired" || session.EndOperationId is not null ||
+                session.UsedAttachmentIds?.LastOrDefault() != attachmentId)
+                throw new InvalidOperationException("Recovered observation does not belong to the last fenced attachment.");
+        }
+        else RequireRealtimeAttachment(session, attachmentId);
         var history = session.History ?? EmptyRealtimeHistory();
         if (history.Events.FirstOrDefault(e => e.Id == observationId) is { } prior)
         {

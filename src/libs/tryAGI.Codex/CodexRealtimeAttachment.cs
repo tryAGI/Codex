@@ -14,6 +14,9 @@ public enum CodexRealtimeAttachmentAuthentication
     ExternalHeaders,
 }
 
+/// <summary>The current SDK OAuth account does not match the persisted logical call account.</summary>
+public sealed class CodexRealtimeAccountMismatchException() : InvalidOperationException("Realtime account identity changed.");
+
 /// <summary>Parameters for a transport-only attachment to an existing logical call.</summary>
 public sealed class CodexRealtimeAttachmentOptions
 {
@@ -124,7 +127,7 @@ public sealed partial class CodexClient
             var auth = await GetRealtimeAuthorizationAsync(ct).ConfigureAwait(false);
             if (attachment.ExpectedAccountId is not null &&
                 !string.Equals(auth.AccountId, attachment.ExpectedAccountId, StringComparison.Ordinal))
-                throw new InvalidOperationException("Realtime account identity changed.");
+                throw new CodexRealtimeAccountMismatchException();
             headers.Add("Authorization", "Bearer " + auth.Token);
             if (auth.AccountId is not null) headers.Add("ChatGPT-Account-Id", auth.AccountId);
             if (attachment.Protocol != "v2")

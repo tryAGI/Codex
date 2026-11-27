@@ -71,7 +71,7 @@ public sealed class RealtimeAttachmentTests
     {
         var auth = new OAuth();
         using var client = new CodexClient(auth);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => client.AttachExistingRealtimeCallAsync("rtc_test",
+        await Assert.ThrowsAsync<CodexRealtimeAccountMismatchException>(() => client.AttachExistingRealtimeCallAsync("rtc_test",
             new CodexRealtimeAttachmentOptions { ExpectedAccountId = "account-b" }, TestContext.Current.CancellationToken));
         Assert.Equal(1, auth.Requests);
     }
