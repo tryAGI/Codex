@@ -22,9 +22,9 @@ All paths in the Rust column are relative to `codex-rs` at the pinned revision.
 | `file-system`, `file-watcher/src/file_watcher_tests.rs`, exec-server no_follow and fs_sandbox_windows_tests | Preserve fs/watch behavior; authorization before path-based I/O is not proof of race-free rooted enforcement. | #103 |
 | Rust file-search and App Server search contracts | No native file-search session handler identified. | #102 |
 | `apply-patch/src/lib.rs`, `apply-patch/src/file_update_tests.rs`, `apply-patch/tests/suite`; command_exec apply_patch line endings test | Existing `CodexPatch`, `CodexPatchUpdate`, `CodexWorkspacePatch`, `CodexWorkspacePatchTransport` and related tests; preconditions and plan digest already represented. | Preserve; differential coverage and authorization integration pending #79, #80 |
-| `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. Compiled enforcement, scoped grants and server-request bridge remain separate. | #80, #111–#113; coordinate #64 |
+| `app-server-protocol/src/protocol/v2/permissions.rs`; `app-server/tests/suite/v2/permission_profile_list.rs`, `request_permissions.rs` | `CodexApprovalStore` models exact-action authorization, expiry, revocation, single-use and durable storage CAS. `CodexPermissionProfileCatalog` implements profile discovery, inheritance-chain resolution, pagination and host-checked selection against current project configuration. `CodexApprovalRpcBridge` binds v2 server-request responses to exact durable approval records. Compiled enforcement, scoped grants, legacy routing and actual dispatch remain separate. | #80, #111–#113; coordinate #64 |
 | `execpolicy`, `sandboxing`, `network-proxy`; sandboxing platform tests, network-proxy authorization_path_tests and host_policy_tests | Need actual enforceable OS and network policies, explicit unsupported/denied status; do not infer enforcement from policy DTOs. | #81, #104, coordinate #86 and #98 |
-| `app-server-protocol/src/protocol/v2/review.rs`; `app-server/tests/suite/v2/review.rs`; `core/src/guardian`; app-server guardian_v2 / guardian_v3_sync_tests | Review targets and inline turn delivery, correlated guardian decisions, budgets and history; no native contract identified yet. | #82 |
+| `app-server-protocol/src/protocol/v2/review.rs`; `app-server/tests/suite/v2/review.rs`; `core/src/guardian`; app-server guardian_v2 / guardian_v3_sync_tests | `CodexReviewRpc` validates inline review targets, verifies a committed correlated turn, routes advisory Guardian assessment and exact denial escalation through a trusted adapter and approval store. Actual runner, history and auto-review notifications remain separate. | #82, #129, #130 |
 
 ## Adapter rules
 
@@ -131,3 +131,24 @@ These failed probes do not prove that Seatbelt is unavailable or that the policy
 the desired restrictions. Keep the real-adapter row unaccepted; no fallback or looser
 production policy was installed. Review the pinned Rust base/defaults policies and lifecycle
 before admitting any real platform adapter.
+
+## Review and Guardian RPC (#82)
+
+`CodexReviewRpc` serves review/start, thread/guardianReview and thread/approveGuardianDeniedAction.
+It validates the four Rust review targets and inline-only delivery before authorization and I/O.
+The explicit adapter receives a retained operation ID and the current native thread revision.
+The review/start response is rejected unless the corresponding turn was actually recorded in
+`CodexThreadStore`; an already committed operation cannot start a second review. Guardian
+assessment must have the correlated call ID and recognized outcome, risk and authorization
+classifications; a null assessment or an allow result is never execution authorization.
+Denial escalation requires an exact recorded event digest and a separate, existing pending
+approval for the same thread and connection, resolved by the trusted adapter. The authenticated
+reviewer is checked by both the review host and approval store. Terminal denied approvals
+cannot be revived; successful escalation does not dispatch or amend persistent policy.
+
+Local validation on macOS arm64 / .NET 10: 40 tests passed, 0 failed, 0 skipped across
+CodexReviewRpcTests, CodexApprovalRpcBridgeTests and CodexApprovalStoreTests.
+Admitted build receipt: native-20261127-4d3ce0e7b85d444596b6b6a351b5b41b.
+The tests use the real native thread/approval stores against CAS test doubles and a synthetic
+review adapter. Actual review runner, durable review history and notification mapping are
+tracked in #129 and #130; no live Guardian or confidential reviewer implementation is claimed.
