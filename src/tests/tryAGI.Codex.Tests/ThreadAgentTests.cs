@@ -392,7 +392,7 @@ public sealed class ThreadAgentTests
             value => value.GetProperty("item").GetProperty("id").GetString() == frameId)).GetProperty("item");
         var livePage = await Invoke("list", new() { ["order"] = "position" });
         var listed = Assert.Single(livePage.GetProperty("data").EnumerateArray()
-            .Select(x => x.GetProperty("item")).Where(x => x.GetProperty("id").GetString() == frameId));
+            .Select(x => x.GetProperty("item")), x => x.GetProperty("id").GetString() == frameId);
         Assert.True(JsonElement.DeepEquals(completedFrame, listed));
         server.Replies.Enqueue(Text("::codex-realtime-inline{}\nnative direct answer"));
         await incoming.Writer.WriteAsync("""
@@ -423,9 +423,9 @@ public sealed class ThreadAgentTests
         var data = end.GetProperty("data").EnumerateArray().ToArray();
         Assert.Equal("realtimeSessionClosed", data[^1].GetProperty("item").GetProperty("type").GetString());
         Assert.True(JsonElement.DeepEquals(closed, data[^1].GetProperty("item")));
-        Assert.Single(data.Where(x => x.GetProperty("item").GetProperty("id").GetString() == frameId));
-        Assert.True(JsonElement.DeepEquals(promoted, Assert.Single(data.Select(x => x.GetProperty("item"))
-            .Where(x => x.GetProperty("id").GetString() == promoted.GetProperty("id").GetString()))));
+        Assert.Single(data, x => x.GetProperty("item").GetProperty("id").GetString() == frameId);
+        Assert.True(JsonElement.DeepEquals(promoted, Assert.Single(data.Select(x => x.GetProperty("item")),
+            x => x.GetProperty("id").GetString() == promoted.GetProperty("id").GetString())));
         Assert.Contains("last speech before close", end.GetRawText());
         Assert.Equal(1, Volatile.Read(ref socket.CloseCommands));
         var old = await Invoke("list", new() { ["order"] = "position", ["snapshotEnd"] = snapshot });
