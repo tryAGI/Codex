@@ -13,7 +13,8 @@ public sealed partial class CodexThreadStore
         return CaptureCompaction(before, settings);
     }
 
-    internal static CodexThreadCompactionCandidate CaptureCompaction(CodexThreadDocument before, CodexResponseOptions settings)
+    internal static CodexThreadCompactionCandidate CaptureCompaction(CodexThreadDocument before, CodexResponseOptions settings,
+        CodexDescendantGoalAttribution? descendantGoal = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settings.Model);
         ArgumentException.ThrowIfNullOrWhiteSpace(settings.Instructions);
@@ -23,7 +24,7 @@ public sealed partial class CodexThreadStore
         var metadata = new List<JsonElement?>();
         var history = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, settings.Model, scope, before.Turns.Length,
             metadata: metadata);
-        return new(before, settings.Model, scope, history, metadata: metadata);
+        return new(before, settings.Model, scope, history, metadata: metadata, descendantGoal: descendantGoal);
     }
 
     internal static CodexThreadCompactionCandidate? CaptureActiveCompaction(CodexThreadDocument before,

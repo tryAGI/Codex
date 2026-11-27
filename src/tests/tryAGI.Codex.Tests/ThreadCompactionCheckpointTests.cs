@@ -41,6 +41,67 @@ public sealed class ThreadCompactionCheckpointTests
         new(candidate.Model, "response-id", Checkpoint, Json("""{"input_tokens":15,"output_tokens":3}"""),
             candidate.History, candidate.ExecutedCallIds);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreTurnDetachedCompactionChargesOnlyCapturedGoalAndPreservesAdoptionFence(bool replaceGoal)
+    {
+        var (storage, store, original) = await Setup();
+        original = await store.SetGoalAsync(original.Id, original.Revision, "original goal", null, true, 100, null, Ct);
+        var goalId = original.Goal!.Id;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var server = new Server
+        {
+            CompactionUsage = """{"input_tokens":15,"input_tokens_details":{"cached_tokens":10},"output_tokens":4}""",
+            CompactionEntered = entered, ReleaseCompaction = release
+        };
+        var budget = new Budget();
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, observer) => new CodexClient(credentials, handler: server.Handler(), usageObserver: observer));
+        var turn = Guid.NewGuid();
+        var settings = Settings(original.Id, turn) with { AutomaticCompaction = new() { TokenThreshold = 1 } };
+        var run = agent.RunAsync(original.Id, original.Revision, turn, "owner", settings, [User("next")],
+            (_, _) => throw new InvalidOperationException("Unexpected tool"), cancellationToken: Ct);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+            if (replaceGoal)
+            {
+                var current = await store.ClearGoalAsync(original.Id, original.Revision, Ct);
+                _ = await store.SetGoalAsync(original.Id, current.Thread.Revision, "replacement", null, false, null, null, Ct);
+            }
+            release.TrySetResult();
+            if (replaceGoal)
+                await Assert.ThrowsAsync<CodexThreadConflictException>(() => run);
+            else
+                Assert.Equal("done", (await run).Result.Text);
+
+            var restored = await new CodexThreadStore(storage, "account").ReadAsync(original.Id, Ct);
+            var receipt = Assert.Single(restored.DetachedCompactionReceipts!);
+            Assert.Equal(goalId, receipt.GoalInference!.GoalId);
+            Assert.Equal(original.Revision, receipt.SourceRevision);
+            Assert.Equal(original.Id, receipt.GoalInference.OriginThreadId);
+            Assert.Equal(replaceGoal ? 0L : 9L, restored.Goal!.TokensUsed);
+            Assert.Equal(replaceGoal ? 1 : 2, server.Requests.Count);
+            Assert.Equal(replaceGoal ? 1 : 2, budget.Completed);
+            if (replaceGoal)
+            {
+                Assert.NotEqual(goalId, restored.Goal.Id);
+                Assert.Null(restored.CompactionCheckpoint);
+                Assert.Single(restored.Turns);
+            }
+            else
+            {
+                Assert.Equal(goalId, restored.Goal.Id);
+                Assert.Equal(receipt.GoalInference.UsageId, Assert.Single(restored.Goal.UsageReceipts!).Id);
+                Assert.Equal("compact-response", restored.CompactionCheckpoint!.ResponseId);
+                Assert.Equal(2, restored.Turns.Length);
+            }
+        }
+        finally { release.TrySetResult(); }
+    }
+
     [Fact]
     public async Task CasInstallRestartContinuationAndForkPreserveOriginalHistory()
     {
@@ -152,6 +213,7 @@ public sealed class ThreadCompactionCheckpointTests
         internal List<JsonElement> Requests { get; } = [];
         internal TaskCompletionSource? CompactionEntered { get; init; }
         internal TaskCompletionSource? ReleaseCompaction { get; init; }
+        internal string? CompactionUsage { get; init; }
         private int reasoningCalls;
         private int compactionCalls;
         private int ToolRounds => toolRounds;
@@ -178,7 +240,8 @@ public sealed class ThreadCompactionCheckpointTests
                     var id = count == 1 ? "compact-response" : $"compact-response-{count}";
                     var checkpoint = count == 1 ? Checkpoint.GetRawText() :
                         Checkpoint.GetRawText().Replace("compacted-opaque", $"compacted-opaque-{count}", StringComparison.Ordinal);
-                    response = "{\"type\":\"response.completed\",\"response\":{\"id\":\"" + id + "\",\"output\":[" + checkpoint + "]}}";
+                    var usage = owner.CompactionUsage is { } counters ? ",\"usage\":" + counters : "";
+                    response = "{\"type\":\"response.completed\",\"response\":{\"id\":\"" + id + "\",\"output\":[" + checkpoint + "]" + usage + "}}";
                 }
                 else if (owner.MidTurn && ++owner.reasoningCalls <= owner.ToolRounds)
                 {

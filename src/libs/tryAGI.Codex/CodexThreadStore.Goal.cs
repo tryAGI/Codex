@@ -110,6 +110,10 @@ public sealed partial class CodexThreadStore
 
     private CodexStoredThreadGoal ApplyGoalUsage(CodexStoredThreadGoal goal, Guid usageId, long tokenDelta,
         long elapsedSeconds, CodexGoalAccountingMode mode)
+        => ApplyGoalUsageCore(goal, usageId, tokenDelta, elapsedSeconds, mode, time.GetUtcNow());
+
+    private static CodexStoredThreadGoal ApplyGoalUsageCore(CodexStoredThreadGoal goal, Guid usageId, long tokenDelta,
+        long elapsedSeconds, CodexGoalAccountingMode mode, DateTimeOffset now)
     {
         var receipts = goal.UsageReceipts ?? [];
         if (receipts.SingleOrDefault(receipt => receipt.Id == usageId) is { } previous)
@@ -137,7 +141,7 @@ public sealed partial class CodexThreadStore
         return goal with
         {
             TokensUsed = tokens, TimeUsedSeconds = seconds, Status = limited ? "budgetLimited" : goal.Status,
-            UpdatedAt = time.GetUtcNow(), UsageReceipts = [.. receipts, new(usageId, tokenDelta, elapsedSeconds, mode)]
+            UpdatedAt = now, UsageReceipts = [.. receipts, new(usageId, tokenDelta, elapsedSeconds, mode)]
         };
     }
 

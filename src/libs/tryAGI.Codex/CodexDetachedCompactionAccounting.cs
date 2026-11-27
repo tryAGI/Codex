@@ -18,7 +18,14 @@ public sealed record CodexStoredDetachedCompactionReceipt(
     [property: JsonRequired] string ResponseId,
     [property: JsonRequired] long SourceRevision,
     [property: JsonRequired] CodexStoredInferenceAccounting Binding,
-    [property: JsonRequired] JsonElement Terminal);
+    [property: JsonRequired] JsonElement Terminal)
+{
+    /// <summary>Stable original goal generation and usage identity captured for this provider request.</summary>
+    public CodexGoalInferenceBinding? GoalInference { get; init; }
+
+    /// <summary>Original root goal attribution, only for descendant compaction.</summary>
+    public CodexDescendantGoalAttribution? DescendantGoal { get; init; }
+}
 
 internal static class CodexDetachedCompactionAccounting
 {
@@ -49,6 +56,7 @@ internal static class CodexDetachedCompactionAccounting
         if (receipts.Length > MaximumReceipts)
             throw new InvalidDataException("Detached compaction accounting exceeds its bound.");
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        var goalIds = new HashSet<Guid>();
         foreach (var receipt in receipts)
             if (receipt is null || !ValidId(receipt.RequestId) || !ids.Add(receipt.RequestId) ||
                 !ValidHash(receipt.RequestSha256) || !ValidId(receipt.ResponseId) ||
@@ -57,17 +65,19 @@ internal static class CodexDetachedCompactionAccounting
                 binding.OriginThreadId != thread.Id || binding.AccountId != thread.AccountId ||
                 !CodexInferenceAccounting.Valid(binding, binding.OriginTurnId) ||
                 receipt.Terminal.ValueKind != JsonValueKind.Object ||
-                CodexAbnormalInferenceAccounting.ResponseId(binding, receipt.Terminal) != receipt.ResponseId)
+                CodexAbnormalInferenceAccounting.ResponseId(binding, receipt.Terminal) != receipt.ResponseId ||
+                !CodexThreadStore.ValidDetachedGoalReceipt(thread, receipt, goalIds))
                 throw new InvalidDataException("Invalid detached compaction accounting receipt.");
         if ((thread.Turns ?? []).Any(turn => (turn?.Dispatches ?? []).Any(receipt =>
-            receipt is not null && ids.Contains(receipt.CallId))))
+            receipt is not null && (ids.Contains(receipt.CallId) || receipt.GoalInference is { } goal && goalIds.Contains(goal.UsageId)))))
             throw new InvalidDataException("Duplicate native accounting reservation identity.");
     }
 
     private static bool Same(CodexStoredDetachedCompactionReceipt left, CodexStoredDetachedCompactionReceipt right)
         => left.RequestId == right.RequestId && left.RequestSha256 == right.RequestSha256 &&
             left.ResponseId == right.ResponseId && left.SourceRevision == right.SourceRevision &&
-            left.Binding == right.Binding && JsonElement.DeepEquals(left.Terminal, right.Terminal);
+            left.Binding == right.Binding && left.GoalInference == right.GoalInference && left.DescendantGoal == right.DescendantGoal &&
+            JsonElement.DeepEquals(left.Terminal, right.Terminal);
 
     internal static bool Appended(CodexThreadDocument before, CodexThreadDocument after)
     {
@@ -80,8 +90,9 @@ internal static class CodexDetachedCompactionAccounting
         Appended(before, after) &&
         after.Revision - before.Revision == (after.DetachedCompactionReceipts?.Length ?? 0) -
             (before.DetachedCompactionReceipts?.Length ?? 0) &&
-        JsonElement.DeepEquals(CodexThreadStore.Encode(before with { Revision = 1, UpdatedAt = default, DetachedCompactionReceipts = null }),
-            CodexThreadStore.Encode(after with { Revision = 1, UpdatedAt = default, DetachedCompactionReceipts = null }));
+        CodexThreadStore.OnlyDetachedGoalAccountingChanged(before, after) &&
+        JsonElement.DeepEquals(CodexThreadStore.Encode(before with { Revision = 1, UpdatedAt = default, DetachedCompactionReceipts = null, Goal = null }),
+            CodexThreadStore.Encode(after with { Revision = 1, UpdatedAt = default, DetachedCompactionReceipts = null, Goal = null }));
 
     internal static bool Matches(CodexStoredDetachedCompactionReceipt left, CodexStoredDetachedCompactionReceipt right)
         => Same(left, right);
@@ -95,6 +106,9 @@ internal sealed class CodexDetachedCompactionObserver(
 {
     private string? requestId;
     private string? requestHash;
+    private readonly CodexGoalInferenceBinding? goalBinding = candidate.CapturedGoalId is { } goalId
+        ? new(candidate.ThreadId, goalId, Guid.CreateVersion7()) { GoalThreadId = candidate.DescendantGoal?.RootThreadId }
+        : null;
     public bool RequiresPreparedRequest => true;
 
     public Task ReserveAsync(string id, string model, CancellationToken ct) => budget.ReserveAsync(id, model, ct);
@@ -140,8 +154,13 @@ internal sealed class CodexDetachedCompactionObserver(
         if (!CodexInferenceAccounting.Valid(binding, turnId) || !CodexAbnormalInferenceAccounting.ValidId(responseId) ||
             CodexAbnormalInferenceAccounting.ResponseId(binding, evidence) != responseId)
             throw new CodexProtocolException("Detached compaction evidence identity mismatch.");
-        await store.RecordDetachedCompactionAccountingAsync(candidate.ThreadId,
-            new(id, requestHash, responseId, candidate.Revision, binding, evidence.Clone()), ct).ConfigureAwait(false);
+        var receipt = new CodexStoredDetachedCompactionReceipt(id, requestHash, responseId, candidate.Revision, binding, evidence.Clone())
+        {
+            GoalInference = goalBinding, DescendantGoal = candidate.DescendantGoal
+        };
+        var committed = await store.RecordDetachedCompactionAccountingAsync(candidate.ThreadId, receipt, ct).ConfigureAwait(false);
+        if (goalBinding?.GoalThreadId is not null)
+            _ = await store.AccountDetachedDescendantGoalAsync(committed, id, ct).ConfigureAwait(false);
     }
 
     public async Task CompleteUnvalidatedAsync(string id, CodexResponseOptions settings, string eventType,
@@ -193,7 +212,9 @@ public sealed partial class CodexThreadStore
                 Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
             };
             CodexDetachedCompactionAccounting.Validate(next);
-            try { return await PublishAsync(before.Revision, next, ct).ConfigureAwait(false); }
+            next = AccountLocalDetachedGoal(before, next, receipt);
+            var notice = CaptureGoalNotice(before, before.Turns.LastOrDefault() is { Status: "inProgress" } active ? active.Id : null);
+            try { return await PublishAsync(before.Revision, next, ct, notice).ConfigureAwait(false); }
             catch (CodexThreadConflictException) when (attempt < 3)
             {
                 // Retry only the append after a known CAS conflict. A provider or

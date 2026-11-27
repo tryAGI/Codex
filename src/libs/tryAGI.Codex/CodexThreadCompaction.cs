@@ -100,6 +100,8 @@ public sealed class CodexThreadCompactionCandidate
     internal string AccountId { get; }
     internal JsonElement CapturedSettings { get; }
     internal long? PriorCheckpointRevision { get; }
+    internal Guid? CapturedGoalId { get; }
+    internal CodexDescendantGoalAttribution? DescendantGoal { get; }
     internal string? PriorCheckpointResponseId { get; }
     /// <summary>Exact model prompt to compact.</summary>
     public IReadOnlyList<JsonElement> History { get; }
@@ -109,9 +111,13 @@ public sealed class CodexThreadCompactionCandidate
     public IReadOnlyList<string> ExecutedCallIds { get; }
     internal CodexThreadCompactionCandidate(CodexThreadDocument document, string model, string scope,
         IReadOnlyList<JsonElement> history, CodexActiveCompactionBoundary? activeBoundary = null,
-        IReadOnlyList<JsonElement?>? metadata = null)
+        IReadOnlyList<JsonElement?>? metadata = null, CodexDescendantGoalAttribution? descendantGoal = null)
     {
         ThreadId = document.Id;
+        DescendantGoal = descendantGoal ?? (activeBoundary is not null ? document.Turns[^1].DescendantGoal : null);
+        if (DescendantGoal is { } attribution && attribution.OriginThreadId != document.Id)
+            DescendantGoal = null;
+        CapturedGoalId = DescendantGoal?.GoalId ?? (document.Goal is { Status: "active" } goal ? goal.Id : null);
         Revision = document.Revision;
         AccountId = document.AccountId;
         CapturedSettings = document.Settings.Clone();

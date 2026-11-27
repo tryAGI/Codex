@@ -91,7 +91,12 @@ public sealed partial class CodexThreadStore
             return CodexDescendantGoalUsageOutcome.NoEvidence;
         var delta = GoalTokenDelta(evidence, accounting.AccountingKind == CodexAbnormalInferenceAccounting.IncompleteObservation);
         if (delta is null or 0) return CodexDescendantGoalUsageOutcome.NoEvidence;
+        return await ApplyAttributedDescendantGoalAsync(attribution, binding, delta.Value, ct).ConfigureAwait(false);
+    }
 
+    private async Task<CodexDescendantGoalUsageOutcome> ApplyAttributedDescendantGoalAsync(
+        CodexDescendantGoalAttribution attribution, CodexGoalInferenceBinding binding, long delta, CancellationToken ct)
+    {
         // One read of the original root and one CAS per observed receipt. Known conflicts
         // can rebase; an ambiguous write never automatically repeats the operation.
         for (var attempt = 0; ; attempt++)
@@ -103,11 +108,11 @@ public sealed partial class CodexThreadStore
                 return CodexDescendantGoalUsageOutcome.StaleGoal;
             if (root.Revision < attribution.RootRevision)
                 throw new InvalidDataException("Root goal journal predates descendant attribution.");
-            var updated = ApplyGoalUsage(goal, binding.UsageId, delta.Value, 0, CodexGoalAccountingMode.AttributedDescendant);
+            var updated = ApplyGoalUsage(goal, binding.UsageId, delta, 0, CodexGoalAccountingMode.AttributedDescendant);
             if (ReferenceEquals(goal, updated)) return CodexDescendantGoalUsageOutcome.AlreadyApplied;
             var observed = ObserveLocalGoalMutation(root);
             if (!ReferenceEquals(goal, observed.Goal))
-                updated = ApplyGoalUsage(observed.Goal!, binding.UsageId, delta.Value, 0, CodexGoalAccountingMode.AttributedDescendant);
+                updated = ApplyGoalUsage(observed.Goal!, binding.UsageId, delta, 0, CodexGoalAccountingMode.AttributedDescendant);
             try
             {
                 _ = await WriteGoalAsync(observed, updated, ct,

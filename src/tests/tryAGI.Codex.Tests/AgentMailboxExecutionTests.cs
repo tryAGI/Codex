@@ -254,6 +254,46 @@ public sealed class AgentMailboxExecutionTests
             => (reopened ?? Store).ReconcileAgentMailboxWakeAsync(Root, Child, Storage.Mailbox.Revision, Claim, Owner, Ct);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DetachedDescendantUsageReconcilesExactRootReceiptAfterRestart(bool committed)
+    {
+        var f = new Fixture();
+        var child = await f.CreateAsync();
+        var root = await f.CreateRootGoalAsync();
+        var directory = await f.Store.ReadAgentIdentitiesAsync(Root, Ct);
+        var attribution = await f.Store.CaptureDescendantGoalAttributionAsync(directory, directory.GetActive(Child), Ct);
+        Assert.NotNull(attribution);
+        var terminal = Json("""{"id":"compact-response","usage":{"input_tokens":15,"input_tokens_details":{"cached_tokens":10},"output_tokens":6}}""");
+        var accounting = new CodexStoredInferenceAccounting(Child, Guid.NewGuid(), "account", new string('a', 64),
+            "model", CodexRetainedJournalMetadata.ItemHash(terminal)) { RequestKind = "compaction" };
+        var receipt = new CodexStoredDetachedCompactionReceipt("compact", new string('b', 64), "compact-response", child.Revision, accounting, terminal)
+        {
+            GoalInference = new(Child, root.Goal!.Id, Guid.NewGuid()) { GoalThreadId = Root },
+            DescendantGoal = attribution
+        };
+        child = await f.Store.RecordDetachedCompactionAccountingAsync(Child, receipt, Ct);
+        f.Storage.LoseRootUsageReply = committed;
+        f.Storage.FailRootUsageCommit = !committed;
+        await Assert.ThrowsAsync<IOException>(() => f.Store.AccountDetachedDescendantGoalAsync(child, receipt.RequestId, Ct));
+        var cold = new CodexThreadStore(f.Storage, "account");
+        Assert.Equal(committed ? 11 : 0, (await cold.ReadAsync(Root, Ct)).Goal!.TokensUsed);
+        Assert.Equal(committed ? CodexDescendantGoalUsageOutcome.AlreadyApplied : CodexDescendantGoalUsageOutcome.Applied,
+            await cold.ReconcileDetachedDescendantGoalUsageAsync(Child, child.Revision, receipt.RequestId, Ct));
+        Assert.Equal(CodexDescendantGoalUsageOutcome.AlreadyApplied,
+            await cold.ReconcileDetachedDescendantGoalUsageAsync(Child, child.Revision, receipt.RequestId, Ct));
+        var charged = await cold.ReadAsync(Root, Ct);
+        Assert.Equal(11, charged.Goal!.TokensUsed);
+        Assert.Equal("budgetLimited", charged.Goal.Status);
+        Assert.Equal(receipt.GoalInference!.UsageId, Assert.Single(charged.Goal.UsageReceipts!).Id);
+        var fork = await cold.ForkAsync(Child, child.Revision, Guid.NewGuid(), cancellationToken: Ct);
+        Assert.Equal(CodexDescendantGoalUsageOutcome.NoEvidence,
+            await cold.ReconcileDetachedDescendantGoalUsageAsync(fork.Id, fork.Revision, receipt.RequestId, Ct));
+        Assert.Equal(1, f.Storage.RootUsageCommits);
+        Assert.Empty(f.Requests);
+    }
+
     [Fact]
     public async Task DescendantUsageChargesOriginalRootGoalExactlyOnceThroughMailboxRunner()
     {

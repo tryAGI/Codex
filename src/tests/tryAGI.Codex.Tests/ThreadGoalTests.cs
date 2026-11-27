@@ -196,6 +196,55 @@ public sealed class ThreadGoalTests
         Assert.Equal(current.Revision, (await f.Store.ReadAsync(thread.Id, Ct)).Revision);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task DetachedGoalUsageAndOriginalTerminalShareOneCas(bool incomplete, bool missingInput)
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work","tokenBudget":7}""");
+        var before = await f.Finish(thread.Id, "completed", "answer");
+        var terminal = incomplete
+            ? missingInput
+                ? Json("""{"type":"response.incomplete","response":{"id":"response","usage":{"output_tokens":4}}}""")
+                : Json("""{"type":"response.incomplete","response":{"id":"response","usage":{"input_tokens":15,"input_tokens_details":{"cached_tokens":10},"output_tokens":4}}}""")
+            : Json("""{"id":"response","usage":{"input_tokens":15,"input_tokens_details":{"cached_tokens":10},"output_tokens":4}}""");
+        var accounting = new CodexStoredInferenceAccounting(before.Id, Guid.NewGuid(), before.AccountId,
+            new string('a', 64), "model", CodexRetainedJournalMetadata.ItemHash(terminal))
+        { RequestKind = "compaction" };
+        if (incomplete)
+            accounting = accounting with
+            {
+                AccountingKind = CodexAbnormalInferenceAccounting.IncompleteObservation,
+                TerminalEventType = "response.incomplete", ObservedAt = f.Clock.GetUtcNow()
+            };
+        var usageId = Guid.NewGuid();
+        var receipt = new CodexStoredDetachedCompactionReceipt("request", new string('b', 64), "response", before.Revision, accounting, terminal)
+        { GoalInference = new(before.Id, before.Goal!.Id, usageId) };
+        f.Clock.Advance(TimeSpan.FromHours(2));
+        f.LoseNextAcknowledgment();
+        await Assert.ThrowsAsync<IOException>(() => f.Store.RecordDetachedCompactionAccountingAsync(before.Id, receipt, Ct));
+        var cold = f.Reopen();
+        var saved = await cold.ReadAsync(before.Id, Ct);
+        Assert.Equal(before.Revision + 1, saved.Revision);
+        Assert.Equal(usageId, Assert.Single(saved.DetachedCompactionReceipts!).GoalInference!.UsageId);
+        Assert.Equal(missingInput ? 0L : 9L, saved.Goal!.TokensUsed);
+        Assert.Equal(missingInput ? "active" : "budgetLimited", saved.Goal.Status);
+        Assert.Equal(0, saved.Goal.TimeUsedSeconds);
+        Assert.True(CodexDetachedCompactionAccounting.OnlyReceiptsAppended(before, saved));
+        Assert.False(CodexDetachedCompactionAccounting.OnlyReceiptsAppended(before,
+            saved with { Goal = saved.Goal with { Objective = "different objective" } }));
+        var replay = await cold.RecordDetachedCompactionAccountingAsync(before.Id, receipt, Ct);
+        Assert.Equal(saved.Revision, replay.Revision);
+        Assert.Equal(saved.Goal.TokensUsed, replay.Goal!.TokensUsed);
+        var forged = receipt with { RequestId = "different", Terminal = Json("""{"id":"response","usage":{"input_tokens":100,"output_tokens":100}}""") };
+        await Assert.ThrowsAsync<InvalidDataException>(() => cold.RecordDetachedCompactionAccountingAsync(before.Id, forged, Ct));
+        var fork = await cold.ForkAsync(before.Id, saved.Revision, Guid.NewGuid(), cancellationToken: Ct);
+        Assert.Null(fork.DetachedCompactionReceipts);
+        Assert.Equal(saved.Goal.TokensUsed, fork.Goal!.TokensUsed);
+    }
+
     [Fact]
     public async Task GoalSteeringContextIsDurableAndOnlyReinjectedWhenProjectionNeedsIt()
     {

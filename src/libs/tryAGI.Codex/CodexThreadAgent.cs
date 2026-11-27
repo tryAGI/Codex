@@ -134,7 +134,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         if (historyTurnLimit is null && options.AutomaticCompaction is { } compaction && before.Turns.Length != 0 &&
             before.Turns.All(turn => turn.Status != "inProgress"))
         {
-            var candidate = CodexThreadStore.CaptureCompaction(before, options);
+            var candidate = CodexThreadStore.CaptureCompaction(before, options, descendantGoal);
             var upcoming = CodexThreadStore.RealtimeCarryoverBeforeTurn(before, before.Turns.Length).Concat(input).ToArray();
             var hardThresholdReached = candidate.History.Count != 0 && CodexContextWindow.Evaluate(options,
                 [.. candidate.History, .. upcoming], CodexContextWindow.ReadObservation(before.Turns[^1], before),
@@ -278,7 +278,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
 
     private void ScheduleBackground(CodexThreadCompactionScheduler scheduler, CodexThreadDocument current,
         CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner owner, CodexContextWindowStatus? context)
-        => ScheduleBackground(scheduler, CodexThreadStore.CaptureCompaction(current, settings), settings, owner, context);
+        => ScheduleBackground(scheduler, CodexThreadStore.CaptureCompaction(current, settings,
+            current.Turns.LastOrDefault()?.DescendantGoal), settings, owner, context);
 
     private void ScheduleBackground(CodexThreadCompactionScheduler scheduler, CodexThreadCompactionCandidate candidate,
         CodexResponseOptions settings, CodexThreadCompactionScheduler.AuthOwner owner, CodexContextWindowStatus? context)
