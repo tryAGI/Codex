@@ -150,6 +150,8 @@ public sealed class ThreadCompactionCheckpointTests
     private sealed class Server(bool incomplete = false, bool midTurn = false, int toolRounds = 1)
     {
         internal List<JsonElement> Requests { get; } = [];
+        internal TaskCompletionSource? CompactionEntered { get; init; }
+        internal TaskCompletionSource? ReleaseCompaction { get; init; }
         private int reasoningCalls;
         private int compactionCalls;
         private int ToolRounds => toolRounds;
@@ -162,6 +164,11 @@ public sealed class ThreadCompactionCheckpointTests
                 owner.Requests.Add(payload);
                 var compacting = payload.GetProperty("input").EnumerateArray().Any(item =>
                     item.TryGetProperty("type", out var type) && type.GetString() == "compaction_trigger");
+                if (compacting && owner.ReleaseCompaction is { } release)
+                {
+                    owner.CompactionEntered?.TrySetResult();
+                    await release.Task.WaitAsync(ct);
+                }
                 string response;
                 if (compacting && owner.Incomplete)
                     response = """{"type":"response.incomplete","response":{"id":"incomplete","usage":{"output_tokens":2}}}""";
@@ -343,6 +350,127 @@ public sealed class ThreadCompactionCheckpointTests
         Assert.Equal("succeeded", Assert.Single(observed.Turns[^1].Dispatches).State);
         await Assert.ThrowsAsync<CodexThreadConflictException>(() =>
             store.InstallActiveCompactionAsync(candidate, Result(candidate), "compact", "owner", null, Ct));
+    }
+
+    [Fact]
+    public async Task BackgroundAdoptionPreservesAppendedClosedTurnsAndRejectsInterveningCheckpoint()
+    {
+        var (_, store, thread) = await Setup();
+        var settings = Settings(thread.Id, Guid.NewGuid());
+        var candidate = await store.CaptureCompactionAsync(thread.Id, thread.Revision, settings, Ct);
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "owner", [User("appended")], cancellationToken: Ct);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() =>
+            store.InstallBackgroundCompactionAsync(candidate, Result(candidate), settings, thread.Revision, cancellationToken: Ct));
+        thread = await store.CompleteAsync(thread.Id, thread.Revision, turn, "owner", "completed", [Encrypted], Ct);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() =>
+            store.InstallBackgroundCompactionAsync(candidate, Result(candidate), settings with { Instructions = "changed" },
+                thread.Revision, cancellationToken: Ct));
+        var installed = await store.InstallBackgroundCompactionAsync(candidate, Result(candidate), settings, thread.Revision, cancellationToken: Ct);
+        Assert.Equal(2, installed.Turns.Length);
+        Assert.Equal(1, installed.CompactionCheckpoint!.ThroughTurnCount);
+        var projected = CodexThreadCompaction.Project(installed, installed.CompactionCheckpoint, settings.Model,
+            CodexThreadCompaction.ScopeHash(settings), installed.Turns.Length);
+        Assert.Equal("appended", projected[^2].GetProperty("content").GetString());
+        Assert.True(JsonElement.DeepEquals(Encrypted, projected[^1]));
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() =>
+            store.InstallBackgroundCompactionAsync(candidate, Result(candidate), settings, installed.Revision, cancellationToken: Ct));
+    }
+
+    [Fact]
+    public async Task BackgroundAdoptionRejectsChangedReceiptAndStoredSettings()
+    {
+        var (_, store, thread) = await Setup(interrupted: true);
+        var settings = Settings(thread.Id, Guid.NewGuid());
+        var candidate = await store.CaptureCompactionAsync(thread.Id, thread.Revision, settings, Ct);
+        thread = await store.SettleAsync(thread.Id, thread.Revision, thread.Turns[0].Id, "owner", "executed", "succeeded", ToolOutput, Ct);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() =>
+            store.InstallBackgroundCompactionAsync(candidate, Result(candidate), settings, thread.Revision, cancellationToken: Ct));
+        candidate = await store.CaptureCompactionAsync(thread.Id, thread.Revision, settings, Ct);
+        thread = await store.UpdateSettingsAsync(thread.Id, thread.Revision, Json("""{"model":"changed"}"""), Ct);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() =>
+            store.InstallBackgroundCompactionAsync(candidate, Result(candidate), settings, thread.Revision, cancellationToken: Ct));
+    }
+
+    [Fact]
+    public async Task BackgroundCompactionDoesNotBlockCompletedTurnAndHardThresholdReusesPendingRequest()
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var budget = new Budget();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var server = new Server { CompactionEntered = entered, ReleaseCompaction = release };
+        await using var scheduler = new CodexThreadCompactionScheduler();
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage))
+        { BackgroundCompactions = scheduler };
+        var firstTurn = Guid.NewGuid();
+        var options = Settings(thread.Id, firstTurn) with
+        {
+            AutomaticCompaction = new() { TokenThreshold = 256, BackgroundTokenThreshold = 1 },
+        };
+        var first = await agent.RunAsync(thread.Id, thread.Revision, firstTurn, "owner", options, [User("first")],
+            (_, _) => throw new InvalidOperationException("No tools"), cancellationToken: Ct);
+        Assert.Equal("done", first.Result.Text);
+        await entered.Task.WaitAsync(Ct);
+        Assert.Equal(1, scheduler.Started);
+        Assert.Equal(0, scheduler.Completed);
+        Assert.Null(first.Thread.CompactionCheckpoint);
+        var secondTurn = Guid.NewGuid();
+        var secondOptions = options with { Identity = Settings(thread.Id, secondTurn).Identity };
+        var second = agent.RunAsync(thread.Id, first.Thread.Revision, secondTurn, "owner", secondOptions,
+            [User(new string('x', 3000))], (_, _) => throw new InvalidOperationException("No tools"), cancellationToken: Ct);
+        Assert.False(second.IsCompleted);
+        release.TrySetResult();
+        var result = await second;
+        Assert.Equal(3, server.Requests.Count);
+        Assert.Equal(3, budget.Completed);
+        Assert.Equal(1, scheduler.Completed);
+        Assert.Equal("compact-response", result.Thread.CompactionCheckpoint!.ResponseId);
+        Assert.Single(server.Requests[2].GetProperty("input").EnumerateArray(), item => CodexRealtimeProtocol.Text(item, "type") == "compaction");
+        Assert.Equal(2, result.Thread.Turns.Length);
+    }
+
+    [Fact]
+    public async Task SchedulerDeduplicatesAndDiscardsChangedAuthOwner()
+    {
+        var (_, store, thread) = await Setup();
+        var settings = Settings(thread.Id, Guid.NewGuid());
+        var candidate = await store.CaptureCompactionAsync(thread.Id, thread.Revision, settings, Ct);
+        var budget = new Budget();
+        var owner = new CodexThreadCompactionScheduler.AuthOwner("account", "user-a", false);
+        await using var scheduler = new CodexThreadCompactionScheduler();
+        Assert.True(scheduler.TrySchedule(store, budget, owner, candidate, _ => Task.FromResult(Result(candidate))));
+        await scheduler.WaitForPendingAsync(thread.Id, Ct);
+        Assert.Null(await scheduler.TakeAsync(store, budget, owner with { UserId = "user-b" }, thread, settings, true, Ct));
+        Assert.Equal(1, scheduler.Discarded);
+        Assert.False(scheduler.TrySchedule(store, budget, owner, candidate, _ => throw new InvalidOperationException("Duplicate")));
+        Assert.Equal(1, scheduler.Started);
+        Assert.Equal(1, scheduler.Completed);
+    }
+
+    [Fact]
+    public async Task SchedulerShutdownCancelsAndAwaitsItsOwnedAttempt()
+    {
+        var (_, store, thread) = await Setup();
+        var candidate = await store.CaptureCompactionAsync(thread.Id, thread.Revision, Settings(thread.Id, Guid.NewGuid()), Ct);
+        var budget = new Budget();
+        var owner = new CodexThreadCompactionScheduler.AuthOwner("account", null, false);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var scheduler = new CodexThreadCompactionScheduler();
+        Assert.True(scheduler.TrySchedule(store, budget, owner, candidate, async ct =>
+        {
+            entered.TrySetResult();
+            await Task.Delay(Timeout.Infinite, ct);
+            return Result(candidate);
+        }));
+        await entered.Task.WaitAsync(Ct);
+        await scheduler.DisposeAsync();
+        Assert.Equal(1, scheduler.Failed);
+        Assert.Equal(0, scheduler.Completed);
+        Assert.False(scheduler.TrySchedule(store, budget, owner, candidate, _ => throw new InvalidOperationException("Disposed")));
     }
 
     [Theory]

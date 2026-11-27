@@ -15,6 +15,9 @@ public sealed record CodexThreadCompactionOptions
     public CodexRetainedContextOptions? Retention { get; init; }
     /// <summary>Maximum additional compaction attempts during an active turn, zero disables inline compaction.</summary>
     public int MaximumInlineCompactions { get; init; } = 4;
+    /// <summary>Optional lower context threshold for speculative post-turn compaction.
+    /// Requires a host-owned <see cref="CodexThreadCompactionScheduler"/>; must be below TokenThreshold.</summary>
+    public long? BackgroundTokenThreshold { get; init; }
 }
 
 /// <summary>Exact durable prefix of a turn that was active when compaction started.</summary>
@@ -77,6 +80,10 @@ public sealed class CodexThreadCompactionCandidate
     public string ScopeSha256 { get; }
     /// <summary>Captured model.</summary>
     public string Model { get; }
+    internal string AccountId { get; }
+    internal JsonElement CapturedSettings { get; }
+    internal long? PriorCheckpointRevision { get; }
+    internal string? PriorCheckpointResponseId { get; }
     /// <summary>Exact model prompt to compact.</summary>
     public IReadOnlyList<JsonElement> History { get; }
     /// <summary>All known durable tool call identities, including ambiguous dispatches.</summary>
@@ -86,6 +93,10 @@ public sealed class CodexThreadCompactionCandidate
     {
         ThreadId = document.Id;
         Revision = document.Revision;
+        AccountId = document.AccountId;
+        CapturedSettings = document.Settings.Clone();
+        PriorCheckpointRevision = document.CompactionCheckpoint?.SourceRevision;
+        PriorCheckpointResponseId = document.CompactionCheckpoint?.ResponseId;
         ActiveBoundary = activeBoundary;
         ThroughTurnCount = document.Turns.Length - (activeBoundary is null ? 0 : 1);
         HistorySha256 = CodexThreadCompaction.PrefixHash(document, ThroughTurnCount);

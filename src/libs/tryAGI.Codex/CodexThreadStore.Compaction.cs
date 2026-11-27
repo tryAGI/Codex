@@ -91,6 +91,46 @@ public sealed partial class CodexThreadStore
         return await PublishAsync(before.Revision, next, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Adopt a speculative closed-prefix compaction at an idle turn boundary.
+    /// Appended turns are preserved. Changed captured history, effective settings, account,
+    /// or an intervening checkpoint invalidate the candidate. A live execution must not be displaced.</summary>
+    public async Task<CodexThreadDocument> InstallBackgroundCompactionAsync(CodexThreadCompactionCandidate candidate,
+        CodexCompactionResult result, CodexResponseOptions currentSettings, long expectedRevision,
+        CodexRetainedContextOptions? retention = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(currentSettings);
+        if (candidate.ActiveBoundary is not null)
+            throw new ArgumentException("Background adoption requires a closed prefix.", nameof(candidate));
+        var before = await CurrentAsync(candidate.ThreadId, expectedRevision, cancellationToken).ConfigureAwait(false);
+        if (!CanAdoptBackgroundCompaction(before, candidate, currentSettings))
+            throw new CodexThreadConflictException();
+        var now = time.GetUtcNow();
+        var checkpoint = CodexThreadCompaction.BuildCheckpoint(candidate, result, retention, now);
+        var next = before with { CompactionCheckpoint = checkpoint, Format = 2, Revision = checked(before.Revision + 1), UpdatedAt = now };
+        CodexThreadCompaction.Validate(next, checkpoint);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await PublishAsync(before.Revision, next, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static bool CanAdoptBackgroundCompaction(CodexThreadDocument before, CodexThreadCompactionCandidate candidate,
+        CodexResponseOptions currentSettings)
+    {
+        if (candidate.ActiveBoundary is not null || before.Id != candidate.ThreadId ||
+            before.Revision < candidate.Revision || before.AccountId != candidate.AccountId ||
+            before.Turns.Any(turn => turn.Status == "inProgress") ||
+            !JsonElement.DeepEquals(before.Settings, candidate.CapturedSettings) ||
+            currentSettings.Model != candidate.Model || CodexThreadCompaction.ScopeHash(currentSettings) != candidate.ScopeSha256 ||
+            before.CompactionCheckpoint?.SourceRevision != candidate.PriorCheckpointRevision ||
+            before.CompactionCheckpoint?.ResponseId != candidate.PriorCheckpointResponseId ||
+            !CodexThreadCompaction.MatchesPrefix(before, candidate.ThroughTurnCount, candidate.HistorySha256, null))
+            return false;
+        var actual = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, candidate.Model,
+            candidate.ScopeSha256, candidate.ThroughTurnCount);
+        return SameHistory(actual, candidate.History);
+    }
+
     // A late durable receipt or history correction may change a covered prefix. Drop only
     // the derived projection in the same journal write, never the new receipt or original turns.
     private static CodexThreadDocument InvalidateChangedCompactionPrefix(CodexThreadDocument document)
