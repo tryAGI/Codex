@@ -162,7 +162,13 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
             if (item.Error is { } error) throw new CodexProtocolException("Realtime initialization was rejected; no session accepted.") { RealtimeError = error };
             if (retained.Count >= 32) throw new CodexProtocolException("Realtime initialization event bound exceeded.");
             retained.Add(item);
-            if (item.Type == expected)
+            // The frameless Rust parser projects both event names to SessionUpdated.
+            // A malformed receipt remains raw evidence, but cannot complete readiness.
+            var ready = protocol == "v3" && expected == "session.started"
+                ? item.Type is "session.started" or "session.updated" && item.Session is { } receipt &&
+                    !string.IsNullOrWhiteSpace(receipt.Id)
+                : item.Type == expected;
+            if (ready)
             {
                 if (model is not null && (!item.Payload.TryGetProperty("session", out var session) || CodexRealtimeProtocol.Text(session, "model") != model))
                     throw new CodexProtocolException("GA provider model identity did not match the requested model.");
@@ -240,8 +246,12 @@ public sealed class CodexRealtimeConnection : IAsyncDisposable
                 using var document = JsonDocument.Parse(message.GetBuffer().AsMemory(0, checked((int)message.Length)));
                 var payload = document.RootElement.Clone();
                 var type = CodexRealtimeProtocol.Text(payload, "type") ?? throw new CodexProtocolException("Sideband event omitted its type.");
-                ModelIdentity.Observe(payload);
                 var item = new CodexRealtimeEvent(type, payload, Stopwatch.GetElapsedTime(connectedAt).TotalMilliseconds) { Protocol = protocol };
+                // Only a typed receipt from the negotiated adapter can establish model evidence.
+                // The existing GA OAuth model-only acknowledgement is an explicit compatibility path.
+                if (item.Session is { } session && !string.IsNullOrWhiteSpace(session.Id) ||
+                    protocol == "v2" && type is "session.created" or "session.updated")
+                    ModelIdentity.Observe(payload);
                 if (protocol == "v2" && type is "response.created" or "response.done" or "response.cancelled" or
                     "response.function_call_arguments.done" or "conversation.item.done" or "input_audio_buffer.speech_started" or
                     "response.output_audio.delta" or "response.audio.delta" or "error")

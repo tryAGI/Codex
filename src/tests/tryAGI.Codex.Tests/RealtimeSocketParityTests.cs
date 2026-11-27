@@ -137,6 +137,64 @@ public sealed class RealtimeSocketParityTests
     }
 
     [Theory]
+    [InlineData("session.started")]
+    [InlineData("session.updated")]
+    public async Task V3RequiresTypedReadinessAndRetainsEarlierMalformedReceipts(string readyType)
+    {
+        var incoming = new[]
+        {
+            """{"type":"session.started","session":{"model":"wrong-missing-id"}}""",
+            """{"type":"session.updated","session":{"id":42,"model":"wrong-number-id"}}""",
+            """{"type":"session.started","session":{"id":" ","model":"wrong-blank-id"}}""",
+            """{"type":"session.created","session":{"id":"wrong-adapter","model":"wrong-adapter"}}""",
+            "{\"type\":\"" + readyType + "\",\"session\":{\"id\":\"valid\",\"model\":\"snapshot\"}}",
+        };
+        var socket = new Socket(incoming);
+        await using var connection = new CodexRealtimeConnection(socket, 8192, "v3", chatGptCall: false);
+        var ct = TestContext.Current.CancellationToken;
+        await connection.InitializeDirectSessionAsync(new("test") { Model = "snapshot" }, TimeSpan.FromSeconds(1), false, ct);
+        Assert.Equal(incoming.Length, socket.Reads);
+        Assert.Equal("snapshot", connection.ModelIdentity.Read("snapshot").ConfirmedModel);
+        var events = new List<string>();
+        await foreach (var item in connection.ReadEventsAsync(ct)) events.Add(item.Payload.GetRawText());
+        Assert.Equal(incoming, events);
+        Assert.Single(socket.Sent);
+    }
+
+    [Theory]
+    [InlineData("""{"type":"session.started"}""")]
+    [InlineData("""{"type":"session.started","session":{"id":false,"model":"snapshot"}}""")]
+    [InlineData("""{"type":"session.updated","session":{"id":"","model":"snapshot"}}""")]
+    [InlineData("""{"type":"session.created","session":{"id":"s","model":"snapshot"}}""")]
+    public async Task V3MalformedOrWrongAdapterReceiptCannotEstablishReadinessOrModelIdentity(string frame)
+    {
+        var socket = new Socket([frame]);
+        await using var connection = new CodexRealtimeConnection(socket, 8192, "v3");
+        var ct = TestContext.Current.CancellationToken;
+        await Assert.ThrowsAsync<CodexProtocolException>(() => connection.InitializeDirectSessionAsync(
+            new("test") { Model = "snapshot" }, TimeSpan.FromSeconds(1), false, ct));
+        Assert.Null(connection.ModelIdentity.Read("snapshot").ProviderReportedModel);
+        Assert.Single(socket.Sent);
+    }
+
+    [Theory]
+    [InlineData("v1", "session.created")]
+    [InlineData("v1", "session.started")]
+    [InlineData("v2", "session.started")]
+    [InlineData("v3", "session.created")]
+    public async Task OtherAdapterSessionCannotOverwriteConnectionModelEvidence(string protocol, string eventType)
+    {
+        var socket = new Socket([
+            """{"type":"session.updated","session":{"id":"s","model":"snapshot"}}""",
+            "{\"type\":\"" + eventType + "\",\"session\":{\"id\":\"other\",\"model\":\"wrong\"}}",
+        ]);
+        await using var connection = new CodexRealtimeConnection(socket, 8192, protocol);
+        await foreach (var item in connection.ReadEventsAsync(TestContext.Current.CancellationToken)) { }
+        Assert.Equal("snapshot", connection.ModelIdentity.Read("snapshot").ConfirmedModel);
+        Assert.Equal("session.updated", connection.ModelIdentity.Read("snapshot").SourceEvent);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task V3RejectsClosureOrProviderErrorBeforeReady(bool providerError)
