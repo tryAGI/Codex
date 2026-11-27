@@ -45,7 +45,17 @@ public sealed record CodexResponseOptions(string Model, string Instructions)
 /// <param name="Type">Event type, for example <c>response.output_text.delta</c>.</param>
 /// <param name="Payload">Raw event JSON.</param>
 /// <param name="ReceivedAfterRequestMs">Milliseconds between sending the request and receiving this event.</param>
-public sealed record CodexResponseEvent(string Type, JsonElement Payload, double ReceivedAfterRequestMs);
+public sealed record CodexResponseEvent(string Type, JsonElement Payload, double ReceivedAfterRequestMs)
+{
+    /// <summary>Caller-owned request correlation.</summary>
+    public CodexResponsesIdentity? Identity { get; init; }
+    /// <summary>Local reservation identifier.</summary>
+    public string? RequestId { get; init; }
+    /// <summary>Observed provider accounting data, if this event carries it.</summary>
+    public CodexObservedUsage? Usage => CodexObservedUsage.Read(Payload, Identity, RequestId, ObservedAt);
+    /// <summary>Local receipt time.</summary>
+    public DateTimeOffset ObservedAt { get; init; } = DateTimeOffset.UtcNow;
+}
 
 public sealed partial class CodexClient
 {
@@ -72,6 +82,7 @@ public sealed partial class CodexClient
             await usageObserver.ReserveWithIdentityAsync(accountingId, settings.Model, cancellationToken).ConfigureAwait(false);
         var accountingComplete = false;
         var dispatchStarted = false;
+        CodexObservedUsage? incompleteUsage = null;
         CancellationToken requestCancellation = default;
         try
         {
@@ -133,6 +144,7 @@ public sealed partial class CodexClient
         using var ws = settings.WebSocketSession is { } session
             ? await session.OpenAsync(request, responsesRouting, routingGeneration, options.MaximumMessageBytes, deadline.Token).ConfigureAwait(false)
             : null;
+        diagnostics.ObserveQuotas(ws?.Quotas);
         if (settings.WebSocketSession is not null && ws is null) diagnostics.Mark("transport.websocket_fallback_sse");
         // Entering SendAsync is the conservative boundary: no replay after ambiguous dispatch.
         // Even unexpected generation during a prewarm must not be replayed automatically.
@@ -148,6 +160,7 @@ public sealed partial class CodexClient
         if (response is not null)
         {
             diagnostics.Mark("response.headers");
+            diagnostics.ObserveQuotaHeaders(response.Headers);
             await EnsureCallSuccessAsync(response, deadline.Token).ConfigureAwait(false);
             responsesRouting.Capture(response, routingGeneration);
         }
@@ -169,7 +182,13 @@ public sealed partial class CodexClient
             var type = CodexRealtimeProtocol.Text(payload, "type") ?? throw new CodexProtocolException("Responses event omitted its type.");
             if (type is "error" or "response.failed" or "response.incomplete")
             {
+                incompleteUsage = CodexObservedUsage.Read(payload, identity, accountingId);
                 var category = diagnostics.Failure(type, payload);
+                var error = payload.TryGetProperty("response", out var failed) && failed.ValueKind == JsonValueKind.Object &&
+                    failed.TryGetProperty("error", out var nested) ? nested :
+                    payload.TryGetProperty("error", out var direct) ? direct : default;
+                if (error.ValueKind == JsonValueKind.Object && CodexUsageLimitException.TryRead(429, error, null) is { } quota)
+                    throw quota;
                 throw new CodexProtocolException($"Codex response terminated ({type}; {category}); usage is unknown and output must not execute.");
             }
             diagnostics.Event(type, payload);
@@ -187,7 +206,7 @@ public sealed partial class CodexClient
             }
             ws?.Observe(type, payload, body);
             completed |= type == "response.completed";
-            yield return new(type, payload, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            yield return new(type, payload, Stopwatch.GetElapsedTime(started).TotalMilliseconds) { Identity = identity, RequestId = accountingId };
             if (completed) yield break;
         }
         if (!completed)
@@ -207,7 +226,7 @@ public sealed partial class CodexClient
                     finally
                     {
                         // Diagnostic callbacks must not prevent conservative accounting.
-                        await usageObserver.IncompleteAsync(accountingId, settings.Model, save.Token).ConfigureAwait(false);
+                        await usageObserver.IncompleteWithUsageAsync(accountingId, settings.Model, incompleteUsage, save.Token).ConfigureAwait(false);
                     }
                 }
                 else

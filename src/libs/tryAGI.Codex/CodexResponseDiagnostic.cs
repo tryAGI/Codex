@@ -46,6 +46,10 @@ public sealed record CodexResponseDiagnostic(string Phase, string RequestId, dou
     public long? ReasoningTokens { get; init; }
     /// <summary>Correlation identity sent with the request.</summary>
     public CodexResponsesIdentity? Identity { get; init; }
+    /// <summary>Typed provider counters and context or quota metadata, if present.</summary>
+    public CodexObservedUsage? Usage { get; init; }
+    /// <summary>Quota snapshots from the transport response headers, if reported.</summary>
+    public IReadOnlyList<CodexObservedQuota>? Quotas { get; init; }
 }
 
 internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Action<CodexResponseDiagnostic>? observe)
@@ -99,7 +103,9 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
             _ => "unclassified",
         };
         terminalFailure = true;
-        Mark(type + "." + category);
+        var phase = type + "." + category;
+        lastTransportPhase = phase;
+        observe?.Invoke(Point(phase) with { Usage = CodexObservedUsage.Read(payload, Identity, requestId) });
         return category;
     }
 
@@ -128,6 +134,8 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
                     ? arguments.GetString()?.Length : null,
             });
         if (type == "response.created") Mark(type);
+        if (type == "codex.rate_limits")
+            observe(Point(type) with { Usage = CodexObservedUsage.Read(payload, Identity, requestId) });
         if (type == "response.completed")
         {
             lastTransportPhase = type;
@@ -137,6 +145,7 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
                 CachedInputTokens = Number(response, "usage", "input_tokens_details", "cached_tokens"),
                 OutputTokens = Number(response, "usage", "output_tokens"),
                 ReasoningTokens = Number(response, "usage", "output_tokens_details", "reasoning_tokens"),
+                Usage = CodexObservedUsage.Read(payload, Identity, requestId),
             });
             // Structural evidence, not a claim that the host accepted this response. A later
             // protocol rejection remains distinct from provider completion and paid usage.
@@ -150,6 +159,17 @@ internal sealed class CodexResponseDiagnostics(int inputItems, int toolCount, Ac
             }
             else observe(Point("response.output_shape.invalid_output"));
         }
+    }
+
+    internal void ObserveQuotaHeaders(IEnumerable<KeyValuePair<string, IEnumerable<string>>> headers)
+    {
+        if (observe is null) return;
+        ObserveQuotas(CodexObservedUsage.ReadHeaders(headers));
+    }
+
+    internal void ObserveQuotas(IReadOnlyList<CodexObservedQuota>? quotas)
+    {
+        if (quotas is { Count: > 0 }) observe?.Invoke(Point("response.quota_headers") with { Quotas = quotas });
     }
 
     private static string MergeShape(string? previous, string current)

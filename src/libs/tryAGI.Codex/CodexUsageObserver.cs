@@ -25,6 +25,10 @@ public interface ICodexUsageObserver
     Task PreparedAsync(string requestId, string model, JsonElement request, CancellationToken cancellationToken) => Task.CompletedTask;
     /// <summary>Records a dispatched request whose usage is unknown.</summary>
     Task IncompleteAsync(string requestId, string model, CancellationToken cancellationToken);
+    /// <summary>Records an incomplete dispatch with optional reported counters. These are observations, not settled billing.
+    /// The reservation ID remains the idempotency key; older observers retain unknown-usage behavior.</summary>
+    Task IncompleteWithUsageAsync(string requestId, string model, CodexObservedUsage? usage, CancellationToken cancellationToken) =>
+        IncompleteAsync(requestId, model, cancellationToken);
     /// <summary>Called only before entering HTTP dispatch. Older observers retain conservative accounting.</summary>
     Task NotDispatchedAsync(string requestId, string model, CancellationToken cancellationToken) =>
         IncompleteAsync(requestId, model, cancellationToken);

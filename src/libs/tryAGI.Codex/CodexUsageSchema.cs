@@ -3,11 +3,21 @@ using System.Text.Json;
 namespace tryAGI.Codex;
 
 /// <summary>A bounded diagnostic observation, not a billing or quota interpretation.</summary>
-internal sealed record CodexUsageSchemaSnapshot(string EventType, DateTimeOffset ObservedAt,
+/// <param name="EventType">Accounting event type.</param>
+/// <param name="ObservedAt">Observation time.</param>
+/// <param name="Fields">Bounded schema observations.</param>
+/// <param name="Truncated">Some fields exceeded the diagnostic bounds.</param>
+public sealed record CodexUsageSchemaSnapshot(string EventType, DateTimeOffset ObservedAt,
     CodexUsageField[] Fields, bool Truncated);
 
 /// <summary>String content and array elements are deliberately not retained.</summary>
-internal sealed record CodexUsageField(string Path, string Kind, decimal? Number = null,
+/// <param name="Path">Accounting field path.</param>
+/// <param name="Kind">JSON value kind.</param>
+/// <param name="Number">Representable numeric value.</param>
+/// <param name="Boolean">Boolean value.</param>
+/// <param name="StringLength">String length, never its content.</param>
+/// <param name="ArrayLength">Array length, never its elements.</param>
+public sealed record CodexUsageField(string Path, string Kind, decimal? Number = null,
     bool? Boolean = null, int? StringLength = null, int? ArrayLength = null);
 
 /// <summary>Retains usage schema changes without persisting raw provider events or private text.</summary>
@@ -23,8 +33,11 @@ internal static class CodexUsageSchema
         if (payload.ValueKind != JsonValueKind.Object || !payload.TryGetProperty("type", out var type) ||
             type.ValueKind != JsonValueKind.String || type.GetString() is not ("session.usage.updated" or "session.closed"))
             return null;
-        var eventType = type.GetString() ?? string.Empty;
+        return ObserveAccounting(payload, type.GetString()!, observedAt);
+    }
 
+    internal static CodexUsageSchemaSnapshot ObserveAccounting(JsonElement payload, string eventType, DateTimeOffset observedAt)
+    {
         var fields = new List<CodexUsageField>();
         var paths = new HashSet<string>(StringComparer.Ordinal);
         var truncated = false;
@@ -59,11 +72,18 @@ internal static class CodexUsageSchema
 
         // These are accounting envelopes observed on the Codex V3 connection. Do not
         // recursively traverse unrelated session, transcript, reasoning or audio data.
-        foreach (var property in payload.EnumerateObject())
+        void VisitEnvelopes(JsonElement root, string prefix)
         {
-            if (++visited > MaximumVisitedProperties) { truncated = true; break; }
-            if (property.Name is "usage" or "usage_limit" or "context_window") Visit(property.Value, property.Name, 0);
+            if (root.ValueKind != JsonValueKind.Object) return;
+            foreach (var property in root.EnumerateObject())
+            {
+                if (++visited > MaximumVisitedProperties) { truncated = true; break; }
+                if (property.Name is "usage" or "usage_limit" or "context_window" or "rate_limits" or "credits" or "info")
+                    Visit(property.Value, prefix + property.Name, 0);
+            }
         }
+        VisitEnvelopes(payload, "");
+        if (payload.TryGetProperty("response", out var response)) VisitEnvelopes(response, "response.");
         return new(eventType, observedAt, fields.ToArray(), truncated);
     }
 }

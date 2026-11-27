@@ -27,7 +27,8 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
     internal CodexResponsesWebSocketSession(Func<HttpRequestMessage, CancellationToken, Task<Connection?>> connect)
         => this.connect = connect;
 
-    internal sealed record Connection(WebSocket Socket, IEnumerable<string>? TurnState = null);
+    internal sealed record Connection(WebSocket Socket, IEnumerable<string>? TurnState = null,
+        IReadOnlyList<CodexObservedQuota>? Quotas = null);
 
     internal async Task<Lease?> OpenAsync(HttpRequestMessage request, CodexResponsesRouting routing, object generation,
         int maximumBytes, CancellationToken ct)
@@ -44,6 +45,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
                 fallback = false;
             }
             if (fallback) return null;
+            IReadOnlyList<CodexObservedQuota>? quotas = null;
             if (socket?.State != WebSocketState.Open)
             {
                 Reset();
@@ -54,9 +56,10 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
                     return null;
                 }
                 socket = connection.Socket;
+                quotas = connection.Quotas;
                 if (connection.TurnState is { } state) routing.Capture(state, generation);
             }
-            var lease = new Lease(this, routing, generation, maximumBytes);
+            var lease = new Lease(this, routing, generation, maximumBytes) { Quotas = quotas };
             handedOff = true;
             return lease;
         }
@@ -82,7 +85,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
             await socket.ConnectAsync(uri.Uri, ct).ConfigureAwait(false);
             var turnState = socket.HttpResponseHeaders?.FirstOrDefault(header =>
                 header.Key.Equals("x-codex-turn-state", StringComparison.OrdinalIgnoreCase)).Value;
-            return new(socket, turnState);
+            return new(socket, turnState, socket.HttpResponseHeaders is { } headers ? CodexObservedUsage.ReadHeaders(headers) : null);
         }
         catch (WebSocketException)
         {
@@ -184,6 +187,7 @@ public sealed class CodexResponsesWebSocketSession : IAsyncDisposable
         private bool streamedOverflow;
         private long streamedBytes;
 
+        internal IReadOnlyList<CodexObservedQuota>? Quotas { get; init; }
         internal bool NeedsPrewarm => owner.previous is null;
 
         internal async Task SendAsync(JsonObject body, bool prewarm, CancellationToken ct)
