@@ -11,6 +11,14 @@ public sealed class CodexAgentControl : IDisposable
     private readonly SemaphoreSlim realtimeGate = new(1, 1);
     private Func<CodexRealtimeHandoffRequest, CancellationToken, Task<CodexRealtimeHandoffAdmission>>? realtimeAdmission;
     private bool reservingRealtime;
+    private Func<CodexRealtimeReasoningObserver?>? captureRealtimeObserver;
+    private CodexRealtimeReasoningObserver? capturedRealtimeObserver;
+
+    internal void BindRealtimeObserver(Func<CodexRealtimeReasoningObserver?> capture)
+        => captureRealtimeObserver = capture;
+
+    internal void ObserveRealtimeProvider(CodexResponseEvent item) => capturedRealtimeObserver?.Provider(item);
+    internal void ObserveRealtimeValidated(JsonElement item) => capturedRealtimeObserver?.Validated(item);
     private readonly Queue<PendingInput> input = new();
     private readonly List<string?> clientIds = [];
     private bool inputInitialized;
@@ -116,7 +124,13 @@ public sealed class CodexAgentControl : IDisposable
     internal async Task<CodexResponseOptions> CaptureAsync(CodexResponseOptions initial, List<JsonElement> history, CancellationToken ct)
     {
         await realtimeGate.WaitAsync(ct).ConfigureAwait(false);
-        try { return Capture(initial, history); }
+        try
+        {
+            var settings = Capture(initial, history);
+            // Capture the exact voice generation with the input, before a later steer can replace it.
+            capturedRealtimeObserver = captureRealtimeObserver?.Invoke();
+            return settings;
+        }
         finally { realtimeGate.Release(); }
     }
 

@@ -114,6 +114,8 @@ public sealed partial class CodexThreadRpc
         try
         {
             events = new CodexTurnEvents(thread.Id.ToString(), running.Id.ToString(), PublishAsync);
+            running.Control.BindRealtimeObserver(() => realtimeObservers.TryGetValue(thread.Id, out var coordinator)
+                ? coordinator.CaptureReasoningObserver(running.Id) : null);
             var run = new CodexThreadRun(thread, running.Id, "native-rpc:" + Guid.CreateVersion7(), running.Options, input, running.Control,
                 (_, ct) => PublishItemsAsync(thread.Id, running, ct))
             {
@@ -146,7 +148,10 @@ public sealed partial class CodexThreadRpc
         finally
         {
             if (events is not null) Interlocked.Add(ref notificationFailures, events.DeliveryFailures);
-            running.Control.Seal(); RemoveActive(thread.Id, running); running.Control.Dispose();
+            running.Control.Seal();
+            if (running.Failure is not null && realtimeObservers.TryGetValue(thread.Id, out var coordinator))
+                coordinator.CompleteReasoning(running.Id, "failed");
+            RemoveActive(thread.Id, running); running.Control.Dispose();
         }
     }
 
@@ -182,8 +187,10 @@ public sealed partial class CodexThreadRpc
     private Task CompletedAsync(CodexThreadDocument thread, Running running)
     {
         running.Control.Seal();
-        RemoveActive(thread.Id, running);
         var completed = thread.Turns.Single(t => t.Id == running.Id);
+        if (realtimeObservers.TryGetValue(thread.Id, out var coordinator))
+            coordinator.CompleteReasoning(completed.Id, completed.Status);
+        RemoveActive(thread.Id, running);
         JsonObject snapshot;
         try { snapshot = Turn(completed, "summary"); }
         catch (CodexThreadRpcException) { Interlocked.Increment(ref notificationFailures); snapshot = Turn(completed, "notLoaded"); }

@@ -140,11 +140,16 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             async Task Validated(JsonElement item, CancellationToken ct)
             {
                 await execution.ValidatedAsync(item, ct).ConfigureAwait(false);
+                control?.ObserveRealtimeValidated(item);
                 if (validatedItem is not null) await validatedItem(item, ct).ConfigureAwait(false);
             }
             var result = await new CodexAgent(client).RunWithToolsAsync(options, execution.Seed,
                 (call, ct) => execution.ExecuteAsync(call, execute, ct, control), Validated,
-                maximumRequests, observe, cancellationToken, observeDiagnostics,
+                maximumRequests, item =>
+                {
+                    control?.ObserveRealtimeProvider(item);
+                    observe?.Invoke(item);
+                }, cancellationToken, observeDiagnostics,
                 canExecuteConcurrently: canExecuteConcurrently,
                 previouslyExecutedCallIds: CodexThreadStore.DispatchedToolCallIds(started), control: control,
                 observeAsync: observeAsync).ConfigureAwait(false);

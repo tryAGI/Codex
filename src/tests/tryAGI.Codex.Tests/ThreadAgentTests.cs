@@ -369,6 +369,83 @@ public sealed class ThreadAgentTests
     }
 
     [Fact]
+    public async Task OrdinaryReasoningTurnCanSpeakAndSteerWithoutRebindingInflightResponse()
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        var agent = Agent(store, auth, budget, server);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "rtc_call", "v3", "voice-owner", Ct);
+        using var client = new CodexClient(auth);
+        var incoming = Channel.CreateUnbounded<string>();
+        var outgoing = Channel.CreateUnbounded<string>();
+        var controller = new CodexRealtimeSessionController(store, thread.Id, "voice", "voice-owner",
+            (request, ct) => client.AttachExistingRealtimeCallAsync(request.CallId,
+                new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), request.Protocol, request.StartBefore, ct));
+        var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+            Json("{}"), (_, _, _) => throw new InvalidOperationException("Use the native owned executor."), (_, _) => Task.CompletedTask);
+        await using var coordinator = new CodexRealtimeCoordinator(store, agent, rpc, controller, thread.Id, "voice", "voice-owner", "account",
+            _ => Options(thread.Id, Guid.NewGuid()), NoTools, new() { ChannelMode = CodexRealtimeReasoningChannelMode.BemTags });
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        var token = deadline.Token;
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await coordinator.AttachAsync(token));
+        var pump = coordinator.RunAsync(ct: token);
+        await coordinator.PumpReady.WaitAsync(token);
+        async Task<CodexThreadDocument> RunOrdinary(CodexThreadDocument current, Guid id, string input)
+            => await rpc.RunOwnedAsync(current, id, Options(current.Id, id), [Input(input)],
+                async (native, started, ct) => (await agent.RunAsync(native.Thread.Id, native.Thread.Revision, native.TurnId,
+                    native.OwnerId, native.Options, native.Input, NoTools, cancellationToken: ct, control: native.Control,
+                    turnStarted: (snapshot, _) => started(snapshot), validatedItem: native.ValidatedItem,
+                    observeAsync: native.ObserveProvider)).Thread, token);
+        var before = await store.ReadAsync(thread.Id, token);
+        server.Replies.Enqueue(Text("proactive ordinary answer"));
+        var firstId = Guid.NewGuid();
+        var first = await RunOrdinary(before, firstId, "host event, not a voice input");
+        var standalone = Json(await outgoing.Reader.ReadAsync(token));
+        Assert.Equal("session.context.append", standalone.GetProperty("type").GetString());
+        Assert.Contains("proactive ordinary answer", standalone.GetRawText());
+        Assert.False(standalone.TryGetProperty("delegation_item_id", out _));
+
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        server.Replies.Enqueue(Text("superseded answer"));
+        server.Replies.Enqueue(Text("steered current answer"));
+        var secondId = Guid.NewGuid();
+        server.BeforeResponse = async () =>
+        {
+            if (server.Requests.Count != 2) return;
+            entered.TrySetResult();
+            await release.Task.WaitAsync(token);
+        };
+        var second = RunOrdinary(first, secondId, "ordinary task");
+        try
+        {
+            await entered.Task.WaitAsync(token);
+            await incoming.Writer.WriteAsync("""
+                {"type":"delegation.created","item":{"type":"delegation","target":"client","id":"new-handoff","content":[{"type":"input_text","text":"new instruction"}]}}
+                """, token);
+            while (true)
+            {
+                var actual = await store.ReadAsync(thread.Id, token);
+                if (actual.RealtimeSessions!.Single().HandoffAdmissions?.Any(x => x.HandoffId == "new-handoff") == true) break;
+                await Task.Delay(10, token);
+            }
+        }
+        finally { release.TrySetResult(); }
+        var completed = await second;
+        Assert.Equal(2, completed.Turns.Length);
+        Assert.Equal(secondId, completed.Turns.Last().Id);
+        Assert.Equal(3, server.Requests.Count);
+        var reply = Json(await outgoing.Reader.ReadAsync(token));
+        Assert.Equal("delegation.context.append", reply.GetProperty("type").GetString());
+        Assert.Equal("new-handoff", reply.GetProperty("delegation_item_id").GetString());
+        Assert.Contains("steered current answer", reply.GetRawText());
+        Assert.DoesNotContain("superseded answer", reply.GetRawText());
+        Assert.False(outgoing.Reader.TryRead(out _));
+        Assert.Equal(CodexRealtimeLifecycleStatus.Detached, await coordinator.DetachAsync(token));
+        await pump;
+    }
+
+    [Fact]
     public async Task NativeCoordinatorKeepsAudioAndControlLiveDuringToolAndContinuesSameThread()
     {
         var (_, store, thread, auth, budget, server) = await Setup();

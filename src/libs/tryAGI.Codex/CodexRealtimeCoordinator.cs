@@ -60,15 +60,13 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     private readonly TaskCompletionSource pumpReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal Task PumpReady => pumpReady.Task;
     private Binding? activeFeedback;
-    private Binding? responseFeedback;
-    private string? feedbackRequestId;
     private Task? ownedReasoning;
     private Exception? reasoningFailure;
     private bool disposed;
 
     private sealed record Handoff(CodexRealtimeEvent Event, Guid Attachment, CodexRealtimeConnection Connection);
     private sealed record Binding(CodexRealtimeFeedbackHandoff Handoff, Guid TurnId,
-        CodexRealtimeConnection Connection, CodexRealtimeConnection.FeedbackAdmission Admission, RunState Run, string WireHandoffId)
+        CodexRealtimeConnection Connection, CodexRealtimeConnection.FeedbackAdmission Admission, RunState Run, string? WireHandoffId)
     {
         internal bool HasOutput;
         internal bool Completed;
@@ -76,8 +74,9 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     private sealed record Feedback(Binding Binding, string Text, string? Channel, CodexRealtimeFeedbackKind Kind = CodexRealtimeFeedbackKind.Progress, string? WireId = null);
     private sealed record Control(string Text, bool Speech, string Role);
 
-    private sealed class RunState
+    private sealed class RunState(CodexRealtimeConnection connection)
     {
+        internal CodexRealtimeConnection Connection { get; } = connection;
         internal readonly CodexRealtimeBoundedQueue<Handoff> Handoffs = new(64, 4 * 1024 * 1024, "handoff");
         internal readonly CodexRealtimeBoundedQueue<CodexRealtimeEvent> Events = new(256, 8 * 1024 * 1024, "observer");
         internal readonly CodexRealtimeBoundedQueue<CodexRealtimeEvent> AudioEvents = new(256, 8 * 1024 * 1024, "audio observer");
@@ -158,7 +157,7 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(text);
         lock (gate)
         {
-            if (activeFeedback is not { } binding || binding.Connection.Protocol != "v3" ||
+            if (activeFeedback is not { Completed: false, WireHandoffId: not null } binding || binding.Connection.Protocol != "v3" ||
                 stream.Status(binding.Handoff, text) is not { } chunk) return false;
             return binding.Run.Feedback.TryWrite(new(binding, chunk.Text, chunk.Channel, CodexRealtimeFeedbackKind.Status), Encoding.UTF8.GetByteCount(chunk.Text));
         }
@@ -185,11 +184,12 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         await ReadBoundAsync(ct).ConfigureAwait(false);
         var connection = controller.Connection ?? throw new InvalidOperationException("Attach the realtime session first.");
         var attachment = controller.AttachmentId ?? throw new InvalidOperationException("Missing attachment fence.");
-        var run = new RunState();
+        var run = new RunState(connection);
         lock (gate)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             if (current is not null) throw new InvalidOperationException("A realtime coordinator pump is already running.");
+            rpc.RegisterRealtimeObserver(threadId, this);
             current = run;
             pumpReady.TrySetResult();
         }
@@ -229,8 +229,11 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
             lock (gate)
             {
                 if (activeFeedback?.Run == run) { stream.Retire(activeFeedback.Handoff); activeFeedback = null; }
-                if (responseFeedback?.Run == run) responseFeedback = null;
-                if (current == run) current = null;
+                if (current == run)
+                {
+                    rpc.UnregisterRealtimeObserver(threadId, this);
+                    current = null;
+                }
             }
             try { await Task.WhenAll(pump is null ? workers : workers.Append(pump)).ConfigureAwait(false); }
             catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
@@ -295,16 +298,11 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
                     await notifyStarted(snapshot).ConfigureAwait(false);
                     started.TrySetResult();
                 },
-                async (item, token) =>
-                {
-                    Validated(submission, item);
-                    await native.ValidatedItem(item, token).ConfigureAwait(false);
-                },
-                item => ObserveReasoning(submission, item), cancel).ConfigureAwait(false);
+                native.ValidatedItem, null, cancel).ConfigureAwait(false);
             return result.Thread;
         }, lifetime.Token);
         lock (gate) ownedReasoning = task;
-        _ = ObserveCompletionAsync(task, submission, started);
+        _ = ObserveCompletionAsync(task, started);
         try { await started.Task.WaitAsync(ct).ConfigureAwait(false); }
         catch (CodexThreadConflictException)
         {
@@ -314,20 +312,11 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         }
     }
 
-    private async Task ObserveCompletionAsync(Task<CodexThreadDocument> task, Guid turnId, TaskCompletionSource started)
+    private async Task ObserveCompletionAsync(Task<CodexThreadDocument> task, TaskCompletionSource started)
     {
         try
         {
-            var document = await task.ConfigureAwait(false);
-            lock (gate)
-            {
-                if (activeFeedback is { Completed: false } binding && binding.TurnId == turnId && document.Turns.Any(t => t.Id == binding.TurnId && t.Status == "completed"))
-                {
-                    if (binding.Connection.Protocol == "v2" && binding.HasOutput)
-                        Queue(binding, options.ResponsesAsItems ? "" : "complete", null, CodexRealtimeFeedbackKind.Complete);
-                    binding.Completed = true;
-                }
-            }
+            await task.ConfigureAwait(false);
             started.TrySetResult();
         }
         catch (Exception error) when (error is not OutOfMemoryException)
@@ -342,10 +331,9 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         lock (gate)
         {
             if (current != run) return;
-            if (responseFeedback?.TurnId != turn) { responseFeedback = null; feedbackRequestId = null; }
             var token = stream.Activate(handoff.Event.Delegation!.Id);
             var prior = activeFeedback;
-            var steer = handoff.Connection.Protocol == "v2" && prior is { Completed: false } && prior.TurnId == turn && prior.Run == run;
+            var steer = handoff.Connection.Protocol == "v2" && prior is { Completed: false, WireHandoffId: not null } && prior.TurnId == turn && prior.Run == run;
             var binding = new Binding(token, turn, handoff.Connection,
                 handoff.Event.Admission ?? handoff.Connection.CaptureFeedbackAdmission(), run,
                 steer ? prior!.WireHandoffId : token.Id);
@@ -354,19 +342,45 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         }
     }
 
-    private void ObserveReasoning(Guid turn, CodexResponseEvent item)
+    // Both ordinary RPC turns and delegated turns use this same request-bound observer.
+    // A standalone local binding never manufactures a provider delegation identifier.
+    internal CodexRealtimeReasoningObserver? CaptureReasoningObserver(Guid turn)
     {
         lock (gate)
         {
-            // Local request IDs distinguish continuation requests even if the provider omits response.created.
-            if (item.Type == "response.created" || responseFeedback is null ||
-                (item.RequestId is not null && item.RequestId != feedbackRequestId))
+            if (disposed || current is not { } run || options.ClientManagedHandoffs) return null;
+            if (activeFeedback is not { Completed: false } binding || binding.TurnId != turn || binding.Run != run)
             {
-                responseFeedback = activeFeedback is { } binding && binding.TurnId == turn ? binding : null;
-                feedbackRequestId = item.RequestId;
+                binding = new Binding(stream.Activate("standalone:" + turn), turn, run.Connection,
+                    run.Connection.CaptureFeedbackAdmission(), run, null);
+                activeFeedback = binding;
             }
-            if (responseFeedback is not { } currentBinding || currentBinding.TurnId != turn ||
-                !stream.IsCurrent(currentBinding.Handoff) || currentBinding.Connection.Protocol != "v3") return;
+            return new(item => ObserveReasoning(binding, item), item => Validated(binding, item));
+        }
+    }
+
+    internal void CompleteReasoning(Guid turn, string status)
+    {
+        lock (gate)
+        {
+            if (activeFeedback is not { Completed: false } binding || binding.TurnId != turn) return;
+            binding.Completed = true;
+            if (status != "completed")
+            {
+                stream.Retire(binding.Handoff);
+                return;
+            }
+            if (binding.WireHandoffId is not null && binding.Connection.Protocol == "v2" && binding.HasOutput)
+                Queue(binding, options.ResponsesAsItems ? "" : "complete", null, CodexRealtimeFeedbackKind.Complete);
+        }
+    }
+
+    private void ObserveReasoning(Binding currentBinding, CodexResponseEvent item)
+    {
+        lock (gate)
+        {
+            if (currentBinding.Completed || !stream.IsCurrent(currentBinding.Handoff) ||
+                currentBinding.Connection.Protocol != "v3") return;
             if (item.Type == "response.output_item.added" && item.Payload.TryGetProperty("item", out var message) &&
                 CodexRealtimeProtocol.Text(message, "role") == "assistant" && CodexRealtimeProtocol.Text(message, "type") == "message" &&
                 CodexRealtimeProtocol.Text(message, "id") is { } id)
@@ -377,13 +391,12 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
         }
     }
 
-    private void Validated(Guid turn, JsonElement item)
+    private void Validated(Binding binding, JsonElement item)
     {
         if (CodexRealtimeProtocol.Text(item, "type") != "message" || CodexRealtimeProtocol.Text(item, "role") != "assistant") return;
         lock (gate)
         {
-            var binding = responseFeedback ?? activeFeedback;
-            if (binding is null || binding.TurnId != turn || !stream.IsCurrent(binding.Handoff)) return;
+            if (binding.Completed || !stream.IsCurrent(binding.Handoff)) return;
             var id = CodexRealtimeProtocol.Text(item, "id");
             var completed = id is not null ? stream.Finish(binding.Handoff, id) : default;
             if (completed.Chunk is { } chunk) Queue(binding, chunk.Text, chunk.Channel);
