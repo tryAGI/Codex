@@ -22,6 +22,12 @@ public sealed partial class CodexThreadStore
         Id(recipientThreadId);
         var mailbox = await RequireAgentMailboxStorage().ReadAgentMailboxAsync(accountId, rootThreadId,
             recipientThreadId, cancellationToken).ConfigureAwait(false);
+        return ValidateAgentMailboxSnapshot(mailbox, accountId, rootThreadId, recipientThreadId);
+    }
+
+    internal static CodexAgentMailbox ValidateAgentMailboxSnapshot(CodexAgentMailbox mailbox, string accountId,
+        Guid rootThreadId, Guid recipientThreadId)
+    {
         if (mailbox is null || mailbox.AccountId != accountId || mailbox.RootThreadId != rootThreadId ||
             mailbox.RecipientThreadId != recipientThreadId || mailbox.Revision < 0 ||
             mailbox.Pending is null || mailbox.Receipts is null ||
@@ -216,7 +222,7 @@ public sealed partial class CodexThreadStore
         catch (EncoderFallbackException) { return false; }
     }
 
-    private static string AgentMailFingerprint(CodexAgentMail mail)
+    internal static string AgentMailFingerprint(CodexAgentMail mail)
     {
         // Fixed-width sender/intent/encryption prefixes prevent ambiguous encodings.
         var prefix = string.Concat(mail.SenderThreadId.ToString("N"), ((int)mail.Mode).ToString(System.Globalization.CultureInfo.InvariantCulture),

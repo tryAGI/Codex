@@ -15,6 +15,11 @@ public sealed partial class CodexThreadStore
             throw new InvalidOperationException("Durable agent identity storage is unavailable.");
         var snapshot = await identities.ReadAgentIdentitySnapshotAsync(accountId, rootThreadId, cancellationToken)
             .ConfigureAwait(false);
+        return ValidateAgentIdentitySnapshot(snapshot, rootThreadId);
+    }
+
+    internal CodexAgentIdentityDirectory ValidateAgentIdentitySnapshot(CodexAgentIdentitySnapshot snapshot, Guid rootThreadId)
+    {
         if (snapshot is null || snapshot.Identities is null || snapshot.Identities.Count > MaximumSpawnEdges)
             throw new InvalidDataException("Invalid agent identity snapshot.");
         var graph = ValidateSpawnGraph(snapshot.Graph, rootThreadId);
