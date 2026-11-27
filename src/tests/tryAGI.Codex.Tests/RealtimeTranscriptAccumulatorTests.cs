@@ -113,6 +113,91 @@ public sealed class RealtimeTranscriptAccumulatorTests
         Assert.Equal(3, tail[0].Fragments.Length);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LegacyEmptyDeltaResetsSpeechAndResponseBoundariesWithoutChangingOldJournalReplay(bool replayOldJournal)
+    {
+        const string protocol = "v2";
+        const string inputDelta = "conversation.item.input_audio_transcription.delta";
+        var accumulator = replayOldJournal
+            ? new CodexRealtimeTranscriptAccumulator(protocol, 4_194_304, canonicalLegacySegments: false)
+            : new CodexRealtimeTranscriptAccumulator(protocol);
+        accumulator.Observe(Event($$"""{"type":"{{inputDelta}}","delta":"first"}""") with { Protocol = protocol });
+        accumulator.Observe(Event("""{"type":"input_audio_buffer.speech_started"}""") with { Protocol = protocol });
+        accumulator.Observe(Event($$"""{"type":"{{inputDelta}}","delta":""}""") with { Protocol = protocol });
+        accumulator.Observe(Event($$"""{"type":"{{inputDelta}}","delta":" second"}""") with { Protocol = protocol });
+        accumulator.Observe(Event("""{"type":"response.output_audio_transcript.delta","delta":"answer"}""") with { Protocol = protocol });
+        accumulator.Observe(Event("""{"type":"response.created","response":{"id":"next"}}""") with { Protocol = protocol });
+        accumulator.Observe(Event("""{"type":"response.output_audio_transcript.delta","delta":""}""") with { Protocol = protocol });
+        accumulator.Observe(Event("""{"type":"response.output_audio_transcript.delta","delta":" continued"}""") with { Protocol = protocol });
+        Assert.Equal(replayOldJournal ? new[] { "first", " second", "answer", " continued" } :
+            new[] { "first second", "answer continued" }, accumulator.TakeTail().Select(e => e.Text));
+    }
+
+    [Theory]
+    [InlineData("user", "input_transcript.added")]
+    [InlineData("assistant", "output_transcript.added")]
+    public void V3RepeatedCompletedUtterancesIncludingFinalOnlyRemainDistinct(string role, string delta)
+    {
+        var accumulator = new CodexRealtimeTranscriptAccumulator("v3");
+        for (var i = 0; i < 3; i++)
+        {
+            if (i < 2)
+                accumulator.Observe(Event($$$"""{"type":"{{{delta}}}","item":{"text":"Again"}}""") with { Protocol = "v3" });
+            accumulator.Observe(Event($$$"""{"type":"turn.done","turn":{"role":"{{{role}}}","transcript":"Again."}}""") with { Protocol = "v3" });
+            accumulator.Observe(Event($$$"""{"type":"{{{delta}}}","item":{"text":""}}""") with { Protocol = "v3" });
+        }
+        var tail = accumulator.TakeTail();
+        Assert.Equal(3, tail.Length);
+        Assert.All(tail, e =>
+        {
+            Assert.Equal(role, e.Role);
+            Assert.Equal("Again.", e.Text);
+            Assert.True(e.Final);
+        });
+        Assert.Empty(accumulator.TakeTail());
+    }
+
+    [Fact]
+    public void V1HandoffConsumesOnlyTheCoveredTranscriptAndLeavesTheTail()
+    {
+        var accumulator = new CodexRealtimeTranscriptAccumulator("v1");
+        Assert.Empty(accumulator.TakeTail());
+        accumulator.Observe(Event("""{"type":"conversation.input_transcript.delta","delta":"already handed off"}""") with { Protocol = "v1" });
+        var handoff = accumulator.Observe(Event("""{"type":"conversation.handoff.requested","handoff_id":"handoff_1","item_id":"item_1","input_transcript":"already handed off"}""") with { Protocol = "v1" });
+        Assert.NotNull(handoff);
+        Assert.Equal("handoff_1", handoff.Id);
+        Assert.Equal("already handed off", handoff.InputTranscript);
+        var covered = Assert.Single(handoff.Entries);
+        Assert.Equal("user", covered.Role);
+        Assert.Equal("already handed off", covered.Text);
+        accumulator.Observe(Event("""{"type":"response.output_audio_transcript.delta","delta":"tail"}""") with { Protocol = "v1" });
+        var tail = Assert.Single(accumulator.TakeTail());
+        Assert.Equal("assistant", tail.Role);
+        Assert.Equal("tail", tail.Text);
+        Assert.Empty(accumulator.TakeTail());
+    }
+
+    [Fact]
+    public void RejectedOversizedFinalDoesNotConsumePresentedPrefixAndRetainsOriginalFragment()
+    {
+        var accumulator = new CodexRealtimeTranscriptAccumulator("v3", 300);
+        accumulator.Observe(Event("""{"type":"input_transcript.added","item":{"text":"prefix"}}"""), "prefix");
+        Assert.Equal("prefix", Assert.Single(accumulator.TakePresentationBoundary()).Text);
+        accumulator.Observe(Event("""{"type":"input_transcript.added","item":{"text":"suffix"}}"""), "suffix");
+        var oversized = Event($$$"""{"type":"turn.done","turn":{"role":"user","transcript":"prefixsuffix{{{new string('x', 400)}}}"}}""");
+        Assert.Throws<InvalidOperationException>(() => accumulator.Observe(oversized, "final"));
+        Assert.Equal("suffix", Assert.Single(accumulator.Snapshot()).Text);
+        accumulator.Observe(Event("""{"type":"turn.done","turn":{"role":"user","transcript":"prefixsuffix!"}}"""), "final");
+        var tail = Assert.Single(accumulator.TakeTail());
+        Assert.Equal("suffix!", tail.Text);
+        Assert.True(tail.Final);
+        Assert.Equal("prefixsuffix!", tail.Fragments[^1].Text);
+        Assert.Equal("final", tail.Fragments[^1].ObservationId);
+        Assert.Equal("prefixsuffix!", tail.Fragments[^1].Payload.GetProperty("turn").GetProperty("transcript").GetString());
+    }
+
     [Fact]
     public void StableObservationIdsSurviveReplayAndRejectConflictsWithoutMutatingState()
     {

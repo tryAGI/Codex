@@ -51,6 +51,7 @@ public sealed class CodexRealtimeTranscriptAccumulator
     private readonly string protocol;
     private readonly int maximumActiveBytes;
     private readonly bool canonicalLegacySegments;
+    private readonly bool legacyEmptyDeltaResetsBoundary;
     private bool IndependentSegments => protocol == "v3" || canonicalLegacySegments;
     private readonly List<Entry> entries = [];
     private readonly Dictionary<string, string> receipts = new(StringComparer.Ordinal);
@@ -80,15 +81,18 @@ public sealed class CodexRealtimeTranscriptAccumulator
     /// <param name="protocol">V1, V2 or V3 (lowercase).</param>
     /// <param name="maximumActiveBytes">Hard bound for active text plus raw event payloads.</param>
     public CodexRealtimeTranscriptAccumulator(string protocol, int maximumActiveBytes = 4_194_304)
-        : this(protocol, maximumActiveBytes, canonicalLegacySegments: false) { }
+        : this(protocol, maximumActiveBytes, canonicalLegacySegments: false, legacyEmptyDeltaResetsBoundary: true) { }
 
-    internal CodexRealtimeTranscriptAccumulator(string protocol, int maximumActiveBytes, bool canonicalLegacySegments)
+    // Durable replay retains the original reducer behavior for pre-canonical journals.
+    internal CodexRealtimeTranscriptAccumulator(string protocol, int maximumActiveBytes, bool canonicalLegacySegments,
+        bool legacyEmptyDeltaResetsBoundary = false)
     {
         if (protocol is not ("v1" or "v2" or "v3")) throw new ArgumentException("Unsupported realtime protocol.", nameof(protocol));
         if (maximumActiveBytes is <= 0 or > MaximumHandoffBytes) throw new ArgumentOutOfRangeException(nameof(maximumActiveBytes));
         this.protocol = protocol;
         this.maximumActiveBytes = maximumActiveBytes;
         this.canonicalLegacySegments = canonicalLegacySegments;
+        this.legacyEmptyDeltaResetsBoundary = legacyEmptyDeltaResetsBoundary;
     }
 
     /// <summary>Observes a typed or raw wire event. Returns a handoff snapshot only for a
@@ -163,7 +167,8 @@ public sealed class CodexRealtimeTranscriptAccumulator
             if (end < 0) end = entries.Count;
             if (end == 0) return [];
             var completed = entries.Take(end).ToArray();
-            var flushed = completed.Where(e => e.Role == "user").Select(e => Hash(e.Text.Trim())).ToArray();
+            var flushed = completed.Where(e => e.Role == "user").Select(e => Hash(e.Text.Trim()))
+                .Distinct(StringComparer.Ordinal).ToArray();
             if (flushedUserInputs.Count + flushed.Count(h => !flushedUserInputs.Contains(h)) > MaximumReceipts)
                 throw new InvalidOperationException("Realtime flushed transcript identity capacity exhausted.");
             foreach (var digest in flushed) flushedUserInputs.Add(digest);
@@ -239,17 +244,22 @@ public sealed class CodexRealtimeTranscriptAccumulator
 
         var text = fragment.Text;
         var prefix = forceNew ? "" : presentationPrefixes.GetValueOrDefault(fragment.Role, "");
-        if (fragment.Final && prefix.Length != 0)
+        var settlePrefix = fragment.Final && prefix.Length != 0;
+        if (settlePrefix)
         {
             // A full final can extend, never rewrite, already committed speech.
             text = text.StartsWith(prefix, StringComparison.Ordinal) ? text[prefix.Length..] : "";
-            if (fragment.Role == "user") RememberPresentedUser(prefix +
-                (text.StartsWith(entry?.Text ?? "", StringComparison.Ordinal) ? text : entry?.Text ?? ""));
-            presentationPrefixes.Remove(fragment.Role);
         }
-        if (text.Length == 0 && !fragment.Final) return;
+        if (text.Length == 0 && !fragment.Final)
+        {
+            // Rust resets the legacy wire boundary even for an empty delta.
+            // Canonical presentation segments and V3 keep their independent final boundaries.
+            if (!IndependentSegments && legacyEmptyDeltaResetsBoundary) SetBoundary(fragment.Role, false);
+            return;
+        }
         if (entry is null && text.Length == 0)
         {
+            CommitPresentationFinal();
             SetBoundary(fragment.Role, fragment.Final);
             return;
         }
@@ -265,7 +275,10 @@ public sealed class CodexRealtimeTranscriptAccumulator
             throw new InvalidOperationException("Realtime active transcript capacity exhausted; persist history before accepting more speech.");
 
         var frame = new CodexRealtimeTranscriptFragment(observationId, eventId, fragment.InputFragmentId,
-            fragment.InputStartMs, fragment.InputEndMs, source.ReceivedAfterConnectMs, text, fragment.Final, source.Payload.Clone());
+            fragment.InputStartMs, fragment.InputEndMs, source.ReceivedAfterConnectMs, fragment.Text, fragment.Final, source.Payload.Clone());
+        // Do not consume the prefix on a rejected oversized final. A retry must
+        // reconcile against the same already committed text and original receipt.
+        CommitPresentationFinal();
         if (entry is null)
         {
             entry = new(EntryId(identities), fragment.Role);
@@ -277,6 +290,14 @@ public sealed class CodexRealtimeTranscriptAccumulator
         entry.Bytes += increase;
         activeBytes += increase;
         SetBoundary(fragment.Role, fragment.Final);
+
+        void CommitPresentationFinal()
+        {
+            if (!settlePrefix) return;
+            if (fragment.Role == "user") RememberPresentedUser(prefix +
+                (text.StartsWith(entry?.Text ?? "", StringComparison.Ordinal) ? text : entry?.Text ?? ""));
+            presentationPrefixes.Remove(fragment.Role);
+        }
     }
 
     private void SetBoundary(string role, bool final)
