@@ -104,6 +104,7 @@ public sealed partial class CodexThreadRpc
         private Task? worker;
         private bool stopped;
         private long offered;
+        private long projectedRevision;
         private int position;
 
         internal RealtimeNoticeStream(CodexThreadRpc owner, CodexThreadStore journal, CodexThreadDocument baseline)
@@ -111,8 +112,8 @@ public sealed partial class CodexThreadRpc
             this.owner = owner;
             this.journal = journal;
             threadId = baseline.Id;
-            offered = baseline.Revision;
-            position = CodexThreadStore.ProjectRealtimeItems(baseline, journal).Count;
+            offered = projectedRevision = baseline.Revision;
+            position = CodexThreadStore.ProjectRealtimeTimeline(baseline, journal, baseline.Revision).Count;
         }
 
         internal bool Needs(long revision) { lock (gate) return !stopped && revision > offered; }
@@ -164,11 +165,12 @@ public sealed partial class CodexThreadRpc
 
         private async Task PublishAsync(CodexThreadDocument document)
         {
-            var items = CodexThreadStore.ProjectRealtimeItems(document, journal);
-            if (items.Count < position) throw new InvalidDataException("Realtime timeline prefix was truncated.");
-            foreach (var item in items.Skip(position))
+            var items = CodexThreadStore.ProjectRealtimeTimeline(document, journal, projectedRevision, includeActiveFrames: true);
+            if (items.PrefixCount != position) throw new InvalidDataException("Realtime timeline prefix changed.");
+            foreach (var row in items.Rows)
             {
                 lock (gate) if (stopped) return;
+                var item = row.Materialize();
                 var type = (string?)item["type"];
                 // Rust suppresses these two model-input events on the live app-server lane.
                 if (type is "sessionInputSaved" or "turnInputAccepted") continue;
@@ -180,15 +182,15 @@ public sealed partial class CodexThreadRpc
                 await EmitItemAsync("thread/realtime/item/completed", item).ConfigureAwait(false);
             }
             position = items.Count;
+            projectedRevision = document.Revision;
 
-            var committed = items.Select(item => (string)item["id"]!).ToHashSet(StringComparer.Ordinal);
-            var open = document.RealtimeSessions?.LastOrDefault(s => s.State != "ended");
-            if (open?.History is not { } history) { activeText.Clear(); return; }
-            foreach (var frame in history.Frames.Where(f => !committed.Contains(f.Id)))
+            foreach (var frame in items.ActiveFrames)
             {
                 lock (gate) if (stopped) return;
-                await StreamAsync(CodexThreadStore.ProjectRealtimeFrame(open, frame)).ConfigureAwait(false);
+                await StreamAsync(frame).ConfigureAwait(false);
             }
+            var activeIds = items.ActiveFrames.Select(item => (string)item["id"]!).ToHashSet(StringComparer.Ordinal);
+            foreach (var id in activeText.Keys.Where(id => !activeIds.Contains(id)).ToArray()) activeText.Remove(id);
         }
 
         private async Task StreamAsync(JsonObject item)
@@ -203,14 +205,18 @@ public sealed partial class CodexThreadRpc
                 Transcript(start)["text"] = "";
                 await EmitItemAsync("thread/realtime/item/started", start).ConfigureAwait(false);
             }
-            if (text.StartsWith(previous, StringComparison.Ordinal) && text.Length > previous.Length)
-                await owner.EmitAsync("thread/realtime/item/transcript/delta", new JsonObject
-                {
-                    ["threadId"] = threadId.ToString(), ["itemId"] = id, ["delta"] = text[previous.Length..],
-                }).ConfigureAwait(false);
-            // A legacy upstream revision is represented by the final committed item, never
-            // by manufacturing a destructive or repeated delta.
-            activeText[id] = text;
+            if (text.StartsWith(previous, StringComparison.Ordinal))
+            {
+                if (text.Length > previous.Length)
+                    await owner.EmitAsync("thread/realtime/item/transcript/delta", new JsonObject
+                    {
+                        ["threadId"] = threadId.ToString(), ["itemId"] = id, ["delta"] = text[previous.Length..],
+                    }).ConfigureAwait(false);
+                activeText[id] = text;
+            }
+            else activeText.TryAdd(id, previous);
+            // Keep the last actually emitted prefix on a divergent legacy revision.
+            // Only the completed item can replace that prefix.
         }
 
         private static JsonObject Transcript(JsonObject item)

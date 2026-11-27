@@ -342,7 +342,7 @@ public sealed partial class CodexThreadRpc
         var after = Number(p, "afterPosition", true);
         var required = Number(p, "requiredThroughPosition", true);
         var requestedSnapshot = Number(p, "snapshotEnd", true);
-        var items = CodexThreadStore.ProjectRealtimeItems(thread, store);
+        var items = CodexThreadStore.ProjectRealtimeTimeline(thread, store);
         var snapshot = requestedSnapshot ?? items.Count;
         var cursor = Text(p, "cursor");
         var filterKey = new JsonArray(JsonValue.Create(thread.Id.ToString()), JsonValue.Create(session), JsonValue.Create(eventId),
@@ -360,18 +360,18 @@ public sealed partial class CodexThreadRpc
             snapshot = cursorSnapshot;
         }
         var pending = snapshot > items.Count || required is { } through && through >= items.Count ||
-            eventId is not null && !items.Any(x => x["id"]?.GetValue<string>() == eventId);
+            eventId is not null && !items.Rows.Any(x => x.Id == eventId);
         var coverage = thread.RealtimeSessions is not { Length: > 0 } ? "unsupported" : pending ? "pending" : "ready";
-        var entries = items.Select((item, position) => (Item: item, Position: position))
+        var entries = items.Rows.Select((item, position) => (Item: item, Position: position))
             .Where(x => x.Position < snapshot && (after is null || x.Position > after) &&
-                (session is null || x.Item["realtimeSessionId"]?.GetValue<string>() == session) &&
-                (eventId is null || x.Item["id"]?.GetValue<string>() == eventId) &&
-                (from is null || x.Item["observedAtMs"]?.GetValue<long>() >= from) &&
-                (to is null || x.Item["observedAtMs"]?.GetValue<long>() < to));
-        if (order == "observedAt") entries = entries.OrderBy(x => x.Item["observedAtMs"]?.GetValue<long>() ?? long.MaxValue).ThenBy(x => x.Position);
+                (session is null || x.Item.SessionId == session) &&
+                (eventId is null || x.Item.Id == eventId) &&
+                (from is null || x.Item.ObservedAtMs >= from) &&
+                (to is null || x.Item.ObservedAtMs < to));
+        if (order == "observedAt") entries = entries.OrderBy(x => x.Item.ObservedAtMs ?? long.MaxValue).ThenBy(x => x.Position);
         var page = pending ? [] : entries.Skip(offset).Take(checked((int)limit + 1)).ToArray();
         var data = new JsonArray(page.Take((int)limit).Select(x => (JsonNode?)new JsonObject
-        { ["position"] = x.Position, ["item"] = x.Item.DeepClone() }).ToArray());
+        { ["position"] = x.Position, ["item"] = x.Item.Materialize() }).ToArray());
         var next = page.Length > limit ? $"rt1:{snapshot}:{offset + limit}:{filterHash}" : null;
         return Element(new JsonObject { ["coverage"] = coverage, ["data"] = data,
             ["projectedThroughItemIndex"] = items.Count, ["snapshotEnd"] = snapshot, ["nextCursor"] = next });
