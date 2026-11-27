@@ -9,6 +9,24 @@ namespace tryAGI.Codex;
 /// <param name="Text">Item text.</param>
 public sealed record CodexRealtimeInitialItem(string Role, string Text);
 
+/// <summary>Realtime V2 session mode. V1 and V3 are conversational.</summary>
+public enum CodexRealtimeSessionMode
+{
+    /// <summary>Bidirectional conversation.</summary>
+    Conversational,
+    /// <summary>Input audio transcription without generated responses.</summary>
+    Transcription,
+}
+
+/// <summary>Requested realtime output modality. Text output is supported by V2.</summary>
+public enum CodexRealtimeOutputModality
+{
+    /// <summary>Audio output.</summary>
+    Audio,
+    /// <summary>Text output.</summary>
+    Text,
+}
+
 /// <summary>Settings for a Codex realtime session.</summary>
 /// <param name="Instructions">System instructions for the voice model.</param>
 public sealed record CodexRealtimeSessionOptions(string Instructions)
@@ -30,8 +48,32 @@ public sealed record CodexRealtimeSessionOptions(string Instructions)
     /// <summary>Resolves the explicit voice or the default for the actual transport destination.</summary>
     public string ResolveVoice(bool chatGptCall) => voice ?? CodexProtocolCatalog.GetDefaultVoice(Protocol, chatGptCall);
 
-    /// <summary>Let the voice model speak a short acknowledgement while a client delegation runs.</summary>
-    public bool DelegationAckFiller { get; init; }
+    private bool? delegationAckFiller;
+
+    /// <summary>Let the voice model speak a short acknowledgement while a client delegation runs. Unset reads as false.</summary>
+    public bool DelegationAckFiller { get => delegationAckFiller ?? false; init => delegationAckFiller = value; }
+
+    /// <summary>Optional V3 acknowledgement override. Null omits the field, false disables it explicitly.</summary>
+    public bool? DelegationAckFillerSetting { get => delegationAckFiller; init => delegationAckFiller = value; }
+
+    /// <summary>Conversational (default) or V2 transcription-only session.</summary>
+    public CodexRealtimeSessionMode Mode { get; init; }
+
+    /// <summary>Audio (default) or V2 text output.</summary>
+    public CodexRealtimeOutputModality OutputModality { get; init; }
+
+    /// <summary>Optional client-generated session identity, independent of provider session IDs.</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>Optional voice session identity for the transport header.</summary>
+    public string? VoiceSessionId { get; init; }
+
+    /// <summary>Validates the Rust 8192 estimated-token limit for a separate start or end mode instruction.</summary>
+    public static void ValidateModeInstructions(string? instructions)
+    {
+        if (instructions is not null && CodexRealtimeStartupContext.ApproximateTokens(instructions) > 8192)
+            throw new ArgumentException("Realtime mode instructions exceed 8192 estimated tokens.", nameof(instructions));
+    }
 
     /// <summary>V3 only: choice questions the provider answers when the named session events occur.</summary>
     public IReadOnlyList<CodexLiveDecisionTrigger> LiveDecisionTriggers { get; init; } = [];
@@ -121,7 +163,7 @@ internal static class CodexRealtimeProtocol
     /// Sending this command does not prove acceptance: retain session.updated/error receipts.</summary>
     public static JsonObject SessionUpdate(CodexRealtimeSessionOptions options, bool chatGptCall = true)
     {
-        var session = Session(options, chatGptCall); session.Remove("model");
+        var session = Session(options, chatGptCall); session.Remove("model"); session.Remove("id");
         session.Remove("triggers"); // Startup configuration; sleep/wake updates must not recreate triggers.
         if (options.LiveDecisionDelegationQuestions.Count > 0) session.Remove("delegation"); // Delegation type is fixed at creation.
         if (options.LiveCustomVoiceId is not null) session.Remove("audio"); // Never reset a saved custom voice on sleep/wake.
@@ -170,34 +212,53 @@ internal static class CodexRealtimeProtocol
             text.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '.') ? text : null;
         return new(Safe(error, "event_id") ?? Safe(payload, "event_id"), Safe(error, "code"), Safe(error, "type"), Safe(error, "param"));
     }
+    internal static void ValidateSessionOptions(CodexRealtimeSessionOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options.Instructions);
+        if (options.Protocol is not ("v1" or "v2" or "v3")) throw new ArgumentException("Unsupported realtime protocol.", nameof(options));
+        if (!Enum.IsDefined(options.Mode) || !Enum.IsDefined(options.OutputModality)) throw new ArgumentException("Unsupported session mode or modality.", nameof(options));
+        if (options.Protocol != "v2" && options.Mode != CodexRealtimeSessionMode.Conversational)
+            throw new ArgumentException("Transcription sessions require V2.", nameof(options));
+        if (options.Protocol != "v2" && options.OutputModality != CodexRealtimeOutputModality.Audio)
+            throw new ArgumentException("Text output requires V2.", nameof(options));
+        CodexRealtimeStartupContext.ValidateInitialItems(options.InitialItems);
+        if (options.Protocol != "v3" && options.InitialItems.Count != 0)
+            throw new ArgumentException("Initial items require V3.", nameof(options));
+        foreach (var id in new[] { options.SessionId, options.VoiceSessionId })
+            if (id is not null && (id.Length is < 1 or > 128 || id.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('_' or '-' or '.'))))
+                throw new ArgumentException("Invalid realtime session identity.", nameof(options));
+        if (options.Protocol != "v3" && (options.LiveDecisionTriggers.Count != 0 || options.LiveDecisionDelegationQuestions.Count != 0 || options.LiveCustomVoiceId is not null || options.LiveVoiceDescription is not null))
+            throw new ArgumentException("Live features require explicit V3 capability verification.", nameof(options));
+    }
+
     public static JsonObject Session(CodexRealtimeSessionOptions options, bool chatGptCall = true)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.Instructions);
-        CodexRealtimeStartupContext.ValidateInitialItems(options.InitialItems);
+        ValidateSessionOptions(options);
         // Rust v0.172 keeps separate voice catalogs; select the destination before validating.
         var voice = options.ResolveVoice(chatGptCall);
         var voices = options.Protocol == "v1" ? CodexProtocolCatalog.V1Voices : CodexProtocolCatalog.Voices;
         if (!voices.Contains(voice, StringComparer.Ordinal))
             throw new ArgumentException("Voice is not supported by the selected Codex realtime protocol.", nameof(options));
-        if (options.Protocol != "v3" && (options.LiveDecisionTriggers.Count != 0 || options.LiveDecisionDelegationQuestions.Count != 0 || options.LiveCustomVoiceId is not null || options.LiveVoiceDescription is not null))
-            throw new ArgumentException("Live features require explicit V3 capability verification.");
         if (options.LiveCustomVoiceId is { } voiceId && (!voiceId.StartsWith("voice_", StringComparison.Ordinal) || !CodexLiveFeatures.Identifier(voiceId)) ||
             options.LiveVoiceDescription is { } description && (string.IsNullOrWhiteSpace(description) || description.Length > 4000 || options.LiveCustomVoiceId is null))
             throw new ArgumentException("Use a saved custom voice ID and bounded original description.");
         if (options.Protocol == "v1")
         {
-            if (options.InitialItems.Count != 0) throw new ArgumentException("Initial items require V3.", nameof(options));
-            return new JsonObject { ["type"] = "quicksilver", ["model"] = options.Model, ["instructions"] = options.Instructions,
+            var legacy = new JsonObject { ["type"] = "quicksilver", ["model"] = options.Model, ["instructions"] = options.Instructions,
                 ["audio"] = new JsonObject { ["input"] = new JsonObject { ["format"] = new JsonObject
                 { ["type"] = "audio/pcm", ["rate"] = 24000 } }, ["output"] = new JsonObject { ["voice"] = voice } } };
+            if (options.SessionId is { } id) legacy["id"] = id;
+            return legacy;
         }
         if (options.Protocol != "v3") throw new ArgumentException("AVAS calls support V1/V3; V2 requires a different route.", nameof(options));
         var session = new JsonObject
         {
             ["model"] = options.Model, ["instructions"] = options.Instructions,
             ["audio"] = new JsonObject { ["output"] = new JsonObject { ["voice"] = voice } },
-            ["delegation"] = new JsonObject { ["type"] = "client", ["ack_filler"] = options.DelegationAckFiller },
+            ["delegation"] = new JsonObject { ["type"] = "client" },
         };
+        if (options.DelegationAckFillerSetting is { } ackFiller)
+            ((JsonObject)session["delegation"]!)["ack_filler"] = ackFiller;
         if (options.LiveDecisionTriggers.Count > 0) session["triggers"] = CodexLiveFeatures.Triggers(options.LiveDecisionTriggers);
         if (options.LiveDecisionDelegationQuestions.Count > 0)
             session["delegation"] = new JsonObject { ["type"] = "decisions", ["decisions"] = new JsonObject

@@ -125,6 +125,8 @@ public sealed partial class CodexClient : IDisposable
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
         if (auth.AccountId is { } accountId) request.Headers.Add("ChatGPT-Account-Id", accountId);
         request.Headers.Add("originator", options.Originator);
+        if (session.SessionId is { } id) request.Headers.Add("x-session-id", id);
+        if (session.VoiceSessionId is { } voiceId) request.Headers.Add("voice-session-id", voiceId);
         request.Headers.TryAddWithoutValidation("openai-alpha", session.Protocol == "v1" ? "quicksilver=v1" : "quicksilver=v2");
         // Creation is deliberately not retried: a lost response may still have created a call.
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
