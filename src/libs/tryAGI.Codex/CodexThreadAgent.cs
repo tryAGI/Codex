@@ -354,12 +354,12 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 settings.Model, CodexThreadCompaction.ScopeHash(settings), current.Turns.Length, firstTurnIndex, turnId, currentInput);
         }
 
-        // Independent queued input and realtime/public native-item observations may advance the
-        // revision behind this executor. Model history, settings, owners and receipts remain fenced.
+        // Independent queued input, goal bookkeeping and realtime/public native-item observations
+        // may advance the revision. Model history, settings, owners and dispatch receipts remain fenced.
         private static JsonElement ExecutionSnapshot(CodexThreadDocument document) =>
             CodexThreadStore.Encode(document with
             {
-                RealtimeSessions = null, QueuedSubmissions = null, DetachedCompactionReceipts = null,
+                RealtimeSessions = null, QueuedSubmissions = null, DetachedCompactionReceipts = null, Goal = null,
                 Revision = 1, UpdatedAt = default,
                 Turns = document.Turns.Select(t => t with { NativeBackingArtifacts = null }).ToArray(),
             });
@@ -379,7 +379,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 {
                     var actual = await store.ReadAsync(Current.Id, ct).ConfigureAwait(false);
                     if (actual.RealtimeSessions is null && actual.Turns.All(t => t.NativeBackingArtifacts is null)
-                        && CodexThreadStore.SameQueuedSubmissions(Current, actual) &&
+                        && CodexThreadStore.SameQueuedSubmissions(Current, actual)
+                        && CodexThreadStore.SameGoalSnapshot(Current.Goal, actual.Goal) &&
                         !CodexDetachedCompactionAccounting.Appended(Current, actual) ||
                         !JsonElement.DeepEquals(ExecutionSnapshot(Current), ExecutionSnapshot(actual)))
                         throw;

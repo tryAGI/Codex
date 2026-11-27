@@ -217,6 +217,7 @@ public sealed partial class CodexThreadRpc
         try { snapshot = Turn(completed, "summary"); }
         catch (CodexThreadRpcException) { Interlocked.Increment(ref notificationFailures); snapshot = Turn(completed, "notLoaded"); }
         await EmitAsync("turn/completed", new JsonObject { ["threadId"] = thread.Id.ToString(), ["turn"] = snapshot }).ConfigureAwait(false);
+        await NotifyTerminalGoalUsageAsync(thread, completed).ConfigureAwait(false);
         await NotifyTerminalReadStateAsync(thread, completed.Id).ConfigureAwait(false);
     }
     private void RemoveActive(Guid id, Running running) =>

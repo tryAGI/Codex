@@ -24,6 +24,7 @@ public sealed class ThreadGoalTests
     {
         private readonly Dictionary<Guid, JsonElement> rows = [];
         private readonly object gate = new();
+        internal bool LoseNextAcknowledgment;
 
         public Task<JsonElement?> ReadAsync(Guid id, CancellationToken ct)
         {
@@ -39,6 +40,11 @@ public sealed class ThreadGoalTests
                 long? actual = rows.TryGetValue(id, out var row) ? row.GetProperty("revision").GetInt64() : null;
                 if (actual != revision) return Task.FromResult(false);
                 rows[id] = body.Clone();
+                if (LoseNextAcknowledgment)
+                {
+                    LoseNextAcknowledgment = false;
+                    throw new IOException("Lost goal settlement acknowledgment.");
+                }
                 return Task.FromResult(true);
             }
         }
@@ -52,6 +58,8 @@ public sealed class ThreadGoalTests
         internal List<CodexThreadGoalMutation> Authorizations { get; } = [];
 
         internal Fixture() => Store = new(storage, "account");
+        internal void LoseNextAcknowledgment() => storage.LoseNextAcknowledgment = true;
+        internal CodexThreadStore Reopen() => new(storage, "account");
         internal CodexThreadRpc Host(bool enabled = true, long? max = null, bool allow = true)
         {
             var host = new CodexThreadRpc(Store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
@@ -117,6 +125,114 @@ public sealed class ThreadGoalTests
         Assert.Equal(thread.AccountId, f.Authorizations[^1].AccountId);
         Assert.Equal(thread.Revision, f.Authorizations[^1].ExpectedRevision);
         Assert.Single(f.Events, e => e.Method == "thread/goal/updated");
+    }
+
+    [Fact]
+    public async Task GoalInferenceUsageCommitsWithTheOriginalDispatchAndCountsOnlyUncachedTokens()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work","tokenBudget":10}""");
+        var before = await f.Store.ReadAsync(thread.Id, Ct);
+        var turnId = Guid.NewGuid();
+        var started = await f.Store.StartTurnAsync(thread.Id, before.Revision, turnId, "owner", [], cancellationToken: Ct);
+        var admitted = await f.Store.AdmitAsync(thread.Id, started.Revision, turnId, "owner", "request-1", "inference", Json("{}"), Ct);
+        var binding = Assert.Single(admitted.Thread.Turns[^1].Dispatches).GoalInference!;
+        Assert.Equal(before.Goal!.Id, binding.GoalId);
+        Assert.Equal(thread.Id, binding.OriginThreadId);
+        var terminal = Json("""{"id":"resp_1","status":"completed","usage":{"input_tokens":100,"input_tokens_details":{"cached_tokens":95},"output_tokens":6,"output_tokens_details":{"reasoning_tokens":4},"total_tokens":106}}""");
+        var settled = await f.Store.SettleAsync(thread.Id, admitted.Thread.Revision, turnId, "owner", "request-1", "succeeded", terminal, Ct);
+        Assert.Equal(admitted.Thread.Revision + 1, settled.Revision);
+        Assert.Equal(11, settled.Goal!.TokensUsed);
+        Assert.Equal("budgetLimited", settled.Goal.Status);
+        var receipt = Assert.Single(settled.Goal.UsageReceipts!);
+        Assert.Equal(binding.UsageId, receipt.Id);
+        Assert.Equal(11, receipt.Tokens);
+        Assert.Equal("succeeded", Assert.Single(settled.Turns[^1].Dispatches).State);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            f.Store.SettleAsync(thread.Id, settled.Revision, turnId, "owner", "request-1", "succeeded", terminal, Ct));
+        var cold = await f.Store.ReadAsync(thread.Id, Ct);
+        Assert.Equal(settled.Revision, cold.Revision);
+        Assert.Equal(11, cold.Goal!.TokensUsed);
+
+        var uncharged = await f.Store.AdmitAsync(thread.Id, cold.Revision, turnId, "owner", "request-2", "inference", Json("{}"), Ct);
+        Assert.Null(uncharged.Thread.Turns[^1].Dispatches[^1].GoalInference);
+        var next = await f.Store.SettleAsync(thread.Id, uncharged.Thread.Revision, turnId, "owner", "request-2", "succeeded", terminal, Ct);
+        Assert.Equal(11, next.Goal!.TokensUsed);
+    }
+
+    [Fact]
+    public async Task GoalInferenceLostSettlementAcknowledgmentCannotChargeTwiceAfterRestart()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work","tokenBudget":10}""");
+        var before = await f.Store.ReadAsync(thread.Id, Ct);
+        var turnId = Guid.NewGuid();
+        var started = await f.Store.StartTurnAsync(thread.Id, before.Revision, turnId, "owner", [], cancellationToken: Ct);
+        var admitted = await f.Store.AdmitAsync(thread.Id, started.Revision, turnId, "owner", "lost-ack", "inference", Json("{}"), Ct);
+        var terminal = Json("""{"id":"resp","usage":{"input_tokens":6,"output_tokens":5}}""");
+        f.LoseNextAcknowledgment();
+        await Assert.ThrowsAsync<IOException>(() => f.Store.SettleAsync(thread.Id, admitted.Thread.Revision,
+            turnId, "owner", "lost-ack", "succeeded", terminal, Ct));
+        var cold = f.Reopen();
+        var saved = await cold.ReadAsync(thread.Id, Ct);
+        Assert.Equal("succeeded", Assert.Single(saved.Turns[^1].Dispatches).State);
+        Assert.Equal(11, saved.Goal!.TokensUsed);
+        Assert.Equal("budgetLimited", saved.Goal.Status);
+        Assert.Single(saved.Goal.UsageReceipts!);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => cold.SettleAsync(thread.Id, saved.Revision,
+            turnId, "owner", "lost-ack", "succeeded", terminal, Ct));
+        var recovered = await cold.RecoverInterruptedAsync(thread.Id, saved.Revision, turnId, "owner", Ct);
+        Assert.Equal(11, recovered.Goal!.TokensUsed);
+        Assert.Single(recovered.Goal.UsageReceipts!);
+    }
+
+    [Fact]
+    public async Task GoalInferenceLateResponseDoesNotChargeReplacementGenerationOrInheritedReceipt()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"old"}""");
+        var before = await f.Store.ReadAsync(thread.Id, Ct);
+        var turnId = Guid.NewGuid();
+        var started = await f.Store.StartTurnAsync(thread.Id, before.Revision, turnId, "owner", [], cancellationToken: Ct);
+        var admitted = await f.Store.AdmitAsync(thread.Id, started.Revision, turnId, "owner", "original", "inference", Json("{}"), Ct);
+        var originalGoal = admitted.Thread.Goal!.Id;
+        await host.InvokeAsync("thread/goal/clear", Args(thread.Id), Ct);
+        await Goal(host, thread.Id, """{"objective":"replacement"}""");
+        var replacement = await f.Store.ReadAsync(thread.Id, Ct);
+        Assert.NotEqual(originalGoal, replacement.Goal!.Id);
+        var terminal = Json("""{"id":"resp_1","usage":{"input_tokens":12,"output_tokens":3}}""");
+        var settled = await f.Store.SettleAsync(thread.Id, replacement.Revision, turnId, "owner", "original", "succeeded", terminal, Ct);
+        Assert.Equal(0, settled.Goal!.TokensUsed);
+        var next = await f.Store.AdmitAsync(thread.Id, settled.Revision, turnId, "owner", "inherited", "inference", Json("{}"), Ct);
+        var unknown = await f.Store.SettleAsync(thread.Id, next.Thread.Revision, turnId, "owner", "inherited", "unknown", cancellationToken: Ct);
+        var recovered = await f.Store.RecoverInterruptedAsync(thread.Id, unknown.Revision, turnId, "owner", Ct);
+        var fork = await f.Store.ForkAsync(thread.Id, recovered.Revision, Guid.NewGuid(), cancellationToken: Ct);
+        var child = await f.Store.SettleAsync(fork.Id, fork.Revision, turnId, "owner", "inherited", "succeeded", terminal, Ct);
+        Assert.Equal(0, child.Goal!.TokensUsed);
+        var original = await f.Store.SettleAsync(thread.Id, recovered.Revision, turnId, "owner", "inherited", "succeeded", terminal, Ct);
+        Assert.Equal(15, original.Goal!.TokensUsed);
+        Assert.Equal(0, (await f.Store.ReadAsync(fork.Id, Ct)).Goal!.TokensUsed);
+    }
+
+    [Fact]
+    public async Task GoalInferencePartialUsageAndToolOutputsDoNotInventTokenDeltas()
+    {
+        var f = new Fixture(); var thread = await f.Create(); var host = f.Host();
+        await Goal(host, thread.Id, """{"objective":"work"}""");
+        var before = await f.Store.ReadAsync(thread.Id, Ct);
+        var turnId = Guid.NewGuid();
+        var current = await f.Store.StartTurnAsync(thread.Id, before.Revision, turnId, "owner", [], cancellationToken: Ct);
+        foreach (var (call, kind, evidence) in new[]
+        {
+            ("missing-output", "inference", """{"id":"r1","usage":{"input_tokens":100,"total_tokens":110}}"""),
+            ("tool", "tool", """{"id":"fake","usage":{"input_tokens":1000,"output_tokens":1000}}""")
+        })
+        {
+            var admitted = await f.Store.AdmitAsync(thread.Id, current.Revision, turnId, "owner", call, kind, Json("{}"), Ct);
+            current = await f.Store.SettleAsync(thread.Id, admitted.Thread.Revision, turnId, "owner", call, "succeeded", Json(evidence), Ct);
+        }
+        Assert.Equal(0, current.Goal!.TokensUsed);
+        Assert.Null(current.Goal.UsageReceipts);
     }
 
     [Fact]

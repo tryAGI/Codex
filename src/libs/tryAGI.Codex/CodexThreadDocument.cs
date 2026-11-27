@@ -136,6 +136,9 @@ public sealed record CodexStoredDispatch(
     /// <summary>Correlated accounting-only evidence. Billed unvalidated terminals retain the raw
     /// response; incomplete observations retain the raw event. Neither proves executable output.</summary>
     public CodexStoredInferenceAccounting? AbnormalAccounting { get; init; }
+
+    /// <summary>Original active goal generation captured when inference was admitted.</summary>
+    public CodexGoalInferenceBinding? GoalInference { get; init; }
 }
 
 /// <summary>Result of <see cref="CodexThreadStore.AdmitAsync"/>.</summary>

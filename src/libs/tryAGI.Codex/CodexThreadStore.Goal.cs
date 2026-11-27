@@ -95,12 +95,19 @@ public sealed partial class CodexThreadStore
         elapsedSeconds = Math.Max(0, elapsedSeconds);
         var before = await CurrentAsync(threadId, expectedRevision, cancellationToken).ConfigureAwait(false);
         if (before.Goal is not { } goal || goal.Id != expectedGoalId) return before;
+        var updated = ApplyGoalUsage(goal, usageId, tokenDelta, elapsedSeconds, mode);
+        return ReferenceEquals(goal, updated) ? before : await WriteGoalAsync(before, updated, cancellationToken).ConfigureAwait(false);
+    }
+
+    private CodexStoredThreadGoal ApplyGoalUsage(CodexStoredThreadGoal goal, Guid usageId, long tokenDelta,
+        long elapsedSeconds, CodexGoalAccountingMode mode)
+    {
         var receipts = goal.UsageReceipts ?? [];
         if (receipts.SingleOrDefault(receipt => receipt.Id == usageId) is { } previous)
         {
             if (previous.Tokens != tokenDelta || previous.Seconds != elapsedSeconds || previous.Mode != mode)
                 throw new ArgumentException("Goal usage identity already has different accounting.");
-            return before;
+            return goal;
         }
         var eligible = mode switch
         {
@@ -110,18 +117,17 @@ public sealed partial class CodexThreadStore
             CodexGoalAccountingMode.ActiveOrStopped => goal.Status is "active" or "paused" or "blocked" or "usageLimited" or "budgetLimited",
             _ => false
         };
-        if (!eligible || tokenDelta == 0 && elapsedSeconds == 0) return before;
+        if (!eligible || tokenDelta == 0 && elapsedSeconds == 0) return goal;
         if (receipts.Length >= MaximumGoalUsageReceipts) throw new InvalidOperationException("Goal accounting receipt capacity exhausted.");
         var tokens = checked(goal.TokensUsed + tokenDelta);
         var seconds = checked(goal.TimeUsedSeconds + elapsedSeconds);
         var limited = (goal.Status == "active" || mode == CodexGoalAccountingMode.ActiveOrStopped)
             && goal.TokenBudget is { } budget && tokens >= budget;
-        var updated = goal with
+        return goal with
         {
             TokensUsed = tokens, TimeUsedSeconds = seconds, Status = limited ? "budgetLimited" : goal.Status,
             UpdatedAt = time.GetUtcNow(), UsageReceipts = [.. receipts, new(usageId, tokenDelta, elapsedSeconds, mode)]
         };
-        return await WriteGoalAsync(before, updated, cancellationToken).ConfigureAwait(false);
     }
 
     private Task<CodexThreadDocument> WriteGoalAsync(CodexThreadDocument before, CodexStoredThreadGoal? goal, CancellationToken ct)

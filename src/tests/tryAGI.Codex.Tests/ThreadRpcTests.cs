@@ -116,6 +116,7 @@ public sealed class ThreadRpcTests
                 RequiredRoot(value, method switch
                 {
                     "thread/queue/changed" => "ThreadQueueChangedNotification",
+                    "thread/goal/updated" => "ThreadGoalUpdatedNotification", "thread/goal/cleared" => "ThreadGoalClearedNotification",
                     "thread/archived" => "ThreadArchivedNotification", "thread/unarchived" => "ThreadUnarchivedNotification",
                     "turn/started" => "TurnStartedNotification", "turn/completed" => "TurnCompletedNotification",
                     "item/started" => "ItemStartedNotification", "item/completed" => "ItemCompletedNotification",
@@ -900,6 +901,70 @@ public sealed class ThreadRpcTests
                 && current.QueuedSubmissions is not { Length: > 0 }) return current;
             await Task.Delay(10, deadline.Token);
         }
+    }
+
+    [Fact]
+    public async Task GoalProviderUsageIsCommittedByRealThreadRunnerBeforeTerminalReadState()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work", ["tokenBudget"] = 3
+        }), ct);
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        var final = await WaitForQueueDrain(f, id, 1);
+        Assert.Equal("completed", final.Turns[^1].Status);
+        Assert.Equal(3, final.Goal!.TokensUsed);
+        Assert.Equal("budgetLimited", final.Goal.Status);
+        Assert.Single(final.Goal.UsageReceipts!);
+        var inference = Assert.Single(final.Turns[^1].Dispatches, item => item.Kind == "inference");
+        Assert.Equal(inference.GoalInference!.UsageId, final.Goal.UsageReceipts![0].Id);
+        Assert.Equal(final.Turns[^1].Id.ToString(), final.ReadReceipt!.FirstUnreadTurn);
+        // The terminal notification is delivered by the runner, which may still be unwinding.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(Timeout);
+        while (!f.Events.Any(e => e.Method == "thread/goal/updated" &&
+            e.Params.GetProperty("turnId").ValueKind == JsonValueKind.String))
+            await Task.Delay(10, deadline.Token);
+        var notification = Assert.Single(f.Events, e => e.Method == "thread/goal/updated"
+            && e.Params.GetProperty("turnId").ValueKind == JsonValueKind.String).Params;
+        Assert.Equal(final.Turns[^1].Id.ToString(), notification.GetProperty("turnId").GetString());
+        Assert.Equal(3, notification.GetProperty("goal").GetProperty("tokensUsed").GetInt64());
+        Assert.Equal("budgetLimited", notification.GetProperty("goal").GetProperty("status").GetString());
+        await host.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task GoalProviderUsageSurvivesConcurrentPauseDuringInference()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        host.EnableThreadGoals((_, _) => Task.FromResult(true));
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["objective"] = "work"
+        }), ct);
+        var entered = Signal(); var release = Signal(); var reply = f.Provider.Reply;
+        f.Provider.Reply = async (n, token) =>
+        {
+            entered.TrySetResult(); await release.Task.WaitAsync(token);
+            return await reply(n, token);
+        };
+        await host.InvokeAsync("turn/start", Input(id), ct);
+        await entered.Task.WaitAsync(Timeout, ct);
+        await host.InvokeAsync("thread/goal/set", Args(new JsonObject
+        {
+            ["threadId"] = id.ToString(), ["status"] = "paused"
+        }), ct);
+        release.TrySetResult();
+        var final = await WaitForQueueDrain(f, id, 1);
+        Assert.Equal("completed", final.Turns[^1].Status);
+        Assert.Equal("paused", final.Goal!.Status);
+        Assert.Equal(3, final.Goal.TokensUsed);
+        Assert.Single(f.Provider.Requests);
+        await host.StopAsync(ct);
     }
 
     [Fact]

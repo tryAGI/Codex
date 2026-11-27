@@ -195,7 +195,7 @@ public sealed record CodexObservedUsage
         new(Decimal(Property(window, "used_percent")), Count(window, "window_minutes"),
             Count(window, "reset_at") ?? Count(window, "resets_at"));
 
-    private static CodexObservedTokens? ReadTokens(JsonElement usage) => usage.ValueKind != JsonValueKind.Object ? null : new()
+    internal static CodexObservedTokens? ReadTokens(JsonElement usage) => usage.ValueKind != JsonValueKind.Object ? null : new()
     {
         InputTokens = Count(usage, "input_tokens"),
         CachedInputTokens = Count(usage, "cached_input_tokens") ?? Count(Property(usage, "input_tokens_details"), "cached_tokens") ??

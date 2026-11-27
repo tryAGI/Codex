@@ -153,7 +153,9 @@ public sealed partial class CodexThreadStore
             if (prior.Kind != kind || prior.RequestSha256 != hash) throw new InvalidOperationException("Dispatch identity is already bound to different request bytes.");
             return new(false, before);
         }
-        var turn = active with { Dispatches = [.. active.Dispatches, new(callId, kind, hash, "dispatching")] };
+        var dispatch = new CodexStoredDispatch(callId, kind, hash, "dispatching")
+        { GoalInference = CaptureGoalInference(before, kind) };
+        var turn = active with { Dispatches = [.. active.Dispatches, dispatch] };
         var next = Replace(before, turn) with { Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow() };
         return new(true, await PublishAsync(before.Revision, next, cancellationToken).ConfigureAwait(false));
     }
@@ -172,7 +174,10 @@ public sealed partial class CodexThreadStore
                 throw new InvalidOperationException("An observed terminal dispatch result cannot be replaced.");
             var updated = turn with { Dispatches = turn.Dispatches.Select(d => d.CallId == callId
                 ? d with { State = outcome, Result = result?.Clone() } : d).ToArray() };
-            return PromoteRealtimeArtifacts(Replace(document, updated), turn, updated);
+            var next = Replace(document, updated);
+            if (outcome == "succeeded" && result is { } evidence)
+                next = AccountGoalInference(next, prior, evidence);
+            return PromoteRealtimeArtifacts(next, turn, updated);
         }, cancellationToken);
 
     /// <summary>Completes a turn with its final status and output items.</summary>
@@ -328,6 +333,7 @@ public sealed partial class CodexThreadStore
         ValidateRealtimeSessions(value.RealtimeSessions);
         ValidateRealtimeHistoryProjection(value);
         var turnIds = new HashSet<Guid>(); var callIds = new HashSet<string>(StringComparer.Ordinal); var active = false;
+        var goalInferenceIds = new HashSet<Guid>();
         foreach (var turn in value.Turns)
         {
             if (turn is null || active || turn.Id == Guid.Empty || turn.RootTurnId == Guid.Empty || !turnIds.Add(turn.Id) ||
@@ -351,6 +357,7 @@ public sealed partial class CodexThreadStore
                     receipt.Result is { ValueKind: JsonValueKind.Undefined } ||
                     !active && receipt.State == "dispatching" || turn.Status == "completed" && receipt.State == "unknown")
                     throw new InvalidDataException("Native dispatch history is invalid.");
+                ValidateGoalInference(receipt, goalInferenceIds);
             }
             ValidateNativeBackingArtifacts(turn);
         }

@@ -207,6 +207,6 @@ public sealed partial class CodexThreadStore
             var next = Replace(document, updated);
             CodexNativeMailSampling.Validate(next);
             CodexInferenceRecovery.Validate(updated);
-            return PromoteRealtimeArtifacts(next, turn, updated);
+            return PromoteRealtimeArtifacts(AccountGoalInference(next, receipt, response), turn, updated);
         }, ct);
 }

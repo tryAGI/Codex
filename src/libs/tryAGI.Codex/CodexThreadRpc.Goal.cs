@@ -94,4 +94,19 @@ public sealed partial class CodexThreadRpc
         }).ConfigureAwait(false);
         return Element(new JsonObject { ["goal"] = Goal(id, updated.Goal) });
     }
+
+    private async Task NotifyTerminalGoalUsageAsync(CodexThreadDocument thread, CodexStoredTurn turn)
+    {
+        if (Volatile.Read(ref goalAuthority) is null || thread.Goal is not { UsageReceipts: { Length: > 0 } receipts } goal)
+            return;
+        var accounted = receipts.Select(receipt => receipt.Id).ToHashSet();
+        if (!turn.Dispatches.Any(dispatch => dispatch.GoalInference is { } binding
+            && binding.OriginThreadId == thread.Id && binding.GoalId == goal.Id && accounted.Contains(binding.UsageId)))
+            return;
+        // The result was committed together with the dispatch and is available without another read.
+        await EmitAsync("thread/goal/updated", new JsonObject
+        {
+            ["threadId"] = thread.Id.ToString(), ["turnId"] = turn.Id.ToString(), ["goal"] = Goal(thread.Id, goal)
+        }).ConfigureAwait(false);
+    }
 }
