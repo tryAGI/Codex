@@ -141,7 +141,7 @@ public sealed class CodexAccountSessionsRpc
         return Element(Project(replacement));
     }
 
-    private static void Validate(CodexAccountSessionDirectorySnapshot snapshot)
+    internal static void Validate(CodexAccountSessionDirectorySnapshot snapshot)
     {
         if (!Bounded(snapshot.Revision) || !Bounded(snapshot.SelectionEpoch) || snapshot.Sessions.Count > 256 ||
             snapshot.ActiveSessionId is { } active && !Bounded(active))
