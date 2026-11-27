@@ -236,6 +236,7 @@ public sealed partial class CodexThreadStore
         return await PublishAsync(null, source with { Id = destinationId, Revision = 1, CreatedAt = now, UpdatedAt = now,
             ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected, RealtimeSessions = null, ArchivedAt = null,
             InheritedRealtimeCarryover = ForkRealtimeCarryover(source, count, cutoff is null), CompactionCheckpoint = null,
+            DetachedCompactionReceipts = null,
             ReadReceipt = null, QueuedSubmissions = null, Goal = ForkGoal(source, effectiveSettings ?? source.Settings),
             Attachments = ForkAttachments(source, effectiveSettings ?? source.Settings, now),
             Settings = effectiveSettings?.Clone() ?? source.Settings }, cancellationToken).ConfigureAwait(false);

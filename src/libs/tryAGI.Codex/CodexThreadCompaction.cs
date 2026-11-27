@@ -203,6 +203,8 @@ public static class CodexThreadCompaction
                     if (receipt.Result is { } result) result.WriteTo(writer); else writer.WriteNullValue();
                     CodexNativeMailSampling.WriteReceipt(writer, receipt);
                     CodexInferenceRecovery.WriteReceipt(writer, receipt);
+                    if (receipt.CompactionAccounting is { } accounting)
+                        CodexInferenceAccounting.WriteBinding(writer, accounting);
                     writer.WriteEndObject();
                 }
                 writer.WriteEndArray();
@@ -264,6 +266,8 @@ public static class CodexThreadCompaction
                 if (receipt.Result is { } result) result.WriteTo(writer); else writer.WriteNullValue();
                 CodexNativeMailSampling.WriteReceipt(writer, receipt);
                 CodexInferenceRecovery.WriteReceipt(writer, receipt);
+                if (receipt.CompactionAccounting is { } accounting)
+                    CodexInferenceAccounting.WriteBinding(writer, accounting);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();

@@ -49,7 +49,15 @@ public sealed partial record CodexThreadDocument(
     /// <summary>Optional CAS-installed model-context projection; original turns remain authoritative.</summary>
     public CodexStoredCompactionCheckpoint? CompactionCheckpoint { get; init; }
 
-    void IJsonOnDeserialized.OnDeserialized() => CodexNativeMailSampling.Validate(this);
+    /// <summary>Completed pre-turn and speculative compaction accounting evidence, independent of
+    /// checkpoint adoption. The original thread owns these reservations; forks never inherit them.</summary>
+    public CodexStoredDetachedCompactionReceipt[]? DetachedCompactionReceipts { get; init; }
+
+    void IJsonOnDeserialized.OnDeserialized()
+    {
+        CodexNativeMailSampling.Validate(this);
+        CodexDetachedCompactionAccounting.Validate(this);
+    }
 }
 
 /// <summary>One stored turn.</summary>
@@ -96,6 +104,7 @@ public sealed record CodexStoredTurn(
     {
         CodexRetainedJournalMetadata.Validate(this);
         CodexInferenceRecovery.Validate(this);
+        CodexDetachedCompactionAccounting.ValidateInline(this);
     }
 }
 
@@ -119,6 +128,9 @@ public sealed record CodexStoredDispatch(
 
     /// <summary>Validated normal terminal output for crash recovery, not permission to replay or execute tools.</summary>
     public CodexStoredInferenceCompletion? InferenceCompletion { get; init; }
+
+    /// <summary>Validated inline compaction accounting, never a normal inference output or sampling proof.</summary>
+    public CodexStoredInferenceAccounting? CompactionAccounting { get; init; }
 }
 
 /// <summary>Result of <see cref="CodexThreadStore.AdmitAsync"/>.</summary>

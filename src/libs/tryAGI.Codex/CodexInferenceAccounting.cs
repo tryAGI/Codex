@@ -19,6 +19,10 @@ public sealed record CodexStoredInferenceAccounting(
     [property: JsonRequired] string RequestedModel,
     [property: JsonRequired] string TerminalSha256)
 {
+    /// <summary>Null for ordinary native inference (including legacy receipts), or compaction.
+    /// Compaction's wire turn may refer to a not-yet-admitted or already completed turn.</summary>
+    public string? RequestKind { get; init; }
+
     /// <summary>Calculate the same funding-owner digest when reserving usage. No token is retained.</summary>
     public static string FundingOwnerDigest(CodexCredentials credentials)
     {
@@ -76,7 +80,8 @@ internal static class CodexInferenceAccounting
             CodexRetainedJournalMetadata.ItemHash(terminal));
 
     internal static bool Valid(CodexStoredInferenceAccounting binding, Guid turnId) =>
-        binding.OriginThreadId != Guid.Empty && binding.OriginTurnId == turnId &&
+        binding.OriginThreadId != Guid.Empty && turnId != Guid.Empty && binding.OriginTurnId == turnId &&
+        binding.RequestKind is null or "compaction" &&
         ValidToken(binding.AccountId) && ValidToken(binding.RequestedModel) &&
         ValidHash(binding.AuthOwnerSha256) && ValidHash(binding.TerminalSha256);
 
@@ -94,13 +99,14 @@ internal static class CodexInferenceAccounting
         writer.WriteString("owner_sha256", binding.AuthOwnerSha256);
         writer.WriteString("requested_model", binding.RequestedModel);
         writer.WriteString("terminal_sha256", binding.TerminalSha256);
+        if (binding.RequestKind is { } kind) writer.WriteString("request_kind", kind);
         writer.WriteEndObject();
     }
 }
 
 public sealed partial class CodexThreadStore
 {
-    /// <summary>Explicitly reconcile one validated normal inference on a closed turn of its original
+    /// <summary>Explicitly reconcile one validated normal inference or inline compaction on a closed turn of its original
     /// thread. Only an opt-in atomic host ledger is called, once. No model/tool dispatch, new reservation,
     /// journal write, or automatic retry occurs. Old receipts without binding remain unresolved.
     /// If the host reports an ambiguous result, inspect the original ledger reservation before retrying.</summary>
@@ -116,19 +122,30 @@ public sealed partial class CodexThreadStore
         if (turn.Status == "inProgress")
             throw new InvalidOperationException("Recover or finish the live turn before reconciling its accounting.");
         var receipt = turn.Dispatches.SingleOrDefault(item => item.CallId == requestId);
-        if (receipt is not { Kind: "inference", State: "succeeded", Result: { } terminal,
-            InferenceCompletion: { Accounting: { } binding } completion })
+        if (receipt is not { Kind: "inference", State: "succeeded", Result: { } terminal } ||
+            (receipt.InferenceCompletion?.Accounting ?? receipt.CompactionAccounting) is not { } binding ||
+            CodexRealtimeProtocol.Text(terminal, "id") is not { } responseId)
             return CodexInferenceAccountingOutcome.NoEvidence;
+        return await ReconcileAccountingCoreAsync(thread, turn.Id, requestId, receipt.RequestSha256,
+            responseId, terminal, binding, reconciler, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<CodexInferenceAccountingOutcome> ReconcileAccountingCoreAsync(
+        CodexThreadDocument thread, Guid turnId, string requestId, string requestSha256,
+        string responseId, JsonElement terminal, CodexStoredInferenceAccounting binding,
+        ICodexInferenceAccountingReconciler reconciler, CancellationToken cancellationToken)
+    {
         if (binding.AccountId != thread.AccountId)
             throw new InvalidDataException("Inference accounting belongs to another account.");
         if (binding.OriginThreadId != thread.Id)
             return CodexInferenceAccountingOutcome.InheritedReceipt;
-        if (!CodexInferenceAccounting.Valid(binding, turn.Id) ||
+        if (!CodexInferenceAccounting.Valid(binding, turnId) ||
+            CodexRealtimeProtocol.Text(terminal, "id") != responseId ||
             binding.TerminalSha256 != CodexRetainedJournalMetadata.ItemHash(terminal))
             throw new InvalidDataException("Durable inference accounting evidence is inconsistent.");
         cancellationToken.ThrowIfCancellationRequested();
-        var outcome = await reconciler.ReconcileCompletedAsync(new(binding, requestId, receipt.RequestSha256,
-            completion.ResponseId, terminal.Clone()), cancellationToken).ConfigureAwait(false);
+        var outcome = await reconciler.ReconcileCompletedAsync(new(binding, requestId, requestSha256,
+            responseId, terminal.Clone()), cancellationToken).ConfigureAwait(false);
         return outcome is CodexInferenceAccountingOutcome.Settled or CodexInferenceAccountingOutcome.AlreadySettled or
             CodexInferenceAccountingOutcome.MissingReservation or CodexInferenceAccountingOutcome.Conflict or
             CodexInferenceAccountingOutcome.Unknown ? outcome :

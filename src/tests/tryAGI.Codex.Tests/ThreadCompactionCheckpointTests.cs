@@ -252,6 +252,11 @@ public sealed class ThreadCompactionCheckpointTests
             Assert.Equal("original-opaque", stored.Output[0].GetProperty("encrypted_content").GetString());
             Assert.Equal(3, stored.Dispatches.Count(receipt => receipt.Kind == "inference"));
             Assert.All(stored.Dispatches, receipt => Assert.Equal("succeeded", receipt.State));
+            var compactReceipt = Assert.Single(stored.Dispatches, receipt => receipt.CompactionAccounting is not null);
+            Assert.Equal("compaction", compactReceipt.CompactionAccounting!.RequestKind);
+            Assert.Null(compactReceipt.InferenceCompletion);
+            Assert.Null(compactReceipt.MailSampling);
+            Assert.Equal("compact-response", compactReceipt.Result!.Value.GetProperty("id").GetString());
             var restored = new CodexThreadStore(storage, "account");
             var observed = await restored.ReadAsync(thread.Id, Ct);
             Assert.Equal(turn, observed.CompactionCheckpoint!.ActiveBoundary!.TurnId);
@@ -559,6 +564,10 @@ public sealed class ThreadCompactionCheckpointTests
         Assert.DoesNotContain(continuation, item => CodexRealtimeProtocol.Text(item, "call_id") == "executed");
         Assert.Equal(2, continuation.Count(item => CodexRealtimeProtocol.Text(item, "call_id") == "executed-2"));
         Assert.Equal(4, server.Requests.Count);
+        var accounting = Assert.Single(result.Thread.DetachedCompactionReceipts!);
+        Assert.Equal(checkpoint.ResponseId, accounting.ResponseId);
+        Assert.Equal(turn, accounting.Binding.OriginTurnId);
+        Assert.Equal("compaction", accounting.Binding.RequestKind);
     }
 
     [Fact]
@@ -705,6 +714,173 @@ public sealed class ThreadCompactionCheckpointTests
         Assert.False(scheduler.TrySchedule(store, budget, owner, candidate, _ => throw new InvalidOperationException("Disposed")));
     }
 
+    // The test ledger commits once per original reservation and can fail before
+    // or after its write. Neither reconciliation nor checkpoint adoption re-reserves.
+    private sealed class RecoveryBudget(string failure = "") : ICodexUsageObserver, ICodexInferenceAccountingReconciler
+    {
+        private readonly object gate = new();
+        private readonly Dictionary<string, (string Model, string? Hash, JsonElement? Terminal)> reservations = new(StringComparer.Ordinal);
+        internal int CompactionCommits, Reconciliations, Reservations;
+        public Task ReserveAsync(string id, string model, CancellationToken ct)
+        {
+            lock (gate)
+            {
+                reservations.Add(id, (model, null, null));
+                Reservations++;
+            }
+            return Task.CompletedTask;
+        }
+        public Task PreparedAsync(string id, string model, JsonElement request, CancellationToken ct)
+        {
+            lock (gate) reservations[id] = (model, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+                Encoding.UTF8.GetBytes(request.GetRawText()))), null);
+            return Task.CompletedTask;
+        }
+        public Task CompleteAsync(string id, string model, JsonElement response, CancellationToken ct)
+        {
+            lock (gate)
+            {
+                var compaction = CodexRealtimeProtocol.Text(response, "id")?.StartsWith("compact-response", StringComparison.Ordinal) == true;
+                if (compaction && failure == "before") throw new IOException("Ledger write lost.");
+                var prior = reservations[id];
+                reservations[id] = (prior.Model, prior.Hash, response.Clone());
+                if (compaction) CompactionCommits++;
+                if (compaction && failure == "after") throw new IOException("Ledger acknowledgement lost.");
+            }
+            return Task.CompletedTask;
+        }
+        public Task IncompleteAsync(string id, string model, CancellationToken ct) => Task.CompletedTask;
+        public Task<CodexInferenceAccountingOutcome> ReconcileCompletedAsync(CodexInferenceAccountingReceipt receipt, CancellationToken ct)
+        {
+            lock (gate)
+            {
+                Reconciliations++;
+                if (!reservations.TryGetValue(receipt.RequestId, out var prior))
+                    return Task.FromResult(CodexInferenceAccountingOutcome.MissingReservation);
+                if (prior.Model != receipt.Binding.RequestedModel || prior.Hash != receipt.RequestSha256 ||
+                    receipt.Binding.RequestKind != "compaction" ||
+                    receipt.Binding.AuthOwnerSha256 != CodexStoredInferenceAccounting.FundingOwnerDigest(new CodexCredentials("test", "account")) ||
+                    receipt.Binding.TerminalSha256 != CodexRetainedJournalMetadata.ItemHash(receipt.Terminal))
+                    return Task.FromResult(CodexInferenceAccountingOutcome.Conflict);
+                if (prior.Terminal is { } terminal)
+                    return Task.FromResult(JsonElement.DeepEquals(terminal, receipt.Terminal)
+                        ? CodexInferenceAccountingOutcome.AlreadySettled : CodexInferenceAccountingOutcome.Conflict);
+                reservations[receipt.RequestId] = (prior.Model, prior.Hash, receipt.Terminal.Clone());
+                CompactionCommits++;
+                return Task.FromResult(CodexInferenceAccountingOutcome.Settled);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false, "before")]
+    [InlineData(false, "after")]
+    [InlineData(true, "before")]
+    [InlineData(true, "after")]
+    public async Task CompactionAccountingSurvivesLedgerFailureBeforeCheckpointInstallation(bool inline, string failure)
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        if (!inline) thread = await CloseTurn(store, thread);
+        var budget = new RecoveryBudget(failure);
+        var server = new Server(midTurn: inline);
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage));
+        var turn = Guid.NewGuid();
+        var settings = Settings(thread.Id, turn) with
+        {
+            Tools = [Json("""{"type":"function","name":"read","parameters":{"type":"object","properties":{}}}""")],
+            AutomaticCompaction = new() { TokenThreshold = 1 },
+        };
+        var effects = 0;
+        await Assert.ThrowsAsync<IOException>(() => agent.RunAsync(thread.Id, thread.Revision, turn, "owner", settings,
+            [User("new")], (_, _) => { effects++; return Task.FromResult(new CodexToolOutput("receipt")); }, cancellationToken: Ct));
+        var restarted = new CodexThreadStore(storage, "account");
+        var loaded = await restarted.ReadAsync(thread.Id, Ct);
+        Assert.Null(loaded.CompactionCheckpoint);
+        Assert.Equal(inline ? 2 : 1, server.Requests.Count);
+        Assert.Equal(inline ? 1 : 0, effects);
+        var reservations = budget.Reservations;
+        var writes = storage.Writes;
+        Task<CodexInferenceAccountingOutcome> Reconcile()
+        {
+            if (inline)
+            {
+                var receipt = Assert.Single(loaded.Turns[^1].Dispatches, item => item.CompactionAccounting is not null);
+                Assert.Null(receipt.InferenceCompletion);
+                Assert.Null(receipt.MailSampling);
+                return restarted.ReconcileInferenceAccountingAsync(loaded.Id, loaded.Revision, turn, receipt.CallId, budget, Ct);
+            }
+            var detached = Assert.Single(loaded.DetachedCompactionReceipts!);
+            Assert.Equal(turn, detached.Binding.OriginTurnId);
+            Assert.DoesNotContain(loaded.Turns, item => item.Id == turn);
+            return restarted.ReconcileDetachedCompactionAccountingAsync(loaded.Id, loaded.Revision, detached.RequestId, budget, Ct);
+        }
+        Assert.Equal(failure == "before" ? CodexInferenceAccountingOutcome.Settled : CodexInferenceAccountingOutcome.AlreadySettled,
+            await Reconcile());
+        Assert.Equal(CodexInferenceAccountingOutcome.AlreadySettled, await Reconcile());
+        Assert.Equal(1, budget.CompactionCommits);
+        Assert.Equal(2, budget.Reconciliations);
+        Assert.Equal(reservations, budget.Reservations);
+        Assert.Equal(writes, storage.Writes);
+        Assert.Equal(inline ? 2 : 1, server.Requests.Count);
+        var fork = await restarted.ForkAsync(loaded.Id, loaded.Revision, Guid.NewGuid(), cancellationToken: Ct);
+        Assert.Null(fork.DetachedCompactionReceipts);
+        if (inline)
+        {
+            var receipt = Assert.Single(loaded.Turns[^1].Dispatches, item => item.CompactionAccounting is not null);
+            Assert.Equal(CodexInferenceAccountingOutcome.InheritedReceipt,
+                await restarted.ReconcileInferenceAccountingAsync(fork.Id, fork.Revision, turn, receipt.CallId, budget, Ct));
+        }
+        else
+        {
+            var receipt = Assert.Single(loaded.DetachedCompactionReceipts!);
+            Assert.Equal(CodexInferenceAccountingOutcome.NoEvidence,
+                await restarted.ReconcileDetachedCompactionAccountingAsync(fork.Id, fork.Revision, receipt.RequestId, budget, Ct));
+        }
+        Assert.Equal(2, budget.Reconciliations);
+    }
+
+    [Fact]
+    public async Task DiscardedBackgroundCheckpointStillHasIndependentAccountingReceipt()
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var budget = new RecoveryBudget();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var server = new Server { CompactionEntered = entered, ReleaseCompaction = release };
+        await using var scheduler = new CodexThreadCompactionScheduler();
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage))
+        { BackgroundCompactions = scheduler };
+        var turn = Guid.NewGuid();
+        var settings = Settings(thread.Id, turn) with
+        {
+            AutomaticCompaction = new() { TokenThreshold = 256, BackgroundTokenThreshold = 1 },
+        };
+        var completed = await agent.RunAsync(thread.Id, thread.Revision, turn, "owner", settings, [User("first")],
+            (_, _) => throw new InvalidOperationException("No tools"), cancellationToken: Ct);
+        await entered.Task.WaitAsync(Ct);
+        await store.UpdateSettingsAsync(thread.Id, completed.Thread.Revision, Json("""{"model":"changed"}"""), Ct);
+        release.TrySetResult();
+        await scheduler.WaitForPendingAsync(thread.Id, Ct);
+        var restarted = new CodexThreadStore(storage, "account");
+        var loaded = await restarted.ReadAsync(thread.Id, Ct);
+        Assert.Null(loaded.CompactionCheckpoint);
+        var receipt = Assert.Single(loaded.DetachedCompactionReceipts!);
+        Assert.Equal("compact-response", receipt.ResponseId);
+        Assert.Null(await scheduler.TakeAsync(store, budget, new("account", null, false), loaded, settings, true, Ct));
+        Assert.Equal(1, scheduler.Discarded);
+        Assert.Equal(1, budget.CompactionCommits);
+        Assert.Equal(CodexInferenceAccountingOutcome.AlreadySettled,
+            await restarted.ReconcileDetachedCompactionAccountingAsync(loaded.Id, loaded.Revision, receipt.RequestId, budget, Ct));
+        Assert.Equal(2, server.Requests.Count);
+        Assert.Equal(2, budget.Reservations);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -738,6 +914,9 @@ public sealed class ThreadCompactionCheckpointTests
             Assert.Equal("compact-response", result.Thread.CompactionCheckpoint!.ResponseId);
             Assert.Equal(2, result.Thread.Turns.Length);
             Assert.Equal("original-opaque", result.Thread.Turns[0].Output[0].GetProperty("encrypted_content").GetString());
+            var accounting = Assert.Single(result.Thread.DetachedCompactionReceipts!);
+            Assert.Equal("compact-response", accounting.ResponseId);
+            Assert.Equal(turn, accounting.Binding.OriginTurnId);
         }
     }
 }

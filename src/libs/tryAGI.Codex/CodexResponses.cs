@@ -255,7 +255,7 @@ public sealed partial class CodexClient
                 var nativeObserver = usageObserver as ICodexValidatedResponseObserver;
                 try
                 {
-                    if (nativeObserver is not null && settings.RequestKind == "turn" &&
+                    if (nativeObserver is not null && settings.RequestKind is ("turn" or "compaction") &&
                         type == "response.completed" && !interruptedTerminal &&
                         interruption?.InterruptSent != true && !cancellationToken.IsCancellationRequested)
                     {

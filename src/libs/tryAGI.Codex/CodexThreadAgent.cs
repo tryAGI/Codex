@@ -131,6 +131,13 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                     if (CodexThreadCompactionScheduler.AuthOwner.From(await guard.GetCredentialsAsync(cancellationToken)
                         .ConfigureAwait(false)) != authOwner)
                         throw new CodexProtocolException("Background compaction auth owner changed; adoption refused.");
+                    var latest = await store.ReadAsync(before.Id, cancellationToken).ConfigureAwait(false);
+                    if (latest.Revision != before.Revision)
+                    {
+                        if (!CodexDetachedCompactionAccounting.OnlyReceiptsAppended(before, latest))
+                            throw new CodexThreadConflictException();
+                        before = latest;
+                    }
                     before = await store.InstallBackgroundCompactionAsync(ready.Candidate, ready.Result, options,
                         before.Revision, compaction.Retention, cancellationToken).ConfigureAwait(false);
                     expectedRevision = before.Revision;
@@ -140,13 +147,19 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             if (!adopted && hardThresholdReached)
             {
                 // Account and budget admission remain mandatory even for discarded compaction attempts.
-                using var compactor = clientFactory is null ? new CodexClient(guard, endpoints, usageObserver: budget)
-                    : clientFactory(guard, budget);
-                if (!compactor.IsBoundTo(guard, budget)) throw new InvalidOperationException("Compaction client must retain account and budget guards.");
+                var accounting = new CodexDetachedCompactionObserver(store, budget, candidate, authOwner);
+                using var compactor = clientFactory is null ? new CodexClient(guard, endpoints, usageObserver: accounting)
+                    : clientFactory(guard, accounting);
+                if (!compactor.IsBoundTo(guard, accounting)) throw new InvalidOperationException("Compaction client must retain account and budget guards.");
                 var result = await compactor.CompactAsync(options with { RequiredFirstFunction = null }, candidate.History,
                     cancellationToken, observeDiagnostics, candidate.ExecutedCallIds).ConfigureAwait(false);
                 await guard.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
-                before = await store.InstallCompactionAsync(candidate, result, compaction.Retention, cancellationToken).ConfigureAwait(false);
+                var latest = await store.ReadAsync(before.Id, cancellationToken).ConfigureAwait(false);
+                if (latest.Revision != before.Revision &&
+                    !CodexDetachedCompactionAccounting.OnlyReceiptsAppended(before, latest))
+                    throw new CodexThreadConflictException();
+                before = await store.InstallBackgroundCompactionAsync(candidate, result, options,
+                    latest.Revision, compaction.Retention, cancellationToken).ConfigureAwait(false);
                 expectedRevision = before.Revision;
             }
         }
@@ -263,9 +276,10 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         {
             var guard = new AccountCredentials(credentials, candidate.AccountId, owner);
             await guard.GetCredentialsAsync(ct).ConfigureAwait(false);
-            using var compactor = clientFactory is null ? new CodexClient(guard, endpoints, usageObserver: budget)
-                : clientFactory(guard, budget);
-            if (!compactor.IsBoundTo(guard, budget))
+            var accounting = new CodexDetachedCompactionObserver(store, budget, candidate, owner);
+            using var compactor = clientFactory is null ? new CodexClient(guard, endpoints, usageObserver: accounting)
+                : clientFactory(guard, accounting);
+            if (!compactor.IsBoundTo(guard, accounting))
                 throw new InvalidOperationException("Background compaction must retain account and budget guards.");
             var result = await compactor.CompactAsync(snapshot, candidate.History, ct,
                 previouslyExecutedCallIds: candidate.ExecutedCallIds).ConfigureAwait(false);
@@ -314,6 +328,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private IReadOnlyList<JsonElement>? preparedMailInput;
         private readonly Dictionary<string, CodexStoredMailSampling> observedMailSampling = new(StringComparer.Ordinal);
         private readonly Dictionary<string, CodexStoredInferenceCompletion> observedInferenceCompletions = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, CodexStoredInferenceAccounting> observedInlineCompaction = new(StringComparer.Ordinal);
         internal CodexContextWindowStatus? ContextWindow { get; private set; }
         private readonly SemaphoreSlim gate = new(1, 1);
         private readonly ConcurrentDictionary<string, JsonElement> observed = new(StringComparer.Ordinal);
@@ -343,7 +358,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private static JsonElement ExecutionSnapshot(CodexThreadDocument document) =>
             CodexThreadStore.Encode(document with
             {
-                RealtimeSessions = null, QueuedSubmissions = null, Revision = 1, UpdatedAt = default,
+                RealtimeSessions = null, QueuedSubmissions = null, DetachedCompactionReceipts = null,
+                Revision = 1, UpdatedAt = default,
                 Turns = document.Turns.Select(t => t with { NativeBackingArtifacts = null }).ToArray(),
             });
 
@@ -362,7 +378,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 {
                     var actual = await store.ReadAsync(Current.Id, ct).ConfigureAwait(false);
                     if (actual.RealtimeSessions is null && actual.Turns.All(t => t.NativeBackingArtifacts is null)
-                        && CodexThreadStore.SameQueuedSubmissions(Current, actual) ||
+                        && CodexThreadStore.SameQueuedSubmissions(Current, actual) &&
+                        !CodexDetachedCompactionAccounting.Appended(Current, actual) ||
                         !JsonElement.DeepEquals(ExecutionSnapshot(Current), ExecutionSnapshot(actual)))
                         throw;
                     Current = actual;
@@ -572,8 +589,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                     {
                         try
                         {
-                            Current = await store.InstallActiveBackgroundCompactionAsync(ready.Candidate, ready.Result,
-                                settings, Current.Revision, turnId, owner, backgroundPolicy.Retention, ct).ConfigureAwait(false);
+                            Current = await JournalAsync(doc => store.InstallActiveBackgroundCompactionAsync(ready.Candidate, ready.Result,
+                                settings, doc.Revision, turnId, owner, backgroundPolicy.Retention, ct), ct).ConfigureAwait(false);
                             changedWireProjection = true;
                             contextObservation = null;
                             preparedWireHistory = Array.AsReadOnly(CodexThreadCompaction.Project(Current,
@@ -711,7 +728,12 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             // neither a failed observer nor a missing output append permits replay.
             try
             {
-                await CaptureInferenceCompletionAsync(id, settings, responseId, response, output, ct).ConfigureAwait(false);
+                if (settings.RequestKind == "compaction" && inlineCandidate is not null &&
+                    inlineCallId == id && projection is null && CodexRealtimeProtocol.Text(response, "id") == responseId)
+                    observedInlineCompaction.Add(id, CodexInferenceAccounting.Capture(Current, turnId, authOwner, settings.Model, response)
+                        with { RequestKind = "compaction" });
+                else
+                    await CaptureInferenceCompletionAsync(id, settings, responseId, response, output, ct).ConfigureAwait(false);
                 await SettleAsync(id, false, ct).ConfigureAwait(false);
             }
             finally { await budget.CompleteAsync(id, settings.Model, response, ct).ConfigureAwait(false); }
@@ -755,6 +777,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 if (known && observedInferenceCompletions.TryGetValue(id, out var completion))
                     await JournalAsync(doc => store.SettleValidatedInferenceAsync(doc.Id, doc.Revision, turnId,
                         owner, id, result, completion, observedMailSampling.GetValueOrDefault(id), ct), ct).ConfigureAwait(false);
+                else if (known && observedInlineCompaction.TryGetValue(id, out var compaction))
+                    await JournalAsync(doc => store.SettleInlineCompactionAccountingAsync(doc.Id, doc.Revision,
+                        turnId, owner, id, result, compaction, ct), ct).ConfigureAwait(false);
                 else
                     await JournalAsync(doc => store.SettleAsync(doc.Id, doc.Revision, turnId, owner, id,
                         known ? "succeeded" : notDispatched ? "failed" : "unknown",
