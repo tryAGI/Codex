@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   parity-release-readiness:
-    name: Check GPT Live Rust parity release readiness
+    name: Check combined global and Realtime Rust parity release readiness
     runs-on: ubuntu-latest
     outputs:
       ready: ${{ steps.parity.outputs.ready }}
@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
       - id: parity
         run: |
-          python3 -B scripts/realtime-parity.py report > parity-report.json
+          python3 -B scripts/global-parity.py report > parity-report.json
           python3 -B -c 'import json; print("ready=" + str(json.load(open("parity-report.json"))["releaseReady"]).lower())' >> "$GITHUB_OUTPUT"
 
   build-test-publish:
