@@ -163,7 +163,8 @@ public sealed partial class CodexThreadRpc
     private JsonObject Thread(CodexThreadDocument thread, bool includeTurns) => new()
     {
         ["id"] = thread.Id.ToString(), ["sessionId"] = Text(thread.Settings, "nativeSessionId") ?? thread.Id.ToString(), ["forkedFromId"] = thread.ForkedFromId?.ToString(),
-        ["preview"] = Preview(thread), ["name"] = thread.Name, ["ephemeral"] = Flag(thread.Settings, "ephemeral"), ["projectId"] = null,
+        ["preview"] = Preview(thread), ["name"] = thread.Name, ["gitInfo"] = GitInfo(thread.GitInfo),
+        ["daybreakEnabled"] = thread.DaybreakEnabled, ["ephemeral"] = Flag(thread.Settings, "ephemeral"), ["projectId"] = null,
         ["modelProvider"] = Text(thread.Settings, "modelProvider"), ["model"] = Text(thread.Settings, "model"),
         ["reasoningEffort"] = Text(thread.Settings, "effort"), ["createdAt"] = thread.CreatedAt.ToUnixTimeSeconds(),
         ["updatedAt"] = thread.UpdatedAt.ToUnixTimeSeconds(), ["cwd"] = Text(thread.Settings, "cwd"),

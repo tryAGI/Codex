@@ -865,6 +865,58 @@ public sealed class ThreadRpcTests
     }
 
     [Fact]
+    public async Task GitMetadataPatchesPreserveOmittedFieldsAndClearExplicitNulls()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var f = new Fixture(); var host = f.Host(); var id = await Create(host);
+        JsonElement Patch(string json, bool? preference = null)
+        {
+            var p = new JsonObject { ["threadId"] = id.ToString(), ["gitInfo"] = JsonNode.Parse(json) };
+            if (preference is not null) p["daybreakEnabled"] = preference;
+            return Args(p);
+        }
+        var updated = await host.InvokeAsync("thread/metadata/update",
+            Patch("""{"sha":" abc ","branch":"main","originUrl":"https://alice:synthetic-secret@example.invalid/org/a%2Fb.git"}""", true), ct);
+        var first = updated.GetProperty("thread");
+        Assert.Equal("abc", first.GetProperty("gitInfo").GetProperty("sha").GetString());
+        Assert.Equal("https://example.invalid/org/a%2Fb.git", first.GetProperty("gitInfo").GetProperty("originUrl").GetString());
+        Assert.DoesNotContain("synthetic-secret", f.Storage.Rows[id].GetRawText(), StringComparison.Ordinal);
+
+        var cold = f.Host();
+        var patched = await cold.InvokeAsync("thread/metadata/update", Patch("""{"branch":null}"""), ct);
+        var git = patched.GetProperty("thread").GetProperty("gitInfo");
+        Assert.Equal(JsonValueKind.Null, git.GetProperty("branch").ValueKind);
+        Assert.Equal("abc", git.GetProperty("sha").GetString());
+        Assert.True(patched.GetProperty("thread").GetProperty("daybreakEnabled").GetBoolean());
+        var before = await f.Store.ReadAsync(id, ct);
+        foreach (var invalid in new[] { "{}", """{"sha":" "}""", """{"originUrl":"https://user:synthetic-secret@[invalid"}""",
+            """{"originUrl":"ext::sshpass -p synthetic-secret host"}""", """{"sha":42}""" })
+        {
+            var error = await Assert.ThrowsAsync<CodexThreadRpcException>(() => cold.InvokeAsync("thread/metadata/update", Patch(invalid), ct));
+            Assert.Equal(-32602, error.Code);
+            Assert.DoesNotContain("synthetic-secret", error.Message, StringComparison.Ordinal);
+        }
+        Assert.Equal(before.Revision, (await f.Store.ReadAsync(id, ct)).Revision);
+        var cleared = await cold.InvokeAsync("thread/metadata/update", Patch("""{"sha":null,"originUrl":null}""", false), ct);
+        Assert.Equal(JsonValueKind.Null, cleared.GetProperty("thread").GetProperty("gitInfo").ValueKind);
+        Assert.False(cleared.GetProperty("thread").GetProperty("daybreakEnabled").GetBoolean());
+        Assert.Empty(f.Provider.Requests);
+    }
+
+    [Theory]
+    [InlineData("https://secret-token@github.com/org/repo.git", "https://github.com/org/repo.git")]
+    [InlineData("https://alice%40example.com:secret%3Atoken@github.com/org/repo.git", "https://github.com/org/repo.git")]
+    [InlineData("file://alice:secret@localhost/repo.git", "file://localhost/repo.git")]
+    [InlineData("ssh://git:secret@github.com/org/repo.git", "ssh://git@github.com/org/repo.git")]
+    [InlineData("alice@[2001:db8::1]:dir name/repo", "[2001:db8::1]:dir name/repo")]
+    [InlineData("git@github.com:org/repo.git", "git@github.com:org/repo.git")]
+    [InlineData("hg::https://alice:secret@example.invalid/org/a%2Fb.git", "hg::https://example.invalid/org/a%2Fb.git")]
+    [InlineData("ssh://user:synthetic?value@example.com/org/repo", "ssh://example.com/org/repo")]
+    [InlineData("https://example.com?@github.com/a/b", "https://example.com?@github.com/a/b")]
+    public void GitMetadataRemovesCredentialsWithoutRewritingPaths(string input, string expected)
+        => Assert.Equal(expected, new CodexStoredGitInfo { OriginUrl = input }.OriginUrl);
+
+    [Fact]
     public async Task ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks()
     {
         var ct = TestContext.Current.CancellationToken;
