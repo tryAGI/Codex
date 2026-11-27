@@ -456,7 +456,10 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 var receipt = Turn.Dispatches.SingleOrDefault(item => item.CallId == requestId);
                 if (receipt is not { Kind: "inference", State: "dispatching", MailSampling: null, InferenceCompletion: null } ||
                     Turn.Output.Length != preparedInferenceOutputCount) return;
-                observedInferenceCompletions.Add(requestId, CodexInferenceRecovery.Capture(Turn, responseId, response, output));
+                observedInferenceCompletions.Add(requestId, CodexInferenceRecovery.Capture(Turn, responseId, response, output) with
+                {
+                    Accounting = CodexInferenceAccounting.Capture(Current, turnId, authOwner, settings.Model, response),
+                });
                 if (!allowMailSampling || preparedMailInput is not { } input ||
                     CodexRealtimeProtocol.Text(response, "model") is { } model && model != settings.Model) return;
                 var metadata = new List<JsonElement?>();

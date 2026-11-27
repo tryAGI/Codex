@@ -1,0 +1,137 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace tryAGI.Codex;
+
+/// <summary>Original funding and model binding of a validated native inference receipt.
+/// Never copied to the provider or interpreted as evidence that the ledger committed.</summary>
+/// <param name="OriginThreadId">Original thread, not a fork inheriting the receipt.</param>
+/// <param name="OriginTurnId">Original native turn.</param>
+/// <param name="AccountId">Original account owning the reservation.</param>
+/// <param name="AuthOwnerSha256">Funding account/user/restriction digest.</param>
+/// <param name="RequestedModel">Model used to reserve and settle usage, not the reported provider alias.</param>
+/// <param name="TerminalSha256">Canonical digest of the exact stored provider terminal.</param>
+public sealed record CodexStoredInferenceAccounting(
+    [property: JsonRequired] Guid OriginThreadId,
+    [property: JsonRequired] Guid OriginTurnId,
+    [property: JsonRequired] string AccountId,
+    [property: JsonRequired] string AuthOwnerSha256,
+    [property: JsonRequired] string RequestedModel,
+    [property: JsonRequired] string TerminalSha256)
+{
+    /// <summary>Calculate the same funding-owner digest when reserving usage. No token is retained.</summary>
+    public static string FundingOwnerDigest(CodexCredentials credentials)
+    {
+        ArgumentNullException.ThrowIfNull(credentials);
+        return CodexContextWindow.AuthHash(CodexThreadCompactionScheduler.AuthOwner.From(credentials));
+    }
+}
+
+/// <summary>Immutable, private reconciliation evidence. The host must verify the original
+/// reservation, not allocate a new one. Do not log or retain terminal output unnecessarily.</summary>
+/// <param name="Binding">Original funding, model, turn and terminal correlation.</param>
+/// <param name="RequestId">Original host reservation identifier, not provider response ID.</param>
+/// <param name="RequestSha256">Digest of the originally admitted request.</param>
+/// <param name="ResponseId">Provider response identity.</param>
+/// <param name="Terminal">Exact durable provider terminal, not a reconstructed usage estimate.</param>
+public sealed record CodexInferenceAccountingReceipt(CodexStoredInferenceAccounting Binding,
+    string RequestId, string RequestSha256, string ResponseId, JsonElement Terminal);
+
+/// <summary>Outcome of an explicit host-ledger reconciliation.</summary>
+public enum CodexInferenceAccountingOutcome
+{
+    /// <summary>No validated durable receipt with original reservation provenance is available.</summary>
+    NoEvidence,
+    /// <summary>The receipt belongs to the source of a fork; reconcile the source instead.</summary>
+    InheritedReceipt,
+    /// <summary>The matching existing reservation was atomically completed.</summary>
+    Settled,
+    /// <summary>The exact matching completion was already committed.</summary>
+    AlreadySettled,
+    /// <summary>No matching reservation exists; do not create one during recovery.</summary>
+    MissingReservation,
+    /// <summary>The stored reservation or completion conflicts with the evidence.</summary>
+    Conflict,
+    /// <summary>The external result is not proven; no automatic retry is permitted.</summary>
+    Unknown,
+}
+
+/// <summary>Opt-in host ledger reconciliation. Implementations must atomically compare the existing
+/// reservation and any settled receipt against the supplied identities, funding owner, requested model,
+/// request digest and terminal digest. Concurrent calls for the same reservation must be idempotent.
+/// Never reserve again, invoke the provider, estimate missing usage, or replace conflicting evidence.
+/// An ordinary ICodexUsageObserver is deliberately not sufficient for this contract.</summary>
+public interface ICodexInferenceAccountingReconciler
+{
+    /// <summary>Reconcile only the existing original reservation; return Unknown if its outcome cannot be proven.</summary>
+    Task<CodexInferenceAccountingOutcome> ReconcileCompletedAsync(CodexInferenceAccountingReceipt receipt,
+        CancellationToken cancellationToken);
+}
+
+internal static class CodexInferenceAccounting
+{
+    internal static CodexStoredInferenceAccounting Capture(CodexThreadDocument thread, Guid turnId,
+        CodexThreadCompactionScheduler.AuthOwner owner, string model, JsonElement terminal)
+        => new(thread.Id, turnId, owner.AccountId, CodexContextWindow.AuthHash(owner), model,
+            CodexRetainedJournalMetadata.ItemHash(terminal));
+
+    internal static bool Valid(CodexStoredInferenceAccounting binding, Guid turnId) =>
+        binding.OriginThreadId != Guid.Empty && binding.OriginTurnId == turnId &&
+        ValidToken(binding.AccountId) && ValidToken(binding.RequestedModel) &&
+        ValidHash(binding.AuthOwnerSha256) && ValidHash(binding.TerminalSha256);
+
+    private static bool ValidToken(string? value) => value is { Length: > 0 and <= 512 } &&
+        !string.IsNullOrWhiteSpace(value) && !value.Any(char.IsControl);
+
+    private static bool ValidHash(string? value) => value is { Length: 64 } && value.All(Uri.IsHexDigit);
+
+    internal static void WriteBinding(Utf8JsonWriter writer, CodexStoredInferenceAccounting binding)
+    {
+        writer.WriteStartObject("accounting");
+        writer.WriteString("origin_thread", binding.OriginThreadId);
+        writer.WriteString("origin_turn", binding.OriginTurnId);
+        writer.WriteString("account", binding.AccountId);
+        writer.WriteString("owner_sha256", binding.AuthOwnerSha256);
+        writer.WriteString("requested_model", binding.RequestedModel);
+        writer.WriteString("terminal_sha256", binding.TerminalSha256);
+        writer.WriteEndObject();
+    }
+}
+
+public sealed partial class CodexThreadStore
+{
+    /// <summary>Explicitly reconcile one validated normal inference on a closed turn of its original
+    /// thread. Only an opt-in atomic host ledger is called, once. No model/tool dispatch, new reservation,
+    /// journal write, or automatic retry occurs. Old receipts without binding remain unresolved.
+    /// If the host reports an ambiguous result, inspect the original ledger reservation before retrying.</summary>
+    public async Task<CodexInferenceAccountingOutcome> ReconcileInferenceAccountingAsync(Guid threadId,
+        long expectedRevision, Guid turnId, string requestId, ICodexInferenceAccountingReconciler reconciler,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reconciler);
+        Token(requestId);
+        var thread = await CurrentAsync(threadId, expectedRevision, cancellationToken).ConfigureAwait(false);
+        var turn = thread.Turns.SingleOrDefault(item => item.Id == turnId)
+            ?? throw new KeyNotFoundException("Native accounting turn not found.");
+        if (turn.Status == "inProgress")
+            throw new InvalidOperationException("Recover or finish the live turn before reconciling its accounting.");
+        var receipt = turn.Dispatches.SingleOrDefault(item => item.CallId == requestId);
+        if (receipt is not { Kind: "inference", State: "succeeded", Result: { } terminal,
+            InferenceCompletion: { Accounting: { } binding } completion })
+            return CodexInferenceAccountingOutcome.NoEvidence;
+        if (binding.AccountId != thread.AccountId)
+            throw new InvalidDataException("Inference accounting belongs to another account.");
+        if (binding.OriginThreadId != thread.Id)
+            return CodexInferenceAccountingOutcome.InheritedReceipt;
+        if (!CodexInferenceAccounting.Valid(binding, turn.Id) ||
+            binding.TerminalSha256 != CodexRetainedJournalMetadata.ItemHash(terminal))
+            throw new InvalidDataException("Durable inference accounting evidence is inconsistent.");
+        cancellationToken.ThrowIfCancellationRequested();
+        var outcome = await reconciler.ReconcileCompletedAsync(new(binding, requestId, receipt.RequestSha256,
+            completion.ResponseId, terminal.Clone()), cancellationToken).ConfigureAwait(false);
+        return outcome is CodexInferenceAccountingOutcome.Settled or CodexInferenceAccountingOutcome.AlreadySettled or
+            CodexInferenceAccountingOutcome.MissingReservation or CodexInferenceAccountingOutcome.Conflict or
+            CodexInferenceAccountingOutcome.Unknown ? outcome :
+            throw new InvalidOperationException("Host ledger returned an invalid reconciliation outcome.");
+    }
+}

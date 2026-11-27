@@ -19,7 +19,11 @@ public sealed record CodexStoredInferenceCompletion(
     [property: JsonRequired] string PrefixSha256,
     [property: JsonRequired] int OutputCount,
     [property: JsonRequired] string OutputSha256,
-    JsonElement[]? SparseOutput = null);
+    JsonElement[]? SparseOutput = null)
+{
+    /// <summary>Original reservation provenance, absent in legacy validated receipts.</summary>
+    public CodexStoredInferenceAccounting? Accounting { get; init; }
+}
 
 internal static class CodexInferenceRecovery
 {
@@ -79,7 +83,8 @@ internal static class CodexInferenceRecovery
                 turn.Output is null || completion.OutputStart < 0 || completion.OutputStart > turn.Output.Length ||
                 completion.OutputCount < 0 || completion.OutputCount > MaximumResponseItems ||
                 completion.OutputStart > MaximumOutput - completion.OutputCount ||
-                !ValidHash(completion.PrefixSha256) || !ValidHash(completion.OutputSha256))
+                !ValidHash(completion.PrefixSha256) || !ValidHash(completion.OutputSha256) ||
+                completion.Accounting is { } accounting && !CodexInferenceAccounting.Valid(accounting, turn.Id))
                 throw new InvalidDataException("Invalid validated inference recovery boundary.");
             var rawCount = 0;
             if (response.TryGetProperty("output", out var raw))
@@ -129,6 +134,8 @@ internal static class CodexInferenceRecovery
         writer.WriteNumber("output_count", completion.OutputCount);
         writer.WriteString("output_sha256", completion.OutputSha256);
         // The digest covers both the terminal and any separately retained sparse output.
+        if (completion.Accounting is { } accounting)
+            CodexInferenceAccounting.WriteBinding(writer, accounting);
         writer.WriteEndObject();
     }
 }
