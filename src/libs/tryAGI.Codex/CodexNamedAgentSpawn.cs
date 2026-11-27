@@ -18,7 +18,14 @@ public sealed record CodexAgentSpawnOrigin(Guid ParentTurnId, Guid RootTurnId, s
     string SourceDispatchId, string SourceDispatchSha256, long ParentRevision, string GraphRevision,
     Guid InitialMessageId, string InitialMessageFingerprint, string InitialSettingsSha256)
 {
-    internal bool IsValid => ParentTurnId != Guid.Empty && RootTurnId != Guid.Empty && ParentRevision > 0 &&
+    /// <summary>Resolved initial child model, when known.</summary>
+    public string? InitialModel { get; init; }
+
+    /// <summary>Resolved initial reasoning effort, when known.</summary>
+    public string? InitialReasoningEffort { get; init; }
+
+    internal bool IsValid => (InitialModel is null || ValidIdentity(InitialModel)) &&
+        (InitialReasoningEffort is null || ValidIdentity(InitialReasoningEffort)) && ParentTurnId != Guid.Empty && RootTurnId != Guid.Empty && ParentRevision > 0 &&
         ValidIdentity(ParentOwnerId) && ValidIdentity(SourceDispatchId) &&
         GraphRevision is { Length: > 0 and <= 1024 } && !string.IsNullOrWhiteSpace(GraphRevision) &&
         InitialMessageId != Guid.Empty && Digest(SourceDispatchSha256) &&

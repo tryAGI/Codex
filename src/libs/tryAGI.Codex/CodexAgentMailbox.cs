@@ -18,7 +18,11 @@ public enum CodexAgentMailMode
 /// <param name="Content">Plaintext or opaque encrypted message content.</param>
 /// <param name="IsEncrypted">Whether content must be preserved without a plaintext wrapper.</param>
 public sealed record CodexAgentMail(Guid Id, Guid SenderThreadId, CodexAgentMailMode Mode,
-    string Content, bool IsEncrypted = false);
+    string Content, bool IsEncrypted = false)
+{
+    /// <summary>Exact durable child terminal response, when this is a native bound result.</summary>
+    public CodexAgentCompletedResult? CompletedResult { get; init; }
+}
 
 /// <summary>Deduplication receipt for consumed mail, without retaining its content.</summary>
 /// <param name="Id">Original delivery identity.</param>
@@ -78,7 +82,9 @@ public interface ICodexAgentMailboxStorage : ICodexThreadStorage
 
     /// <summary>Atomically compare the exact observed revision and persist the proposed mailbox transition.
     /// Check the recipient's current root membership and lifecycle; an enqueue also checks authenticated
-    /// sender membership and direct parent routing for a Result. Validate claim ownership against
+    /// sender membership and direct parent routing for a Result. A bound CompletedResult must match
+    /// the original child terminal journal using CodexAgentCompletedResult.Matches in the same
+    /// transaction. Validate claim ownership against
     /// the host's execution authority, and acknowledge only if the exact reserved messages were
     /// durably admitted to its target turn. Release requires a positive proof of non-admission
     /// and fencing of the previous owner (expiry or a missing runtime alone is not proof).

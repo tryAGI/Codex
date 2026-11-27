@@ -43,7 +43,11 @@ public sealed partial class CodexThreadStore
 
         var origin = new CodexAgentSpawnOrigin(turn.Id, turn.RootTurnId, turn.OwnerId, dispatch.CallId,
             dispatch.RequestSha256, parentThread.Revision, directory.Graph.Revision, request.InitialMessage.Id,
-            AgentMailFingerprint(request.InitialMessage), CodexRetainedJournalMetadata.ItemHash(settings));
+            AgentMailFingerprint(request.InitialMessage), CodexRetainedJournalMetadata.ItemHash(settings))
+        {
+            InitialModel = CodexRealtimeProtocol.Text(settings, "model"),
+            InitialReasoningEffort = CodexRealtimeProtocol.Text(settings, "reasoningEffort"),
+        };
         if (!origin.IsValid) throw new InvalidDataException("Invalid native spawn origin.");
         var identity = new CodexNamedAgentIdentity(request.ChildThreadId, parent.ThreadId, request.RootThreadId,
             path, request.Role, request.Nickname) { SpawnOrigin = origin };

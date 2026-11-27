@@ -28,6 +28,8 @@ public sealed class NamedAgentSpawnTests
         private readonly Dictionary<Guid, CodexAgentMailbox> mailboxes = [];
         private long graphRevision;
         internal bool LoseNextSpawnReply { get; set; }
+        internal bool LoseNextResultReply { get; set; }
+        internal int ResultCommits { get; private set; }
         internal bool FailNextSpawn { get; set; }
         internal Action? BeforeSpawn { get; set; }
         internal int SpawnCommits { get; private set; }
@@ -71,6 +73,8 @@ public sealed class NamedAgentSpawnTests
                     WakeAdmissions++;
                 }
                 documents[threadId] = document.Clone();
+                if (threadId == Root && old is null)
+                    mailboxes.Add(Root, new("account", Root, Root, 0, [], []));
                 return Task.FromResult(true);
             }
         }
@@ -112,7 +116,7 @@ public sealed class NamedAgentSpawnTests
             {
                 if (!mailboxes.TryGetValue(next.RecipientThreadId, out var previous) ||
                     previous.Revision != expectedRevision || next.Revision != expectedRevision + 1 ||
-                    edges[next.RecipientThreadId].Status != CodexThreadSpawnEdgeStatus.Open)
+                    next.RecipientThreadId != Root && edges[next.RecipientThreadId].Status != CodexThreadSpawnEdgeStatus.Open)
                     return Task.FromResult(false);
                 var thread = Decode(documents[next.RecipientThreadId]);
                 if (operation == CodexAgentMailboxOperation.Claim &&
@@ -124,9 +128,28 @@ public sealed class NamedAgentSpawnTests
                      thread.Turns.SingleOrDefault(turn => turn.Id == reserved.TurnId) is not { } turn ||
                      !admission.Matches(reserved, turn)))
                     return Task.FromResult(false);
-                if (operation is not (CodexAgentMailboxOperation.Claim or CodexAgentMailboxOperation.Acknowledge))
+                if (operation == CodexAgentMailboxOperation.Enqueue)
+                {
+                    var mail = next.Pending[^1];
+                    if (mail.CompletedResult is not { } result || !identities.TryGetValue(mail.SenderThreadId, out var sender) ||
+                        sender.ParentThreadId != next.RecipientThreadId ||
+                        !documents.TryGetValue(mail.SenderThreadId, out var body) ||
+                        Decode(body).Turns.SingleOrDefault(turn => turn.Id == result.TurnId) is not { } completed ||
+                        !CodexAgentCompletedResult.Matches(mail, completed))
+                        return Task.FromResult(false);
+                }
+                else if (operation is not (CodexAgentMailboxOperation.Claim or CodexAgentMailboxOperation.Acknowledge))
                     throw new InvalidOperationException("Unexpected mailbox mutation.");
                 mailboxes[next.RecipientThreadId] = next;
+                if (operation == CodexAgentMailboxOperation.Enqueue)
+                {
+                    ResultCommits++;
+                    if (LoseNextResultReply)
+                    {
+                        LoseNextResultReply = false;
+                        throw new IOException("Result acknowledgement lost after commit.");
+                    }
+                }
                 return Task.FromResult(true);
             }
         }
@@ -239,9 +262,16 @@ public sealed class NamedAgentSpawnTests
         internal CodexThreadStore Store { get; }
         internal Fixture() => Store = new CodexThreadStore(Database, "account");
 
-        internal async Task<CodexNamedAgentSpawnRequest> PrepareAsync()
+        internal async Task<CodexNamedAgentSpawnRequest> PrepareAsync(bool realtime = false)
         {
             var parent = await Store.CreateAsync(Root, Json("""{"model":"parent","threadSource":"user"}"""), Ct);
+            if (realtime)
+            {
+                parent = await Store.CreateRealtimeSessionAsync(Root, parent.Revision, "session", "rtc_test", "v3", "voice-owner", Ct);
+                parent = await Store.ConfigureRealtimeHistoryAsync(Root, parent.Revision, "session", "voice-owner",
+                    CodexRealtimeHistoryMode.Canonical, Ct);
+                parent = await Store.AttachRealtimeSessionAsync(Root, parent.Revision, "session", "voice-owner", Id(90), Ct);
+            }
             parent = await Store.StartTurnAsync(Root, parent.Revision, ParentTurn, Owner,
                 [Json("""{"role":"user","content":"delegate"}""")], RootTurn, Ct);
             var admitted = await Store.AdmitAsync(Root, parent.Revision, ParentTurn, Owner, "spawn-call", "tool",
@@ -255,6 +285,16 @@ public sealed class NamedAgentSpawnTests
         internal CodexThreadAgent Agent(List<JsonElement> requests)
             => new(Store, new Credentials(), new Budget(), clientFactory: (credentials, usage) =>
                 new CodexClient(credentials, handler: new Handler(requests), usageObserver: usage));
+
+        internal Task<CodexThreadAgentResult?> WakeAsync(CodexNamedAgentIdentity child, List<JsonElement> requests)
+            => Store.RunAgentMailboxWakeAsync(Agent(requests), Root, child.ThreadId, 1, 1, Id(31), Id(30),
+                ChildOwner, new CodexResponseOptions("child", "instructions")
+                {
+                    Identity = new("session", child.ThreadId.ToString(), Id(30).ToString())
+                    {
+                        ParentThreadId = Root.ToString(), ParentTurnId = ParentTurn.ToString(), RootTurnId = RootTurn.ToString(),
+                    },
+                }, (_, _) => throw new InvalidOperationException("No tools"), cancellationToken: Ct);
     }
 
     [Fact]
@@ -316,6 +356,82 @@ public sealed class NamedAgentSpawnTests
         Assert.Empty(settled.Pending);
         Assert.Equal(request.InitialMessage.Id, Assert.Single(settled.Receipts).Id);
         Assert.Equal(child, await f.Store.InspectNamedAgentSpawnAsync(request, Ct));
+    }
+
+    [Fact]
+    public async Task CompletedChildDeliversOneBoundResultAfterLostReplyAndProjectsRealActivity()
+    {
+        var f = new Fixture();
+        var request = await f.PrepareAsync(realtime: true);
+        var child = await f.Store.SpawnNamedAgentAsync(request, Ct);
+        var started = await f.Store.ObserveNamedAgentStartedAsync(Root, child.ThreadId, request.ExpectedParentRevision, Ct);
+        var item = Assert.Single(Assert.Single(started.Thread.Turns).NativeBackingArtifacts!);
+        Assert.Equal("started", item.Item.GetProperty("kind").GetString());
+        Assert.Equal("child", item.Item.GetProperty("model").GetString());
+        Assert.Equal("spawn-call", item.SourceDispatchId);
+        Assert.Equal("subagent-started-" + child.ThreadId.ToString("D"),
+            Assert.Single(CodexThreadStore.ProjectRealtimeItems(started.Thread),
+                entry => (string?)entry["type"] == "bemItemPromoted")["item_id"]!.GetValue<string>());
+        var replayStarted = await f.Store.ObserveNamedAgentStartedAsync(Root, child.ThreadId, started.Thread.Revision, Ct);
+        Assert.False(replayStarted.Admitted);
+
+        var requests = new List<JsonElement>();
+        var result = Assert.IsType<CodexThreadAgentResult>(await f.WakeAsync(child, requests));
+        var childTurn = Assert.Single(result.Thread.Turns);
+        f.Database.LoseNextResultReply = true;
+        await Assert.ThrowsAsync<IOException>(() => f.Store.DeliverNamedAgentCompletedResultAsync(Root, child.ThreadId,
+            childTurn.Id, result.Thread.Revision, 0, Ct));
+        var reopened = new CodexThreadStore(f.Database, "account");
+        var observed = await reopened.ReadAgentMailboxAsync(Root, Root, Ct);
+        var delivered = Assert.Single(observed.Pending);
+        Assert.Equal(CodexAgentMailMode.Result, delivered.Mode);
+        Assert.Equal(child.ThreadId, delivered.SenderThreadId);
+        Assert.Equal("done", delivered.Content);
+        Assert.Equal(childTurn.Id, delivered.CompletedResult?.TurnId);
+        Assert.Equal(CodexAgentCompletedResult.DeliveryId(child.ThreadId, childTurn.Id), delivered.Id);
+        Assert.False(observed.HasWakeRequest);
+        var retry = await reopened.DeliverNamedAgentCompletedResultAsync(Root, child.ThreadId, childTurn.Id,
+            result.Thread.Revision, observed.Revision, Ct);
+        Assert.Equal(observed.Revision, retry.Revision);
+        Assert.Equal(delivered, Assert.Single(retry.Pending));
+        Assert.Equal(1, f.Database.ResultCommits);
+
+        var completed = await reopened.ObserveNamedAgentInitialCompletionAsync(Root, child.ThreadId, childTurn.Id,
+            result.Thread.Revision, started.Thread.Revision, Ct);
+        var artifacts = Assert.Single(completed.Thread.Turns).NativeBackingArtifacts!;
+        Assert.Equal(2, artifacts.Length);
+        Assert.Equal("completed", artifacts[1].Item.GetProperty("kind").GetString());
+        Assert.Equal("subagent-completed-" + childTurn.Id.ToString("D"), artifacts[1].ItemId);
+        Assert.Equal(item.SourceDispatchId, artifacts[1].SourceDispatchId);
+        Assert.Single(CodexThreadStore.ProjectRealtimeItems(completed.Thread),
+            entry => (string?)entry["type"] == "bemItemPromoted");
+        var replayCompleted = await reopened.ObserveNamedAgentInitialCompletionAsync(Root, child.ThreadId, childTurn.Id,
+            result.Thread.Revision, completed.Thread.Revision, Ct);
+        Assert.False(replayCompleted.Admitted);
+        Assert.Single(requests);
+    }
+
+    [Fact]
+    public async Task UnobservedOrWrongTerminalCannotPublishResultOrActivity()
+    {
+        var f = new Fixture();
+        var request = await f.PrepareAsync();
+        var child = await f.Store.SpawnNamedAgentAsync(request, Ct);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => f.Store.DeliverNamedAgentCompletedResultAsync(Root,
+            child.ThreadId, Id(30), 1, 0, Ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Store.ObserveNamedAgentInitialCompletionAsync(Root,
+            child.ThreadId, Id(30), 1, request.ExpectedParentRevision, Ct));
+        var result = Assert.IsType<CodexThreadAgentResult>(await f.WakeAsync(child, []));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Store.ObserveNamedAgentInitialCompletionAsync(Root,
+            child.ThreadId, Id(999), result.Thread.Revision, request.ExpectedParentRevision, Ct));
+        var turn = Assert.Single(result.Thread.Turns);
+        var mail = CodexAgentCompletedResult.FromCompletedTurn(child.ThreadId, turn);
+        Assert.True(CodexAgentCompletedResult.Matches(mail, turn));
+        Assert.False(CodexAgentCompletedResult.Matches(mail with { Content = "forged" }, turn));
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => f.Store.EnqueueAgentMailAsync(Root, Root, 0,
+            mail with { Content = "forged" }, Ct));
+        Assert.Empty((await f.Store.ReadAgentMailboxAsync(Root, Root, Ct)).Pending);
+        Assert.Equal(0, f.Database.ResultCommits);
     }
 
     [Fact]

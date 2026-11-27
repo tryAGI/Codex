@@ -204,7 +204,10 @@ public sealed partial class CodexThreadStore
         => mail is not null && mail.Id != Guid.Empty && mail.SenderThreadId != Guid.Empty &&
            Enum.IsDefined(mail.Mode) && (mail.Mode != CodexAgentMailMode.Result || mail.SenderThreadId != recipient) &&
            (mail.Mode != CodexAgentMailMode.Followup || root != recipient) &&
-           mail.Content is { Length: > 0 and <= MaximumAgentMailBytes } &&
+           mail.Content is { Length: <= MaximumAgentMailBytes } &&
+           (mail.Content.Length > 0 || mail.CompletedResult is not null) &&
+           (mail.CompletedResult is not { } result || mail.Mode == CodexAgentMailMode.Result && !mail.IsEncrypted &&
+               result.IsValid && mail.Id == CodexAgentCompletedResult.DeliveryId(mail.SenderThreadId, result.TurnId)) &&
            ValidAgentMailText(mail.Content);
 
     private static bool ValidAgentMailText(string content)
@@ -220,6 +223,13 @@ public sealed partial class CodexThreadStore
             mail.IsEncrypted ? "1" : "0");
         // Strict UTF-8 rejects unpaired surrogates instead of silently replacing them.
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        if (mail.CompletedResult is { } result)
+        {
+            // Separate the new bound domain from all legacy mail fingerprints.
+            var binding = string.Concat("bound-result-v1:", result.TurnId.ToString("N"), result.RootTurnId.ToString("N"),
+                result.OutputSha256, result.ResponseId.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), ":", result.ResponseId);
+            hash.AppendData(Encoding.ASCII.GetBytes(binding));
+        }
         hash.AppendData(Encoding.ASCII.GetBytes(prefix));
         hash.AppendData(AgentMailEncoding.GetBytes(mail.Content));
         return Convert.ToHexString(hash.GetHashAndReset());
