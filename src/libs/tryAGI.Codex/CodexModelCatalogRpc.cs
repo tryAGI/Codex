@@ -131,10 +131,15 @@ public sealed class CodexModelCatalogRpc
             throw new CodexProviderRouteException(CodexProviderRouteFailure.ExplicitPaidProviderRequired);
 
         var snapshot = await source.ReadAsync(cancellationToken).ConfigureAwait(false);
-        var models = snapshot.Models
+        var eligible = snapshot.Models
             .Where(model => source.AuthMode == CodexProviderAuthMode.ChatGptSubscription || model.SupportedInApi == true)
-            .OrderBy(Priority).ToArray();
-        var defaultModel = models.FirstOrDefault(model => model.Visibility == "list") ?? models.FirstOrDefault();
+            .ToArray();
+        // Rust's provider-backed catalog preserves display order independently
+        // of the priority used to select the default. Static catalogs keep their
+        // existing priority order; pagination always follows display order.
+        var prioritized = eligible.OrderBy(Priority).ToArray();
+        var defaultModel = prioritized.FirstOrDefault(model => model.Visibility == "list") ?? prioritized.FirstOrDefault();
+        var models = source.Origin == CodexModelCatalogOrigin.Provider ? eligible : prioritized;
         var listed = models.Where(model => includeHidden || model.Visibility == "list").ToArray();
         if (listed.Length == 0) return Element(new JsonObject { ["data"] = new JsonArray(), ["nextCursor"] = null });
         if (start > listed.Length) throw Invalid("Model list cursor exceeds the catalog.");

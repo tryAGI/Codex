@@ -19,6 +19,37 @@ public sealed class CodexModelCatalogRpcTests
         """;
 
     [Fact]
+    public async Task ProviderCatalogPreservesDisplayOrderWhilePrioritySelectsDefaultBeforePagination()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var fixture = CodexModelCatalogSource.ForStatic("openai", CodexProviderAuthMode.ChatGptSubscription,
+            "0.172.0", Json(Catalog));
+        var snapshot = await fixture.ReadAsync(ct);
+        var source = new CodexModelCatalogSource("openai", CodexProviderAuthMode.ChatGptSubscription,
+            _ => Task.FromResult(snapshot), CodexModelCatalogOrigin.Provider);
+        var host = new CodexModelCatalogRpc([source], "openai");
+
+        var first = await host.InvokeAsync("model/list", Json("""{"limit":1}"""), ct);
+        var earlier = Assert.Single(first.GetProperty("data").EnumerateArray());
+        Assert.Equal("visible-later", earlier.GetProperty("id").GetString());
+        Assert.False(earlier.GetProperty("isDefault").GetBoolean());
+        Assert.Equal("1", first.GetProperty("nextCursor").GetString());
+
+        var second = await host.InvokeAsync("model/list", Json("""{"cursor":"1","limit":1}"""), ct);
+        var recommended = Assert.Single(second.GetProperty("data").EnumerateArray());
+        Assert.Equal("chat-only", recommended.GetProperty("id").GetString());
+        Assert.True(recommended.GetProperty("isDefault").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, second.GetProperty("nextCursor").ValueKind);
+
+        var all = await host.InvokeAsync("model/list", Json("""{"includeHidden":true}"""), ct);
+        var rows = all.GetProperty("data").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "visible-later", "hidden-first", "chat-only" },
+            rows.Select(row => row.GetProperty("id").GetString()));
+        Assert.True(rows[1].GetProperty("hidden").GetBoolean());
+        Assert.True(rows[2].GetProperty("isDefault").GetBoolean());
+    }
+
+    [Fact]
     public async Task StaticCatalogProjectsRustWireShapeAndPriorityDefaultBeforePagination()
     {
         var ct = TestContext.Current.CancellationToken;
