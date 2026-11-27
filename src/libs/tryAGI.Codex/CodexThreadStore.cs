@@ -7,7 +7,7 @@ namespace tryAGI.Codex;
 /// <summary>Account-bound, optimistic native thread journal. No model, tool, filesystem effect,
 /// cancellation callback or automatic replay is performed by this store. Execution leases and
 /// authorization belong to the host; expected revisions fence all persisted transitions.</summary>
-public sealed class CodexThreadStore
+public sealed partial class CodexThreadStore
 {
     /// <summary>Largest serialized thread document.</summary>
     public const int MaximumDocumentBytes = 16_777_216;
@@ -201,7 +201,7 @@ public sealed class CodexThreadStore
         if (selected.Any(t => t.Status == "inProgress")) throw new InvalidOperationException("Cannot fork an active turn.");
         var now = time.GetUtcNow();
         return await PublishAsync(null, source with { Id = destinationId, Revision = 1, CreatedAt = now, UpdatedAt = now,
-            ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected,
+            ForkedFromId = source.Id, ForkedFromRevision = source.Revision, Turns = selected, RealtimeSessions = null,
             Settings = effectiveSettings?.Clone() ?? source.Settings }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -278,6 +278,7 @@ public sealed class CodexThreadStore
             value.CreatedAt == default || value.UpdatedAt == default ||
             (value.ForkedFromId is null) != (value.ForkedFromRevision is null) || value.ForkedFromRevision is < 1)
             throw new InvalidDataException("Native thread identity, revision or history is invalid.");
+        ValidateRealtimeSessions(value.RealtimeSessions);
         var turnIds = new HashSet<Guid>(); var callIds = new HashSet<string>(StringComparer.Ordinal); var active = false;
         foreach (var turn in value.Turns)
         {

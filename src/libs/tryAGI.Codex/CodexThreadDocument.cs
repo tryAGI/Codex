@@ -38,7 +38,11 @@ public sealed record CodexThreadDocument(
     [property: JsonRequired] DateTimeOffset CreatedAt,
     [property: JsonRequired] DateTimeOffset UpdatedAt,
     [property: JsonRequired] CodexStoredTurn[] Turns,
-    Guid? ForkedFromId = null, long? ForkedFromRevision = null);
+    Guid? ForkedFromId = null, long? ForkedFromRevision = null)
+{
+    /// <summary>Optional durable logical realtime sessions; absent in older thread documents.</summary>
+    public CodexStoredRealtimeSession[]? RealtimeSessions { get; init; }
+}
 
 /// <summary>One stored turn.</summary>
 /// <param name="Id">Turn ID.</param>
