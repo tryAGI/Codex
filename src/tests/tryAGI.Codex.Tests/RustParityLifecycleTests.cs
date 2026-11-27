@@ -348,6 +348,141 @@ public sealed class RustParityLifecycleTests
         }
     }
 
+
+    // Pinned Rust core/tests/suite/realtime_conversation.rs:
+    // conversation_webrtc_live_reconnects_sideband_after_unclean_disconnect.
+    // This exercises the native controller/coordinator with a synthetic sideband, not live WebRTC.
+    [Fact]
+    public async Task RecoveredSidebandAdmitsNewHandoffOnlyAfterDurableTranscript()
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        var ct = deadline.Token;
+        var store = new CodexThreadStore(new MemoryStorage(), "fixture-account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Parse("{}"), ct);
+        const string session = "reconnect-fixture";
+        const string call = "rtc_reconnect_fixture";
+        const string owner = "fixture-owner";
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, session, call, "v3", owner, ct);
+        thread = await store.ConfigureRealtimeHistoryAsync(thread.Id, thread.Revision, session, owner,
+            CodexRealtimeHistoryMode.Canonical, ct);
+        using var provider = new SyntheticResponses();
+        provider.Replies.Enqueue([Parse("""{"type":"message","id":"msg_after_recovery","role":"assistant","phase":"final_answer","content":[{"type":"output_text","text":"recovered answer"}]}""")]);
+        var budget = new SyntheticBudget();
+        var credentials = new SyntheticCredentials();
+        var agent = new CodexThreadAgent(store, credentials, budget, clientFactory:
+            (auth, usage) => new CodexClient(auth, handler: new NonOwningHandler(provider), usageObserver: usage));
+        var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+            Parse("{}"), (_, _, _) => throw new InvalidOperationException("Unexpected alternate executor."),
+            (_, _) => Task.CompletedTask);
+        using var voice = new CodexClient(new NoNetworkCredentials());
+        var inputs = new[] { Channel.CreateUnbounded<string>(), Channel.CreateUnbounded<string>() };
+        var outputs = new[] { Channel.CreateUnbounded<string>(), Channel.CreateUnbounded<string>() };
+        var requests = new List<CodexRealtimeAttachRequest>();
+        var controller = new CodexRealtimeSessionController(store, thread.Id, session, owner,
+            (request, token) =>
+            {
+                Assert.Equal(call, request.CallId);
+                var index = requests.Count;
+                requests.Add(request);
+                return voice.AttachExistingRealtimeCallAsync(request.CallId,
+                    new CodexRealtimeAttachmentStream(inputs[index].Reader, outputs[index].Writer),
+                    request.Protocol, request.StartBefore, token);
+            }, new CodexRealtimeReconnectOptions
+            {
+                MaximumAttempts = 1, Timeout = TimeSpan.FromSeconds(3),
+                DrainTimeout = TimeSpan.FromSeconds(2), RetryDelay = TimeSpan.Zero,
+            });
+        await using var coordinator = new CodexRealtimeCoordinator(store, agent, rpc, controller,
+            thread.Id, session, owner, "fixture-account",
+            _ => new CodexResponseOptions("fixture-model", "fixture instructions")
+            {
+                Identity = new("fixture-reasoning", thread.Id.ToString(), Guid.NewGuid().ToString()),
+            }, (_, _) => throw new InvalidOperationException("No tool was advertised."),
+            new CodexRealtimeCoordinatorOptions { ChannelMode = CodexRealtimeReasoningChannelMode.BemTags });
+
+        const string first = """{"type":"input_transcript.added","event_id":"before","item":{"text":"before disconnect "}}""";
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await coordinator.AttachAsync(ct));
+        var firstPump = coordinator.RunAsync(ct: ct);
+        await inputs[0].Writer.WriteAsync(first, ct);
+        inputs[0].Writer.TryComplete(new IOException("Synthetic sideband loss."));
+        Assert.Equal(CodexRealtimeLifecycleStatus.Retryable, await firstPump.WaitAsync(ct));
+        var fenced = await store.ReadAsync(thread.Id, ct);
+        var state = Assert.Single(fenced.RealtimeSessions!);
+        Assert.Equal("recoveryRequired", state.State);
+        Assert.Equal("before disconnect ", Assert.Single(state.History!.Frames).Text);
+        Assert.Empty(fenced.Turns);
+        Assert.Empty(provider.Requests);
+        Assert.Equal(CodexRealtimeLifecycleStatus.HistoryRecoveryRequired, await coordinator.AttachAsync(ct));
+        Assert.Single(requests);
+        Assert.Equal(CodexRealtimeLifecycleStatus.HistoryRecoveryRequired,
+            await controller.RecoverAsync((_, _) => Task.FromResult(CodexRealtimeRecoveryDecision.Unknown),
+                cancellationToken: ct));
+        Assert.Single(requests);
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached,
+            await controller.RecoverAsync((context, _) =>
+            {
+                Assert.Equal(session, context.Session.SessionId);
+                Assert.Equal(call, context.Session.CallId);
+                Assert.Equal("before disconnect ", Assert.Single(context.Session.History!.Frames).Text);
+                return Task.FromResult(CodexRealtimeRecoveryDecision.Open);
+            }, cancellationToken: ct));
+        Assert.Equal(2, requests.Count);
+        Assert.NotEqual(requests[0].AttachmentId, requests[1].AttachmentId);
+
+        var observed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondPump = coordinator.RunAsync(observer: async (item, token) =>
+        {
+            if (item.Payload.TryGetProperty("event_id", out var eventId) && eventId.GetString() == "after")
+            {
+                // The observer must see the committed transcript, never an optimistic projection.
+                var saved = await store.ReadAsync(thread.Id, token);
+                Assert.Contains("after reconnect", string.Concat(Assert.Single(saved.RealtimeSessions!).History!.Frames.Select(f => f.Text)));
+                observed.TrySetResult();
+            }
+        }, ct: ct);
+        await inputs[1].Writer.WriteAsync(first, ct); // Provider replay on a new attachment.
+        await inputs[1].Writer.WriteAsync("""{"type":"input_transcript.added","event_id":"after","item":{"text":"after reconnect"}}""", ct);
+        await observed.Task.WaitAsync(ct);
+        const string handoff = """{"type":"delegation.created","event_id":"handoff-after","item":{"type":"delegation","id":"recovered-handoff","target":"client","content":[{"type":"input_text","text":"summarize"}]}}""";
+        await inputs[1].Writer.WriteAsync(handoff, ct);
+        await inputs[1].Writer.WriteAsync(handoff, ct);
+
+        try
+        {
+            while (true)
+            {
+                var frame = Parse(await outputs[1].Reader.ReadAsync(ct));
+                if (frame.GetProperty("type").GetString() != "delegation.context.append") continue;
+                Assert.Equal("recovered-handoff", frame.GetProperty("delegation_item_id").GetString());
+                Assert.Contains("recovered answer", frame.GetRawText());
+                break;
+            }
+            CodexThreadDocument final;
+            while (true)
+            {
+                if (coordinator.ReasoningFailure is { } error) throw new InvalidOperationException("Recovered reasoning failed.", error);
+                final = await store.ReadAsync(thread.Id, ct);
+                if (final.Turns.Length == 1 && final.Turns[0].Status == "completed") break;
+                await Task.Delay(10, ct);
+            }
+            var input = Assert.Single(provider.Requests).GetRawText();
+            Assert.Contains("before disconnect", input);
+            Assert.Contains("after reconnect", input);
+            Assert.Equal(1, input.Split("before disconnect", StringSplitOptions.None).Length - 1);
+            var history = Assert.Single(final.RealtimeSessions!);
+            Assert.Single(history.HandoffAdmissions!);
+            Assert.Equal("recovered-handoff", history.HandoffAdmissions![0].HandoffId);
+            Assert.False(outputs[0].Reader.TryRead(out _));
+            Assert.Equal(1, budget.Reserved);
+            Assert.Equal(1, budget.Completed);
+            Assert.Equal(0, budget.Incomplete);
+            Assert.Equal(CodexRealtimeLifecycleStatus.Detached, await coordinator.DetachAsync(ct));
+            await secondPump.WaitAsync(ct);
+        }
+        finally { await deadline.CancelAsync(); }
+    }
+
     // HttpClient disposes its handler per client. A new adapter borrows the shared synthetic fixture.
     private sealed class NonOwningHandler(HttpMessageHandler inner) : HttpMessageHandler
     {
