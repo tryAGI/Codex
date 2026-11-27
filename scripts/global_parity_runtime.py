@@ -39,12 +39,19 @@ TURN = "TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
 PROVIDER_MODEL_CLASS = "RustProviderModelDifferentialTests"
 PROVIDER_MODEL_PATH = f"src/tests/tryAGI.Codex.Tests/{PROVIDER_MODEL_CLASS}.cs"
 PROVIDER_MODEL = "ProviderDisplayOrderIsIndependentOfPriorityDefaultAndPagination"
+CONTROL_PATH = "src/tests/tryAGI.Codex.Tests/RustTurnControlDifferentialTests.cs"
+INTERRUPT_CLASS = "RustTurnInterruptionDifferentialTests"
+INTERRUPT = "InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
+TOOL_CLASS = "RustToolContinuationDifferentialTests"
+TOOL = "CorrelatedDynamicTextResultContinuesExactlyOnceOnBothRuntimes"
 SUITES = {
     "filesystem": (CLASS, TEST_PATH, (BINARY, DIRECTORY, INVALID, RELATIVE, COPY)),
     "thread-lifecycle": (THREAD_CLASS, THREAD_MODEL_PATH, (NAME, ARCHIVE)),
     "model-catalog": (MODEL_CLASS, THREAD_MODEL_PATH, (MODEL,)),
     "turn-lifecycle": (TURN_CLASS, TURN_PATH, (TURN,)),
     "provider-model-catalog": (PROVIDER_MODEL_CLASS, PROVIDER_MODEL_PATH, (PROVIDER_MODEL,)),
+    "turn-interruption": (INTERRUPT_CLASS, CONTROL_PATH, (INTERRUPT,)),
+    "tool-continuation": (TOOL_CLASS, CONTROL_PATH, (TOOL,)),
 }
 SCENARIOS = {("clientRequests", method): ("filesystem", cases)
              for method, cases in METHOD_CASES.items()}
@@ -63,11 +70,18 @@ SCENARIOS.update({
     ("serverNotifications", "item/started"): ("turn-lifecycle", (TURN,)),
     ("serverNotifications", "item/completed"): ("turn-lifecycle", (TURN,)),
     ("serverNotifications", "turn/completed"): ("turn-lifecycle", (TURN,)),
+    ("clientRequests", "turn/interrupt"): ("turn-interruption", (INTERRUPT,)),
+    ("serverRequests", "item/tool/call"): ("tool-continuation", (TOOL,)),
 })
 
 
 ADDITIONAL_SCENARIOS = {
     ("clientRequests", "model/list", "provider-model-catalog"): ("provider-model-catalog", (PROVIDER_MODEL,)),
+    ("clientRequests", "thread/read", "turn-interruption"): ("turn-interruption", (INTERRUPT,)),
+    ("clientRequests", "thread/resume", "turn-interruption"): ("turn-interruption", (INTERRUPT,)),
+    ("clientRequests", "turn/start", "tool-continuation"): ("tool-continuation", (TOOL,)),
+    ("serverNotifications", "turn/completed", "turn-interruption"): ("turn-interruption", (INTERRUPT,)),
+    ("serverNotifications", "turn/completed", "tool-continuation"): ("tool-continuation", (TOOL,)),
 }
 
 

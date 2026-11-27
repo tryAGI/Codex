@@ -1246,6 +1246,30 @@
             "tryAGI.Codex.Tests.CodexToolRequestLedgerTests.ExactAdmissionAndTerminalResponseSurviveNewLedgerAndCannotBeReapplied"
           ]
         }
+      },
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "ownerIssue": 76,
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+        "scope": "rust-runtime",
+        "rationale": "Actual Rust server request item/tool/call carries exact thread, turn, call, tool and arguments and receives one typed text result; native host callback is called once with identical arguments and continuation payload. Native frontend server-request publication is not proved. Observed on isolated synthetic Responses, not live provider, real transport equivalence, tool side effects, or production storage.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::AnswerServerRequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustTurnControlDifferentialTests.cs::RustToolContinuationDifferentialTests.CorrelatedDynamicTextResultContinuesExactlyOnceOnBothRuntimes"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/global-parity-evidence/rust-tool-continuation-20f2cf1-45974009768.json",
+          "receiptSha256": "66f014df1d10d48e80187d68e270b086034230c9f0ac1cfb32176c907c4117ee",
+          "cases": [
+            "tryAGI.Codex.Tests.RustToolContinuationDifferentialTests.CorrelatedDynamicTextResultContinuesExactlyOnceOnBothRuntimes"
+          ]
+        }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/read": {
@@ -1271,6 +1295,30 @@
           "cases": [
             "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust"
           ]
+        },
+        "runtimeScenarios": {
+          "turn-interruption": {
+            "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+            "scope": "rust-runtime",
+            "rationale": "Interrupted turn retained after host recreation; no assistant result was invented. Observed on isolated synthetic Responses, not live provider, real transport equivalence, tool side effects, or production storage.",
+            "implementation": [
+              "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+              "src/libs/tryAGI.Codex/CodexThreadRpc.Queries.cs::ReadAsync"
+            ],
+            "test": [
+              "src/tests/tryAGI.Codex.Tests/RustTurnControlDifferentialTests.cs::RustTurnInterruptionDifferentialTests.InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
+            ],
+            "runtimeEvidence": {
+              "lane": "rust-runtime-differential",
+              "outcome": "passed",
+              "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+              "receipt": "docs/global-parity-evidence/rust-turn-interruption-20f2cf1-45974000135.json",
+              "receiptSha256": "62d0f3634b0ba64acdfea30ebbe327a9363ad5cbe03a6f423ab4f65d4558eac9",
+              "cases": [
+                "tryAGI.Codex.Tests.RustTurnInterruptionDifferentialTests.InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
+              ]
+            }
+          }
         }
       }
     },
@@ -1299,13 +1347,65 @@
             "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.ArchiveEmptyThreadReadAndRestoreMatchRust",
             "tryAGI.Codex.Tests.RustThreadLifecycleDifferentialTests.NamedEmptyThreadResumesBeforeAndAfterRestart"
           ]
+        },
+        "runtimeScenarios": {
+          "turn-interruption": {
+            "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+            "scope": "rust-runtime",
+            "rationale": "Explicit resume after interruption and restart retains original turn status without repeating the blocked request. Observed on isolated synthetic Responses, not live provider, real transport equivalence, tool side effects, or production storage.",
+            "implementation": [
+              "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+              "src/libs/tryAGI.Codex/CodexThreadRpc.cs::ResumeAsync"
+            ],
+            "test": [
+              "src/tests/tryAGI.Codex.Tests/RustTurnControlDifferentialTests.cs::RustTurnInterruptionDifferentialTests.InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
+            ],
+            "runtimeEvidence": {
+              "lane": "rust-runtime-differential",
+              "outcome": "passed",
+              "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+              "receipt": "docs/global-parity-evidence/rust-turn-interruption-20f2cf1-45974000135.json",
+              "receiptSha256": "62d0f3634b0ba64acdfea30ebbe327a9363ad5cbe03a6f423ab4f65d4558eac9",
+              "cases": [
+                "tryAGI.Codex.Tests.RustTurnInterruptionDifferentialTests.InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
+              ]
+            }
+          }
+        }
+      },
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+        "ownerIssue": 70,
+        "scope": "native-behavior",
+        "rationale": "Native automatic queue wakes after explicit resume of a loaded idle thread; metadata reads never execute, interrupted/uncertain states remain fenced. Synthetic storage/provider only, not complete resume or production storage acceptance.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.cs::ResumeAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.QueueWake.cs::TryWakeQueueAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueColdResumeWakesPersistedInputButMetadataReadsNeverExecute",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAutomaticWakeRemainsPausedAfterInterruptAcrossAddAndColdResume",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAutomaticWakeDoesNotRetryUncertainAdmission"
+        ],
+        "testEvidence": {
+          "lane": "offline",
+          "outcome": "passed",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/realtime-parity-evidence/ci-20f2cf1-45973983045.json",
+          "receiptSha256": "5368b4133bfd186739eab6e0f13b76682079037fa0cc1035a798f43151281d30",
+          "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAutomaticWakeDoesNotRetryUncertainAdmission",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAutomaticWakeRemainsPausedAfterInterruptAcrossAddAndColdResume",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueColdResumeWakesPersistedInputButMetadataReadsNeverExecute"
+          ]
         }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:turn/start": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 90,
         "scope": "rust-runtime",
         "rationale": "Two explicit text-only turn admissions, exactly two Responses requests on each runtime, with retained ordered history after a host restart. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
@@ -1320,19 +1420,44 @@
         "runtimeEvidence": {
           "lane": "rust-runtime-differential",
           "outcome": "passed",
-          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
-          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
-          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-20f2cf1-45974018794.json",
+          "receiptSha256": "198353887efe0ad771c86c85ec0f5ec0e0ee4774a48a0d71ca47d385cfab1d75",
           "cases": [
             "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
           ]
+        },
+        "runtimeScenarios": {
+          "tool-continuation": {
+            "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+            "scope": "rust-runtime",
+            "rationale": "One admitted turn with a dynamic text tool continuation issues exactly two provider requests, then completes. Observed on isolated synthetic Responses, not live provider, real transport equivalence, tool side effects, or production storage.",
+            "implementation": [
+              "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+              "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::StartAsync",
+              "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+            ],
+            "test": [
+              "src/tests/tryAGI.Codex.Tests/RustTurnControlDifferentialTests.cs::RustToolContinuationDifferentialTests.CorrelatedDynamicTextResultContinuesExactlyOnceOnBothRuntimes"
+            ],
+            "runtimeEvidence": {
+              "lane": "rust-runtime-differential",
+              "outcome": "passed",
+              "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+              "receipt": "docs/global-parity-evidence/rust-tool-continuation-20f2cf1-45974009768.json",
+              "receiptSha256": "66f014df1d10d48e80187d68e270b086034230c9f0ac1cfb32176c907c4117ee",
+              "cases": [
+                "tryAGI.Codex.Tests.RustToolContinuationDifferentialTests.CorrelatedDynamicTextResultContinuesExactlyOnceOnBothRuntimes"
+              ]
+            }
+          }
         }
       }
     },
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:turn/started": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 90,
         "scope": "rust-runtime",
         "rationale": "Correlated start notification precedes assistant item lifecycle and terminal for both turns. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
@@ -1347,9 +1472,9 @@
         "runtimeEvidence": {
           "lane": "rust-runtime-differential",
           "outcome": "passed",
-          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
-          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
-          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-20f2cf1-45974018794.json",
+          "receiptSha256": "198353887efe0ad771c86c85ec0f5ec0e0ee4774a48a0d71ca47d385cfab1d75",
           "cases": [
             "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
           ]
@@ -1359,7 +1484,7 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:item/started": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 90,
         "scope": "rust-runtime",
         "rationale": "Exactly one correlated assistant-message start per tested turn, ordered after turn start and before assistant completion. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
@@ -1374,9 +1499,9 @@
         "runtimeEvidence": {
           "lane": "rust-runtime-differential",
           "outcome": "passed",
-          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
-          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
-          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-20f2cf1-45974018794.json",
+          "receiptSha256": "198353887efe0ad771c86c85ec0f5ec0e0ee4774a48a0d71ca47d385cfab1d75",
           "cases": [
             "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
           ]
@@ -1386,7 +1511,7 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:item/completed": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 90,
         "scope": "rust-runtime",
         "rationale": "Exactly one correlated completed assistant message with the same synthetic text and item identity as its start. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
@@ -1401,9 +1526,9 @@
         "runtimeEvidence": {
           "lane": "rust-runtime-differential",
           "outcome": "passed",
-          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
-          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
-          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-20f2cf1-45974018794.json",
+          "receiptSha256": "198353887efe0ad771c86c85ec0f5ec0e0ee4774a48a0d71ca47d385cfab1d75",
           "cases": [
             "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
           ]
@@ -1413,7 +1538,7 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:turn/completed": {
       "rust-app-server-interop": {
         "status": "source-reviewed",
-        "reviewedCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 90,
         "scope": "rust-runtime",
         "rationale": "Correlated completed status and ordered terminal event after assistant completion; both turns and public history survive the restart. The Rust path uses isolated loopback SSE and the native path an injected HTTP handler with the same synthetic event generator; no live-provider, network transport, real database, multi-client, interruption or tool-call parity is inferred.",
@@ -1428,12 +1553,60 @@
         "runtimeEvidence": {
           "lane": "rust-runtime-differential",
           "outcome": "passed",
-          "csharpCommit": "3395d9d811b7918f0a9c445e4b370952498b8844",
-          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-3395d9d-45961870186.json",
-          "receiptSha256": "e1e88922f6d04a2060ed39086f54aa641e2c1c6e5434a4138af35c20ce2775d4",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/global-parity-evidence/rust-turn-lifecycle-20f2cf1-45974018794.json",
+          "receiptSha256": "198353887efe0ad771c86c85ec0f5ec0e0ee4774a48a0d71ca47d385cfab1d75",
           "cases": [
             "tryAGI.Codex.Tests.RustTurnLifecycleDifferentialTests.TwoCompletedTurnsRetainOrderedHistoryAcrossRestart"
           ]
+        },
+        "runtimeScenarios": {
+          "turn-interruption": {
+            "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+            "scope": "rust-runtime",
+            "rationale": "Correlated terminal status is interrupted on both hosts, and persists across restart. Observed on isolated synthetic Responses, not live provider, real transport equivalence, tool side effects, or production storage.",
+            "implementation": [
+              "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+              "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::CompletedAsync",
+              "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+            ],
+            "test": [
+              "src/tests/tryAGI.Codex.Tests/RustTurnControlDifferentialTests.cs::RustTurnInterruptionDifferentialTests.InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
+            ],
+            "runtimeEvidence": {
+              "lane": "rust-runtime-differential",
+              "outcome": "passed",
+              "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+              "receipt": "docs/global-parity-evidence/rust-turn-interruption-20f2cf1-45974000135.json",
+              "receiptSha256": "62d0f3634b0ba64acdfea30ebbe327a9363ad5cbe03a6f423ab4f65d4558eac9",
+              "cases": [
+                "tryAGI.Codex.Tests.RustTurnInterruptionDifferentialTests.InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
+              ]
+            }
+          },
+          "tool-continuation": {
+            "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+            "scope": "rust-runtime",
+            "rationale": "Correlated completed terminal follows the final assistant message after a single tool result continuation. Observed on isolated synthetic Responses, not live provider, real transport equivalence, tool side effects, or production storage.",
+            "implementation": [
+              "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+              "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::CompletedAsync",
+              "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+            ],
+            "test": [
+              "src/tests/tryAGI.Codex.Tests/RustTurnControlDifferentialTests.cs::RustToolContinuationDifferentialTests.CorrelatedDynamicTextResultContinuesExactlyOnceOnBothRuntimes"
+            ],
+            "runtimeEvidence": {
+              "lane": "rust-runtime-differential",
+              "outcome": "passed",
+              "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+              "receipt": "docs/global-parity-evidence/rust-tool-continuation-20f2cf1-45974009768.json",
+              "receiptSha256": "66f014df1d10d48e80187d68e270b086034230c9f0ac1cfb32176c907c4117ee",
+              "cases": [
+                "tryAGI.Codex.Tests.RustToolContinuationDifferentialTests.CorrelatedDynamicTextResultContinuesExactlyOnceOnBothRuntimes"
+              ]
+            }
+          }
         }
       }
     },
@@ -2239,25 +2412,32 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/add": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 70,
         "scope": "native-behavior",
-        "rationale": "Durable submission ID, deduplicated client identity, metadata and capacity fences. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "rationale": "Durable submission ID, deduplicated client identity, metadata and capacity fences. Exact native synthetic storage/provider receipt also exercises the automatic queue cases applicable to this method. Actual database, host notification delivery and complete Rust queue parity remain pending.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
-          "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::AddQueuedSubmissionAsync"
+          "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::AddQueuedSubmissionAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.QueueWake.cs::TryWakeQueueAsync"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages",
-          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAutomaticWakeDrainsLoadedIdleAndCompletedTurnsInOrder",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAutomaticWakeDoesNotRetryUncertainAdmission",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAutomaticWakeRemainsPausedAfterInterruptAcrossAddAndColdResume"
         ],
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
-          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
-          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/realtime-parity-evidence/ci-20f2cf1-45973983045.json",
+          "receiptSha256": "5368b4133bfd186739eab6e0f13b76682079037fa0cc1035a798f43151281d30",
           "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAutomaticWakeDoesNotRetryUncertainAdmission",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAutomaticWakeDrainsLoadedIdleAndCompletedTurnsInOrder",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAutomaticWakeRemainsPausedAfterInterruptAcrossAddAndColdResume",
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages",
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
           ]
@@ -2267,10 +2447,10 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/update": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 70,
         "scope": "native-behavior",
-        "rationale": "Durable queued input and metadata update across a recreated host. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "rationale": "Durable queued input and metadata update across a recreated host. Exact native synthetic storage/provider receipt also exercises the automatic queue cases applicable to this method. Actual database, host notification delivery and complete Rust queue parity remain pending.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
           "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::UpdateQueuedSubmissionAsync"
@@ -2281,9 +2461,9 @@
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
-          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
-          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/realtime-parity-evidence/ci-20f2cf1-45973983045.json",
+          "receiptSha256": "5368b4133bfd186739eab6e0f13b76682079037fa0cc1035a798f43151281d30",
           "cases": [
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
           ]
@@ -2293,10 +2473,10 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/delete": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 70,
         "scope": "native-behavior",
-        "rationale": "Deletion preserves remaining submission identity. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "rationale": "Deletion preserves remaining submission identity. Exact native synthetic storage/provider receipt also exercises the automatic queue cases applicable to this method. Actual database, host notification delivery and complete Rust queue parity remain pending.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
           "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::DeleteQueuedSubmissionAsync"
@@ -2307,9 +2487,9 @@
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
-          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
-          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/realtime-parity-evidence/ci-20f2cf1-45973983045.json",
+          "receiptSha256": "5368b4133bfd186739eab6e0f13b76682079037fa0cc1035a798f43151281d30",
           "cases": [
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
           ]
@@ -2319,10 +2499,10 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/reorder": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 70,
         "scope": "native-behavior",
-        "rationale": "Explicit reorder and persistent page ordering. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "rationale": "Explicit reorder and persistent page ordering. Exact native synthetic storage/provider receipt also exercises the automatic queue cases applicable to this method. Actual database, host notification delivery and complete Rust queue parity remain pending.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
           "src/libs/tryAGI.Codex/CodexThreadStore.Queue.cs::ReorderQueuedSubmissionsAsync"
@@ -2333,9 +2513,9 @@
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
-          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
-          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/realtime-parity-evidence/ci-20f2cf1-45973983045.json",
+          "receiptSha256": "5368b4133bfd186739eab6e0f13b76682079037fa0cc1035a798f43151281d30",
           "cases": [
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
           ]
@@ -2345,24 +2525,26 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/list": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 70,
         "scope": "native-behavior",
-        "rationale": "Feature-gated listing and pagination of durable queued identities. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "rationale": "Feature-gated listing and pagination of durable queued identities. Exact native synthetic storage/provider receipt also exercises the automatic queue cases applicable to this method. Actual database, host notification delivery and complete Rust queue parity remain pending.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages",
-          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueColdResumeWakesPersistedInputButMetadataReadsNeverExecute"
         ],
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
-          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
-          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/realtime-parity-evidence/ci-20f2cf1-45973983045.json",
+          "receiptSha256": "5368b4133bfd186739eab6e0f13b76682079037fa0cc1035a798f43151281d30",
           "cases": [
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueColdResumeWakesPersistedInputButMetadataReadsNeverExecute",
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages",
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
           ]
@@ -2372,27 +2554,36 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/queue/start": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 70,
         "scope": "native-behavior",
-        "rationale": "Atomic admission and consumption, busy-thread fencing and no replay after lost commit acknowledgement. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "rationale": "Atomic admission and consumption, busy-thread fencing and no replay after lost commit acknowledgement. Exact native synthetic storage/provider receipt also exercises the automatic queue cases applicable to this method. Actual database, host notification delivery and complete Rust queue parity remain pending.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::QueueAsync",
-          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::StartAsync"
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::StartAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.QueueWake.cs::TryWakeQueueAsync"
         ],
         "test": [
           "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueStartConsumesSelectedSubmissionWithTurnAdmissionAndBusyPreservesRemaining",
           "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAdmissionLostAcknowledgmentDoesNotReplayProviderOrConsumeAnotherSubmission",
-          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity"
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAutomaticWakeDrainsLoadedIdleAndCompletedTurnsInOrder",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAutomaticWakeRemainsPausedAfterInterruptAcrossAddAndColdResume",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueAutomaticWakeDoesNotRetryUncertainAdmission",
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.QueueColdResumeWakesPersistedInputButMetadataReadsNeverExecute"
         ],
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
-          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
-          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/realtime-parity-evidence/ci-20f2cf1-45973983045.json",
+          "receiptSha256": "5368b4133bfd186739eab6e0f13b76682079037fa0cc1035a798f43151281d30",
           "cases": [
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueAdmissionLostAcknowledgmentDoesNotReplayProviderOrConsumeAnotherSubmission",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAutomaticWakeDoesNotRetryUncertainAdmission",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAutomaticWakeDrainsLoadedIdleAndCompletedTurnsInOrder",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueAutomaticWakeRemainsPausedAfterInterruptAcrossAddAndColdResume",
+            "tryAGI.Codex.Tests.ThreadRpcTests.QueueColdResumeWakesPersistedInputButMetadataReadsNeverExecute",
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueRejectsUnsupportedDispatchMetadataEphemeralArchivedAndExcessCapacity",
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueStartConsumesSelectedSubmissionWithTurnAdmissionAndBusyPreservesRemaining"
           ]
@@ -2402,10 +2593,10 @@
     "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/queue/changed": {
       "native-sdk": {
         "status": "source-reviewed",
-        "reviewedCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
         "ownerIssue": 70,
         "scope": "native-behavior",
-        "rationale": "Observed correlated queue change notifications. Exact shared Realtime receipt from before automatic wake changes. Native synthetic storage/provider tests only; new automatic wake, actual database, cross-client delivery, and full Rust behavior remain pending.",
+        "rationale": "Observed correlated queue change notifications. Exact native synthetic storage/provider receipt also exercises the automatic queue cases applicable to this method. Actual database, host notification delivery and complete Rust queue parity remain pending.",
         "implementation": [
           "src/libs/tryAGI.Codex/CodexThreadRpc.Queue.cs::NotifyQueueChangedAsync"
         ],
@@ -2415,11 +2606,38 @@
         "testEvidence": {
           "lane": "offline",
           "outcome": "passed",
-          "csharpCommit": "3dcbde8867231eb2753d428200eea8cd40efe973",
-          "receipt": "docs/realtime-parity-evidence/ci-3dcbde8-45962724311.json",
-          "receiptSha256": "ea519ee9e43eaa7f430d28ba3860aa089135167632082666e5a07ad2d5e6f4d9",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/realtime-parity-evidence/ci-20f2cf1-45973983045.json",
+          "receiptSha256": "5368b4133bfd186739eab6e0f13b76682079037fa0cc1035a798f43151281d30",
           "cases": [
             "tryAGI.Codex.Tests.ThreadRpcTests.QueueCrudRetainsIdentityAndMetadataAcrossRestartAndPages"
+          ]
+        }
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:turn/interrupt": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "ownerIssue": 69,
+        "reviewedCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+        "scope": "rust-runtime",
+        "rationale": "Both actual runtimes reject wrong active turn IDs, interrupt a blocked response, emit a correlated terminal, reject repeat interruption and preserve interrupted history across restart without replay. Exact RPC error messages/codes, partial-output drain and every tool-interrupt variant remain separate. Observed on isolated synthetic Responses, not live provider, real transport equivalence, tool side effects, or production storage.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerClient.cs::RequestAsync",
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Execution.cs::InterruptAsync",
+          "src/libs/tryAGI.Codex/CodexThreadAgent.cs::RunAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/RustTurnControlDifferentialTests.cs::RustTurnInterruptionDifferentialTests.InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
+        ],
+        "runtimeEvidence": {
+          "lane": "rust-runtime-differential",
+          "outcome": "passed",
+          "csharpCommit": "20f2cf1f2d75528795df0562653203fdab97a3ab",
+          "receipt": "docs/global-parity-evidence/rust-turn-interruption-20f2cf1-45974000135.json",
+          "receiptSha256": "62d0f3634b0ba64acdfea30ebbe327a9363ad5cbe03a6f423ab4f65d4558eac9",
+          "cases": [
+            "tryAGI.Codex.Tests.RustTurnInterruptionDifferentialTests.InterruptBlockedResponseFencesWrongAndRepeatedTurnIdsWithoutReplay"
           ]
         }
       }
