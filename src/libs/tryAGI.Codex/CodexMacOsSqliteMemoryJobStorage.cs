@@ -23,10 +23,15 @@ public sealed record CodexMemorySourceUpdate(Guid ThreadId, long Watermark, bool
 /// <param name="Watermark">Exact requested extraction snapshot, when applicable.</param>
 /// <param name="Sampling">Exact sampling admission, when applicable.</param>
 /// <param name="StartupScan">Exact bounded metadata query, when applicable.</param>
+/// <param name="Artifact">Immutable artifact staging authority, when applicable.</param>
+/// <param name="MemoryAccess">Exact memory retrieval or note path, when applicable.</param>
+/// <param name="IoPolicy">Trusted per-thread memory I/O policy publication.</param>
+/// <param name="NoteSha256">Digest of exact note bytes for write authorization.</param>
 public sealed record CodexMemoryJobStorageAccess(CodexMemoryJobKey Key, string Operation,
     CodexMemoryJobChange? Change = null, CodexMemorySourceUpdate? Source = null,
     Guid? OperationId = null, long? Watermark = null, CodexMemorySamplingAdmission? Sampling = null,
-    CodexMemoryStartupScan? StartupScan = null);
+    CodexMemoryStartupScan? StartupScan = null, CodexMemoryArtifactStage? Artifact = null,
+    CodexMemoryAccess? MemoryAccess = null, CodexMemoryIoPolicyUpdate? IoPolicy = null, string? NoteSha256 = null);
 
 /// <summary>Current verified consolidation pointer and historical maximum successful coverage.</summary>
 /// <param name="ArtifactRevision">Immutable artifact revision, or null if no safe artifact is published.</param>
@@ -44,10 +49,10 @@ public sealed record CodexMemoryConsolidationState(string? ArtifactRevision, uin
 /// consolidation artifact before commit. It must not treat a model claim as authorization.
 /// </summary>
 public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobStorage, ICodexMemorySamplingStorage,
-    ICodexMemoryStartupSource, IAsyncDisposable
+    ICodexMemoryStartupSource, ICodexMemoryStorage, IAsyncDisposable
 {
     private const int ApplicationId = 1129137485;
-    private const int SchemaVersion = 3;
+    private const int SchemaVersion = 4;
     private const string SamplingSchema = """
         CREATE TABLE sampling(claim BLOB PRIMARY KEY NOT NULL, attempt BLOB NOT NULL UNIQUE,
             thread BLOB NOT NULL, worker BLOB NOT NULL, watermark INTEGER NOT NULL) WITHOUT ROWID;
@@ -84,7 +89,7 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
         OpenValidatedAsync(path, scope, authorize, createNew, false, timeProvider, cancellationToken);
 
     /// <summary>
-    /// Explicitly upgrades a schema-1 or schema-2 job database to the current schema.
+    /// Explicitly upgrades a schema-1, schema-2 or schema-3 job database to the current schema.
     /// The host must stop all legacy writers first; migration refuses any unexpired running claim.
     /// Already upgraded databases are reopened without further writes.
     /// </summary>
@@ -147,7 +152,7 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
             if (!createNew)
             {
                 var version = ScalarNumber(db, "PRAGMA user_version;");
-                Verify(db, scope, upgradeLegacy && version is 1 or 2 ? (int)version : SchemaVersion);
+                Verify(db, scope, upgradeLegacy && version is 1 or 2 or 3 ? (int)version : SchemaVersion);
             }
             if (ScalarText(db, "PRAGMA journal_mode=DELETE;") != "delete")
                 throw new IOException("Could not establish SQLite rollback journal mode.");
@@ -174,10 +179,11 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
                             artifact BLOB);
                         INSERT INTO progress(id,max_count,artifact) VALUES(1,0,NULL);
                         PRAGMA application_id=1129137485;
-                        PRAGMA user_version=3;
+                        PRAGMA user_version=4;
                         """);
                     Execute(db, SamplingSchema);
                     Execute(db, DiscoverySchema);
+                    Execute(db, ArtifactSchema);
                     using var identity = Prepare(db, "INSERT INTO identity(id,body) VALUES(1,?1);");
                     identity.Bind(1, Serialize(scope, CodexMemoryStorageJson.Default.CodexMemoryScope));
                     identity.Done();
@@ -188,7 +194,7 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
                 {
                     var version = checked((int)ScalarNumber(db, "PRAGMA user_version;"));
                     if (version == SchemaVersion) return true;
-                    if (version is not (1 or 2)) throw new InvalidDataException("Unsupported memory schema upgrade.");
+                    if (version is not (1 or 2 or 3)) throw new InvalidDataException("Unsupported memory schema upgrade.");
                     Verify(db, scope, version);
                     using (var active = Prepare(db, "SELECT 1 FROM job WHERE status=?1 AND lease_until>?2 LIMIT 1;"))
                     {
@@ -198,8 +204,9 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
                             throw new InvalidOperationException("Stop legacy memory workers before upgrading live leases.");
                     }
                     if (version == 1) Execute(db, SamplingSchema);
-                    Execute(db, DiscoverySchema);
-                    Execute(db, "PRAGMA user_version=3;");
+                    if (version < 3) Execute(db, DiscoverySchema);
+                    Execute(db, ArtifactSchema);
+                    Execute(db, "PRAGMA user_version=4;");
                     return true;
                 });
             Verify(db, scope);
@@ -239,6 +246,15 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
         {
             using var discovery = Prepare(db, "SELECT thread,watermark,updated_at,kind,archived,eligible FROM discovery LIMIT 0;");
             discovery.Done();
+        }
+        if (expectedVersion >= 4)
+        {
+            using var artifacts = Prepare(db, """
+                SELECT m.root,m.claim,m.worker,m.attempt,m.watermark,m.selection,m.file_count,m.total_bytes,m.valid_summary,
+                    e.path,e.parent,e.kind,e.size,e.body,s.thread,s.watermark,v.instance,v.revision,p.thread,p.generation,p.flags
+                FROM memory_manifest m,memory_entry e,memory_artifact_source s,memory_view v,memory_io_policy p LIMIT 0;
+                """);
+            artifacts.Done();
         }
     }
 
@@ -442,7 +458,7 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
             RunningStage1Count(now) >= change.MaximumRunningClaims!.Value)
             outcome = CodexMemoryJobSettlement.Capacity;
         else if (change.Kind == CodexMemoryJobChangeKind.CompletePhase2 &&
-            !SelectionIsEligible(change.Consolidation!.Selected, ct))
+            (!SelectionIsEligible(change.Consolidation!.Selected, ct) || !CanPublishLocalArtifact(change, prior!)))
             outcome = CodexMemoryJobSettlement.Conflict;
 
         if (outcome == CodexMemoryJobSettlement.Applied)
@@ -576,9 +592,16 @@ public sealed partial class CodexMacOsSqliteMemoryJobStorage : ICodexMemoryJobSt
         using var statement = Prepare(database, "DELETE FROM selected WHERE thread=?1;");
         statement.Bind(1, thread);
         statement.Done();
-        if (Changes(database) == 0) return false;
-        Execute(database, "UPDATE progress SET artifact=NULL WHERE id=1;");
-        return true;
+        var affected = Changes(database) != 0;
+        if (affected) Execute(database, "UPDATE progress SET artifact=NULL WHERE id=1;");
+        // Remove unreachable staged and prior artifacts containing revoked source evidence too.
+        using var artifacts = Prepare(database, """
+            DELETE FROM memory_manifest WHERE root IN
+                (SELECT root FROM memory_artifact_source WHERE thread=?1);
+            """);
+        artifacts.Bind(1, thread);
+        artifacts.Done();
+        return affected || Changes(database) != 0;
     }
 
     private void Enqueue(long watermark)

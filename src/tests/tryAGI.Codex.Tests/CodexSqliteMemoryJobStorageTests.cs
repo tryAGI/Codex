@@ -689,6 +689,222 @@ public sealed class CodexSqliteMemoryJobStorageTests
         Assert.Equal(thread, Assert.Single(await upgraded.ScanStartupAsync(scan, Ct)).ThreadId);
     }
 
+    private const string LocalSummary = "v1\n## User Profile\nUser\n## User preferences\nPreference\n## General Tips\nTip\n## What's in Memory\nSource\n";
+
+    private static CodexMemoryBackend LocalBackend(CodexMacOsSqliteMemoryJobStorage storage, Guid thread) =>
+        new(storage, Scope, thread, () => new(true, true, true, CodexMemoryVersion.V2), (_, _) => ValueTask.CompletedTask);
+
+    [Fact]
+    public async Task LocalArtifactIsVisibleOnlyAfterExactPhase2SettlementAndSurvivesReopen()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var consumer = Guid.NewGuid();
+        var firstSource = Guid.NewGuid();
+        var secondSource = Guid.NewGuid();
+        CodexMemoryConsolidationOutput output;
+        await using (var storage = await fixture.Open(clock, true))
+        {
+            await Extract(storage, clock, firstSource, 1, "first");
+            await Extract(storage, clock, secondSource, 2, "second");
+            Assert.True(await storage.PublishMemoryIoPolicyAsync(new(consumer, 1, true, true, true), Ct));
+            var backend = LocalBackend(storage, consumer);
+            Assert.Null(await backend.ReadRpcSummaryAsync(Ct));
+            var jobs = Jobs(storage, clock);
+            var admission = Admission(await Claim(jobs, Key(), Guid.NewGuid()));
+            var selected = await storage.ListEligibleOutputsAsync(cancellationToken: Ct);
+            CodexMemoryFile[] files =
+            [
+                new("memory_summary.md", LocalSummary),
+                new("MEMORY.md", "overview"),
+                new("rollout_summaries/z.md", "needle Z"),
+                new("rollout_summaries/a.md", "needle A"),
+                new("skills/empty.md", ""),
+                new("extensions/ad_hoc/instructions.md", "notes guide"),
+            ];
+            await Assert.ThrowsAsync<InvalidOperationException>(() => storage.StageMemoryArtifactAsync(admission, selected, files, Ct));
+            Assert.True(await storage.TryAdmitSamplingAsync(admission, Ct));
+            output = await storage.StageMemoryArtifactAsync(admission, selected, files, Ct);
+            var repeated = await storage.StageMemoryArtifactAsync(admission, selected.Reverse().ToArray(), files.Reverse().ToArray(), Ct);
+            Assert.Equal(output.ArtifactRevision, repeated.ArtifactRevision);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => storage.StageMemoryArtifactAsync(admission,
+                selected, [.. files, new("extra.md", "different")], Ct));
+
+            Assert.Null(await backend.ReadRpcSummaryAsync(Ct));
+            Assert.Empty((await backend.ListAsync(cancellationToken: Ct)).Entries);
+            Assert.False((await storage.ReadLocalArtifactStatusAsync(Ct)).HasValidV2Summary);
+
+            var observed = await jobs.ReadAsync(Key(), Ct);
+            var wrongSelection = jobs.PreparePhase2Success(observed, admission.WorkerId, admission.OwnershipToken,
+                Guid.NewGuid(), output with { Selected = [selected[0]] });
+            Assert.Equal(CodexMemoryJobSettlement.Conflict, (await jobs.ApplyAsync(wrongSelection, Ct)).Settlement);
+            var forged = jobs.PreparePhase2Success(observed, admission.WorkerId, admission.OwnershipToken,
+                Guid.NewGuid(), output with { ArtifactRevision = "sqlite-memory-v1:missing" });
+            Assert.Equal(CodexMemoryJobSettlement.Conflict, (await jobs.ApplyAsync(forged, Ct)).Settlement);
+            var complete = jobs.PreparePhase2Success(observed, admission.WorkerId, admission.OwnershipToken,
+                Guid.NewGuid(), output);
+            Assert.Equal(CodexMemoryJobSettlement.Applied, (await jobs.ApplyAsync(complete, Ct)).Settlement);
+            Assert.Equal(new CodexMemoryLocalArtifactStatus(output.ArtifactRevision, 2, true),
+                await storage.ReadLocalArtifactStatusAsync(Ct));
+        }
+
+        await using var reopened = await fixture.Open(clock);
+        var reader = LocalBackend(reopened, consumer);
+        Assert.Equal(LocalSummary, await reader.ReadRpcSummaryAsync(Ct));
+        Assert.Equal("", (await reader.ReadAsync("skills/empty.md", cancellationToken: Ct)).Content);
+        var page = await reader.ListAsync("rollout_summaries", maxResults: 1, cancellationToken: Ct);
+        Assert.Equal(new CodexMemoryEntry("rollout_summaries/a.md", false), Assert.Single(page.Entries));
+        Assert.NotNull(page.NextCursor);
+        var next = await reader.ListAsync("rollout_summaries", page.NextCursor, 1, Ct);
+        Assert.Equal(new CodexMemoryEntry("rollout_summaries/z.md", false), Assert.Single(next.Entries));
+        Assert.Null(next.NextCursor);
+        var request = new CodexMemorySearchRequest(["needle"], Path: "rollout_summaries", MaxResults: 1);
+        var search = await reader.SearchAsync(request, Ct);
+        Assert.Equal("rollout_summaries/a.md", Assert.Single(search.Matches).Path);
+        Assert.NotNull(search.NextCursor);
+        var rest = await reader.SearchAsync(request with { Cursor = search.NextCursor }, Ct);
+        Assert.Equal("rollout_summaries/z.md", Assert.Single(rest.Matches).Path);
+        Assert.Null(rest.NextCursor);
+        await using var snapshot = await reopened.OpenReadAsync(new(Scope, consumer, "read", "MEMORY.md"), Ct);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await snapshot.ReadAsync("memory_summary.md", 1024, Ct));
+        await Assert.ThrowsAsync<InvalidDataException>(async () => await snapshot.ReadAsync("MEMORY.md", 2, Ct));
+        Assert.Equal("overview", (await snapshot.ReadAsync("MEMORY.md", 1024, Ct)).Content);
+    }
+
+    [Fact]
+    public async Task NoteCreationAndPolicyChangesFenceOpenSnapshotsWithoutOverwriting()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        var accesses = new List<CodexMemoryJobStorageAccess>();
+        await using var storage = await fixture.Open(clock, true, (access, _) =>
+        {
+            accesses.Add(access);
+            return ValueTask.CompletedTask;
+        });
+        await using var other = await fixture.Open(clock);
+        var backend = LocalBackend(storage, thread);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => backend.ReadRpcSummaryAsync(Ct));
+        Assert.True(await storage.PublishMemoryIoPolicyAsync(new(thread, 1, true, false, false), Ct));
+        Assert.Null(await backend.ReadRpcSummaryAsync(Ct));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => backend.ListAsync(cancellationToken: Ct));
+        Assert.False(await storage.PublishMemoryIoPolicyAsync(new(thread, 1, true, true, true), Ct));
+        Assert.True(await storage.PublishMemoryIoPolicyAsync(new(thread, 2, true, true, true), Ct));
+        await using var before = await storage.OpenReadAsync(new(Scope, thread, "list", ""), Ct);
+        Assert.Empty(await before.ListAsync("", null, 10, Ct));
+
+        const string filename = "2026-11-27T12-00-00-preference.md";
+        const string path = "extensions/ad_hoc/notes/" + filename;
+        var note = new CodexMemoryAccess(Scope, thread, "add_ad_hoc_note", path);
+        Assert.True(await storage.CreateNoteAsync(note, "original", Ct));
+        var authorized = Assert.Single(accesses, access => access.Operation == "memory_create_note");
+        Assert.Equal(note, authorized.MemoryAccess);
+        Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData("original"u8)), authorized.NoteSha256);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await before.ListAsync("", null, 10, Ct));
+        await using var current = await storage.OpenReadAsync(new(Scope, thread, "read", path), Ct);
+        Assert.False(await other.CreateNoteAsync(note, "replacement", Ct));
+        Assert.Equal("original", (await current.ReadAsync(path, 100, Ct)).Content);
+        await Assert.ThrowsAsync<ArgumentException>(async () => await storage.CreateNoteAsync(note with { Path = "extensions/ad_hoc/notes/invalid.md" }, "bad", Ct));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await storage.CreateNoteAsync(note with { Path = "MEMORY.md" }, "bad", Ct));
+
+        Assert.True(await other.PublishMemoryIoPolicyAsync(new(thread, 3, false, false, false), Ct));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await current.ReadAsync(path, 100, Ct));
+        Assert.False(await other.PublishMemoryIoPolicyAsync(new(thread, 2, true, true, true), Ct));
+        Assert.True(await other.PublishMemoryIoPolicyAsync(new(thread, 4, true, true, true), Ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await current.ReadAsync(path, 100, Ct));
+        Assert.Equal("original", (await LocalBackend(other, thread).ReadAsync(path, cancellationToken: Ct)).Content);
+        var roots = await LocalBackend(other, thread).ListAsync(cancellationToken: Ct);
+        Assert.Equal(new CodexMemoryEntry("extensions", true), Assert.Single(roots.Entries));
+    }
+
+    [Fact]
+    public async Task SourceRevocationHidesPublishedArtifactAndFencesSnapshots()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var source = Guid.NewGuid();
+        var consumer = Guid.NewGuid();
+        await using var storage = await fixture.Open(clock, true);
+        await using var publisher = await fixture.Open(clock);
+        await Extract(storage, clock, source, 1, "revocable");
+        Assert.True(await storage.PublishMemoryIoPolicyAsync(new(consumer, 1, true, true, false), Ct));
+        var jobs = Jobs(storage, clock);
+        var admission = Admission(await Claim(jobs, Key(), Guid.NewGuid()));
+        Assert.True(await storage.TryAdmitSamplingAsync(admission, Ct));
+        var selected = await storage.ListEligibleOutputsAsync(cancellationToken: Ct);
+        var output = await storage.StageMemoryArtifactAsync(admission, selected,
+            [new("memory_summary.md", LocalSummary), new("MEMORY.md", "revocable")], Ct);
+        var complete = jobs.PreparePhase2Success(await jobs.ReadAsync(Key(), Ct), admission.WorkerId,
+            admission.OwnershipToken, Guid.NewGuid(), output);
+        Assert.Equal(CodexMemoryJobSettlement.Applied, (await jobs.ApplyAsync(complete, Ct)).Settlement);
+        await using var snapshot = await storage.OpenReadAsync(new(Scope, consumer, "read", "MEMORY.md"), Ct);
+        Assert.Equal("revocable", (await snapshot.ReadAsync("MEMORY.md", 100, Ct)).Content);
+        Assert.True(await publisher.PublishSourceAsync(new(source, 2, false), Ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await snapshot.ReadAsync("MEMORY.md", 100, Ct));
+        Assert.Null(await LocalBackend(storage, consumer).ReadRpcSummaryAsync(Ct));
+        Assert.Equal(new CodexMemoryLocalArtifactStatus(null, 1, false), await storage.ReadLocalArtifactStatusAsync(Ct));
+    }
+
+    [Fact]
+    public async Task StagedArtifactCannotCrossClaimsAndInvalidPathsNeverBecomeVisible()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var source = Guid.NewGuid();
+        await using var storage = await fixture.Open(clock, true);
+        await Extract(storage, clock, source, 1, "source");
+        var jobs = Jobs(storage, clock);
+        var admission = Admission(await Claim(jobs, Key(), Guid.NewGuid()));
+        Assert.True(await storage.TryAdmitSamplingAsync(admission, Ct));
+        var selected = await storage.ListEligibleOutputsAsync(cancellationToken: Ct);
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.StageMemoryArtifactAsync(admission, selected,
+            [new("memory_summary.md", "invalid")], Ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => storage.StageMemoryArtifactAsync(admission, selected,
+            [new("memory_summary.md", LocalSummary), new("../escape.md", "bad")], Ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => storage.StageMemoryArtifactAsync(admission, selected,
+            [new("memory_summary.md", LocalSummary), new("extensions/ad_hoc/notes/a.md", "bad")], Ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => storage.StageMemoryArtifactAsync(admission, selected,
+            [new("memory_summary.md", LocalSummary), new("a", "file"), new("a/b", "conflict")], Ct));
+        var output = await storage.StageMemoryArtifactAsync(admission, selected, [new("memory_summary.md", LocalSummary)], Ct);
+        clock.Advance(Lease);
+        var fresh = Admission(await Claim(jobs, Key(), Guid.NewGuid()));
+        Assert.True(await storage.TryAdmitSamplingAsync(fresh, Ct));
+        var oldOutput = jobs.PreparePhase2Success(await jobs.ReadAsync(Key(), Ct), fresh.WorkerId,
+            fresh.OwnershipToken, Guid.NewGuid(), output);
+        Assert.Equal(CodexMemoryJobSettlement.Conflict, (await jobs.ApplyAsync(oldOutput, Ct)).Settlement);
+        Assert.Null((await storage.ReadLocalArtifactStatusAsync(Ct)).ArtifactRevision);
+    }
+
+    [Fact]
+    public async Task Schema3UpgradePreservesDiscoveryAndRequiresExplicitIoPermission()
+    {
+        RequireMac();
+        using var fixture = new Fixture();
+        var clock = new Clock();
+        var thread = Guid.NewGuid();
+        var update = Discover(clock, thread, 7, 2);
+        await using (var storage = await fixture.Open(clock, true))
+        {
+            await Extract(storage, clock, thread, 7, "legacy");
+            Assert.True(await storage.PublishSourceAsync(update, Ct));
+        }
+        await fixture.MakeLegacySchemaAsync(3);
+        await Assert.ThrowsAsync<InvalidDataException>(() => fixture.Open(clock));
+        await using var upgraded = await fixture.Upgrade(clock);
+        Assert.Equal("legacy", (await upgraded.ReadExtractionAsync(new(thread, 7), Ct))!.RawMemory);
+        var scan = new CodexMemoryStartupScan(Scope, Guid.NewGuid(), clock.GetUtcNow().AddDays(-30),
+            clock.GetUtcNow().AddHours(-1), ["cli"], 10);
+        Assert.Equal(thread, Assert.Single(await upgraded.ScanStartupAsync(scan, Ct)).ThreadId);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => LocalBackend(upgraded, thread).ReadRpcSummaryAsync(Ct));
+        Assert.True(await upgraded.PublishMemoryIoPolicyAsync(new(thread, 1, true, true, false), Ct));
+        Assert.Null(await LocalBackend(upgraded, thread).ReadRpcSummaryAsync(Ct));
+    }
+
     private sealed class AfterScan(ICodexMemoryStartupSource inner, Func<CancellationToken, Task> change) : ICodexMemoryStartupSource
     {
         public async ValueTask<IReadOnlyList<CodexMemoryStartupCandidate>> ScanStartupAsync(
@@ -731,10 +947,14 @@ public sealed class CodexSqliteMemoryJobStorageTests
 
         internal async Task MakeLegacySchemaAsync(int version = 1)
         {
+            const string removeArtifacts = "BEGIN IMMEDIATE; DROP TRIGGER memory_pointer_changed; " +
+                "DROP TABLE memory_artifact_source; DROP TABLE memory_entry; DROP TABLE memory_manifest; " +
+                "DROP TABLE memory_io_policy; DROP TABLE memory_view; ";
             var sql = version switch
             {
-                1 => "BEGIN IMMEDIATE; DROP TABLE discovery; DROP TABLE sampling; PRAGMA user_version=1; COMMIT;",
-                2 => "BEGIN IMMEDIATE; DROP TABLE discovery; PRAGMA user_version=2; COMMIT;",
+                1 => removeArtifacts + "DROP TABLE discovery; DROP TABLE sampling; PRAGMA user_version=1; COMMIT;",
+                2 => removeArtifacts + "DROP TABLE discovery; PRAGMA user_version=2; COMMIT;",
+                3 => removeArtifacts + "PRAGMA user_version=3; COMMIT;",
                 _ => throw new ArgumentOutOfRangeException(nameof(version)),
             };
             using var process = Process.Start(new ProcessStartInfo("/usr/bin/sqlite3")

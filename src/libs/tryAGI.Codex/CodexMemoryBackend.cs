@@ -353,11 +353,8 @@ public sealed class CodexMemoryBackend
     /// <summary>Creates a timestamp-slug Markdown note without replacing any existing content.</summary>
     public async Task AddAdHocNoteAsync(string filename, string note, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(filename);
+        ValidateAdHocFilename(filename);
         ArgumentException.ThrowIfNullOrWhiteSpace(note);
-        if (filename.Length is < 24 or > 103 || !filename.EndsWith(".md", StringComparison.Ordinal) ||
-            !ValidFilename(filename))
-            throw new ArgumentException("Expected YYYY-MM-DDTHH-MM-SS-slug.md.", nameof(filename));
         if (Utf8.GetByteCount(note) > MaximumDocumentBytes)
             throw new ArgumentException("Memory note exceeds its size bound.", nameof(note));
         var path = "extensions/ad_hoc/notes/" + filename;
@@ -383,7 +380,7 @@ public sealed class CodexMemoryBackend
         return access;
     }
 
-    private static string ValidatePath(string? path, bool allowRoot)
+    internal static string ValidatePath(string? path, bool allowRoot)
     {
         if (string.IsNullOrEmpty(path) && allowRoot) return "";
         if (string.IsNullOrEmpty(path) || path.Length > 4096 || path.Contains('\\') || path.Contains(':') ||
@@ -427,6 +424,14 @@ public sealed class CodexMemoryBackend
         try { return (ValidatePath(Utf8.GetString(Convert.FromBase64String(parts[2])), false), line); }
         catch (FormatException ex) { throw new ArgumentException("Malformed memory cursor.", nameof(cursor), ex); }
         catch (DecoderFallbackException ex) { throw new ArgumentException("Malformed memory cursor.", nameof(cursor), ex); }
+    }
+
+    internal static void ValidateAdHocFilename(string filename)
+    {
+        ArgumentNullException.ThrowIfNull(filename);
+        if (filename.Length is < 24 or > 103 || !filename.EndsWith(".md", StringComparison.Ordinal) ||
+            !ValidFilename(filename))
+            throw new ArgumentException("Expected YYYY-MM-DDTHH-MM-SS-slug.md.", nameof(filename));
     }
 
     private static bool ValidFilename(string value)
