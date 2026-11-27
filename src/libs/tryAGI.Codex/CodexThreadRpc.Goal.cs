@@ -85,10 +85,20 @@ public sealed partial class CodexThreadRpc
         finally { admission.Release(); }
         if (clearing)
         {
-            if (cleared) await EmitAsync("thread/goal/cleared", new JsonObject { ["threadId"] = id.ToString() }).ConfigureAwait(false);
+            if (cleared && Volatile.Read(ref liveGoalProgress))
+            {
+                ReconcileGoalProgress(updated, null);
+                await FlushGoalProgressAsync(id, ct).ConfigureAwait(false);
+            }
+            else if (cleared) await EmitAsync("thread/goal/cleared", new JsonObject { ["threadId"] = id.ToString() }).ConfigureAwait(false);
             return Element(new JsonObject { ["cleared"] = cleared });
         }
-        await EmitAsync("thread/goal/updated", new JsonObject
+        if (Volatile.Read(ref liveGoalProgress))
+        {
+            ReconcileGoalProgress(updated, null);
+            await FlushGoalProgressAsync(id, ct).ConfigureAwait(false);
+        }
+        else await EmitAsync("thread/goal/updated", new JsonObject
         {
             ["threadId"] = id.ToString(), ["turnId"] = null, ["goal"] = Goal(id, updated.Goal)
         }).ConfigureAwait(false);
@@ -102,6 +112,11 @@ public sealed partial class CodexThreadRpc
 
     private async Task NotifyTerminalGoalUsageAsync(CodexThreadDocument thread, CodexStoredTurn turn)
     {
+        if (Volatile.Read(ref liveGoalProgress))
+        {
+            ReconcileGoalProgress(thread, turn.Id);
+            return;
+        }
         if (Volatile.Read(ref goalAuthority) is null || thread.Goal is not { } goal) return;
         var accounted = (goal.UsageReceipts ?? []).Select(receipt => receipt.Id).ToHashSet();
         var continuation = turn.GoalContinuation is { } auto && auto.OriginThreadId == thread.Id && auto.GoalId == goal.Id;

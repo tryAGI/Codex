@@ -110,7 +110,8 @@ public sealed partial class CodexThreadStore
                 updated = ApplyGoalUsage(observed.Goal!, binding.UsageId, delta.Value, 0, CodexGoalAccountingMode.AttributedDescendant);
             try
             {
-                _ = await WriteGoalAsync(observed, updated, ct).ConfigureAwait(false);
+                _ = await WriteGoalAsync(observed, updated, ct,
+                    CaptureGoalNotice(root, root.Turns.LastOrDefault() is { Status: "inProgress" } activeTurn ? activeTurn.Id : null)).ConfigureAwait(false);
                 return CodexDescendantGoalUsageOutcome.Applied;
             }
             catch (CodexThreadConflictException) when (attempt < 3) { }

@@ -176,12 +176,13 @@ public sealed partial class CodexThreadStore
             return new(false, before);
         }
         RequireGoalContinuationDispatch(before, active, nativeGoalTool);
+        var goalNotice = CaptureGoalNotice(before, turnId);
         before = ObserveGoalExecutionTime(before, turnId, true);
         var dispatch = new CodexStoredDispatch(callId, kind, hash, "dispatching")
         { GoalInference = CaptureGoalInference(before, active, kind) };
         var turn = active with { Dispatches = [.. active.Dispatches, dispatch] };
         var next = Replace(before, turn) with { Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow() };
-        return new(true, await PublishAsync(before.Revision, next, cancellationToken).ConfigureAwait(false));
+        return new(true, await PublishAsync(before.Revision, next, cancellationToken, goalNotice).ConfigureAwait(false));
     }
 
     /// <summary>Records the outcome of a dispatch: <c>succeeded</c>, <c>failed</c> or <c>unknown</c>.</summary>
@@ -294,8 +295,9 @@ public sealed partial class CodexThreadStore
         Func<CodexThreadDocument, CodexThreadDocument> update, CancellationToken ct)
     {
         var before = await CurrentAsync(threadId, revision, ct).ConfigureAwait(false);
+        var goalNotice = CaptureGoalNotice(before, before.Turns.LastOrDefault() is { Status: "inProgress" } activeTurn ? activeTurn.Id : null);
         return await PublishAsync(before.Revision, InvalidateChangedCompactionPrefix(update(before)) with { Revision = checked(before.Revision + 1),
-            UpdatedAt = time.GetUtcNow() }, ct).ConfigureAwait(false);
+            UpdatedAt = time.GetUtcNow() }, ct, goalNotice).ConfigureAwait(false);
     }
     private Task<CodexThreadDocument> ChangeTurnAsync(Guid threadId, long revision, Guid turnId, string ownerId,
         Func<CodexStoredTurn, CodexStoredTurn> update, CancellationToken ct)
@@ -309,7 +311,8 @@ public sealed partial class CodexThreadStore
     }
     private static CodexThreadDocument Replace(CodexThreadDocument value, CodexStoredTurn turn)
         => value with { Turns = value.Turns.Select(t => t.Id == turn.Id ? turn : t).ToArray() };
-    private async Task<CodexThreadDocument> PublishAsync(long? expected, CodexThreadDocument value, CancellationToken ct)
+    private async Task<CodexThreadDocument> PublishAsync(long? expected, CodexThreadDocument value, CancellationToken ct,
+        CodexGoalNotice? goalNotice = null)
     {
         if (value.Revision != checked((expected ?? 0) + 1)) throw new InvalidOperationException("Invalid next native thread revision.");
         // Archive is a durable execution fence, including writers entering through other hosts.
@@ -332,6 +335,7 @@ public sealed partial class CodexThreadStore
         }
         if (!await storage.CompareExchangeAsync(value.Id, expected, body, ct).ConfigureAwait(false))
             throw new CodexThreadConflictException();
+        NotifyGoalCommit(next, goalNotice);
         NotifyRealtimeCommit(next, body);
         return next;
     }

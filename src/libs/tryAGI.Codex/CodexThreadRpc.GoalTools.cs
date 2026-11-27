@@ -15,10 +15,17 @@ public sealed partial class CodexThreadRpc
         var authority = Volatile.Read(ref goalAuthority)
             ?? throw new InvalidOperationException("Enable native goals before native goal tools.");
         var policy = new CodexGoalToolPolicy(authorize, authority.MaximumTokenBudget, (thread, turn) =>
-            EmitAsync("thread/goal/updated", new JsonObject
+        {
+            if (Volatile.Read(ref liveGoalProgress))
+            {
+                ReconcileGoalProgress(thread, turn);
+                return Task.CompletedTask;
+            }
+            return EmitAsync("thread/goal/updated", new JsonObject
             {
                 ["threadId"] = thread.Id.ToString(), ["turnId"] = turn.ToString(), ["goal"] = Goal(thread.Id, thread.Goal)
-            }));
+            });
+        });
         if (Interlocked.CompareExchange(ref goalTools, policy, null) is not null)
             throw new InvalidOperationException("Native goal tool authority is already installed.");
     }

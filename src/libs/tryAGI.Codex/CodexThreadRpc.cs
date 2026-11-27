@@ -139,9 +139,13 @@ public sealed partial class CodexThreadRpc(
         await admission.WaitAsync(ct).ConfigureAwait(false);
         try { Volatile.Write(ref stopping, true); pending = active.Values.ToArray(); }
         finally { admission.Release(); }
-        await DrainRealtimeAsync(ct).ConfigureAwait(false);
-        foreach (var running in pending) running.Control.Interrupt();
-        await Task.WhenAll(pending.Select(r => r.Completion)).WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await DrainRealtimeAsync(ct).ConfigureAwait(false);
+            foreach (var running in pending) running.Control.Interrupt();
+            await Task.WhenAll(pending.Select(r => r.Completion)).WaitAsync(ct).ConfigureAwait(false);
+        }
+        finally { await StopGoalProgressAsync(ct).ConfigureAwait(false); }
     }
 
     private async Task<JsonElement> CreateAsync(JsonElement p, CancellationToken ct)

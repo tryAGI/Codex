@@ -60,6 +60,7 @@ public sealed partial class CodexThreadStore
         if (budgetSpecified) ValidateGoalBudget(budget, maximumBudget);
         var before = await CurrentAsync(id, revision, ct).ConfigureAwait(false);
         RequireGoalThread(before, true);
+        var notice = CaptureGoalNotice(before, null, mayCreate: true);
         before = ObserveLocalGoalMutation(before);
         var previous = before.Goal;
         if (previous is null && objective is null) throw new ArgumentException("Cannot update goal: no goal exists.");
@@ -74,7 +75,7 @@ public sealed partial class CodexThreadStore
         var goal = new CodexStoredThreadGoal(previous?.Id ?? Guid.CreateVersion7(), objective ?? previous!.Objective,
             effectiveStatus, effectiveBudget, tokensUsed, previous?.TimeUsedSeconds ?? 0, previous?.CreatedAt ?? now,
             now, previous?.UsageReceipts) { ElapsedRemainderTicks = previous?.ElapsedRemainderTicks };
-        return await WriteGoalAsync(before, goal, ct).ConfigureAwait(false);
+        return await WriteGoalAsync(before, goal, ct, notice).ConfigureAwait(false);
     }
 
     internal async Task<(CodexThreadDocument Thread, bool Cleared)> ClearGoalAsync(Guid id, long revision, CancellationToken ct)
@@ -82,7 +83,7 @@ public sealed partial class CodexThreadStore
         var before = await CurrentAsync(id, revision, ct).ConfigureAwait(false);
         RequireGoalThread(before, true);
         if (before.Goal is null) return (before, false);
-        return (await WriteGoalAsync(ObserveLocalGoalMutation(before), null, ct).ConfigureAwait(false), true);
+        return (await WriteGoalAsync(ObserveLocalGoalMutation(before), null, ct, CaptureGoalNotice(before, null)).ConfigureAwait(false), true);
     }
 
     /// <summary>Accounts one trusted, observed usage delta for the exact goal generation. Duplicate
@@ -103,7 +104,8 @@ public sealed partial class CodexThreadStore
         var observed = ObserveLocalGoalMutation(before);
         if (!ReferenceEquals(goal, observed.Goal))
             updated = ApplyGoalUsage(observed.Goal!, usageId, tokenDelta, elapsedSeconds, mode);
-        return await WriteGoalAsync(observed, updated, cancellationToken).ConfigureAwait(false);
+        return await WriteGoalAsync(observed, updated, cancellationToken,
+            CaptureGoalNotice(before, before.Turns.LastOrDefault() is { Status: "inProgress" } turn ? turn.Id : null)).ConfigureAwait(false);
     }
 
     private CodexStoredThreadGoal ApplyGoalUsage(CodexStoredThreadGoal goal, Guid usageId, long tokenDelta,
@@ -139,9 +141,10 @@ public sealed partial class CodexThreadStore
         };
     }
 
-    private Task<CodexThreadDocument> WriteGoalAsync(CodexThreadDocument before, CodexStoredThreadGoal? goal, CancellationToken ct)
+    private Task<CodexThreadDocument> WriteGoalAsync(CodexThreadDocument before, CodexStoredThreadGoal? goal, CancellationToken ct,
+        CodexGoalNotice? notice)
         => PublishAsync(before.Revision, RebindGoalClock(before with { Revision = checked(before.Revision + 1), Goal = goal,
-            DeferredGoalId = goal?.Id == before.DeferredGoalId ? before.DeferredGoalId : null }), ct);
+            DeferredGoalId = goal?.Id == before.DeferredGoalId ? before.DeferredGoalId : null }), ct, notice);
 
     private static CodexStoredThreadGoal? ForkGoal(CodexThreadDocument source, System.Text.Json.JsonElement settings)
         => settings.TryGetProperty("ephemeral", out var ephemeral) && ephemeral.ValueKind == System.Text.Json.JsonValueKind.True
