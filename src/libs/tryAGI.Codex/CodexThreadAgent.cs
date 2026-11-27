@@ -110,6 +110,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 expectedRevision = before.Revision;
             }
         }
+        using var ownedControl = control is null && (before.RealtimeSessions is { Length: > 0 } ||
+            before.Turns.Any(t => t.RealtimeModeTransitions is { Length: > 0 })) ? new CodexAgentControl() : null;
+        control ??= ownedControl;
         var persistedInput = journalProjection is null ? input : input.Select(journalProjection).ToArray();
         control?.InitializeInput(input, handoff?.SubmissionId.ToString(), handoff is null ? null : "realtime");
         CodexThreadDocument started;
@@ -127,6 +130,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         }
         using var execution = new Execution(store, started, turnId, ownerId, budget, input, journalProjection, historyTurnLimit, control, options);
         control?.BindRealtimeAdmission(execution.AdmitRealtimeSteerAsync);
+        control?.BindRealtimeMode(execution.CaptureRealtimeModeAsync);
         try
         {
             // The host may publish pending after the durable turn exists, before any
@@ -184,6 +188,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private readonly ICodexUsageObserver budget;
         private readonly Func<JsonElement, JsonElement>? projection;
         private readonly CodexAgentControl? control;
+        private CodexRealtimeModeCapture? pendingMode;
         private readonly SemaphoreSlim gate = new(1, 1);
         private readonly ConcurrentDictionary<string, JsonElement> observed = new(StringComparer.Ordinal);
         internal CodexThreadDocument Current { get; private set; }
@@ -251,6 +256,21 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 return await JournalAsync(doc => store.AdmitRealtimeHandoffAsync(doc.Id, doc.Revision,
                     handoff.SessionId, handoff.OwnerId, handoff.AttachmentId, handoff.HandoffId,
                     handoff.SubmissionId, turnId, owner, handoff.ContextualInput, ct), result => result.Thread, ct).ConfigureAwait(false);
+            }
+            finally { gate.Release(); }
+        }
+
+        internal async Task CaptureRealtimeModeAsync(List<JsonElement> history, CancellationToken ct)
+        {
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var actual = await store.ReadAsync(Current.Id, ct).ConfigureAwait(false);
+                var turn = actual.Turns.Single(t => t.Id == turnId);
+                if (turn.OwnerId != owner || turn.Status != "inProgress")
+                    throw new InvalidOperationException("Realtime mode capture lost its native turn owner.");
+                pendingMode = CodexRealtimeModeContext.Capture(actual, history, Seed.Count);
+                if (pendingMode is { } capture) history.Add(capture.Message);
             }
             finally { gate.Release(); }
         }
@@ -371,7 +391,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         {
             if (projection is not null) output = output.Select(projection).ToArray();
             if (output.Count == Turn.Output.Length && !output.Where((item, i) => !JsonElement.DeepEquals(item, Turn.Output[i])).Any()) return;
-            await JournalAsync(doc => store.SynchronizeOutputAsync(doc.Id, doc.Revision, turnId, owner, output, ct), ct).ConfigureAwait(false);
+            var mode = pendingMode;
+            await JournalAsync(doc => store.SynchronizeOutputCoreAsync(doc.Id, doc.Revision, turnId, owner, output, mode, ct), ct).ConfigureAwait(false);
+            pendingMode = null;
         }
         internal async Task FinishAsync(IReadOnlyList<JsonElement> history, CancellationToken ct)
         {

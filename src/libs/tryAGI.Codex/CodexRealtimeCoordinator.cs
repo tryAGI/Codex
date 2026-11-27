@@ -33,6 +33,8 @@ public sealed record CodexRealtimeCoordinatorOptions
     public bool ResponsesAsItems { get; init; }
     /// <summary>Optional prefix for complete backend conversation items.</summary>
     public string? ResponseItemPrefix { get; init; }
+    /// <summary>Backing model's contextual instructions at logical realtime mode transitions.</summary>
+    public CodexRealtimeModeInstructions? ModeInstructions { get; init; }
     /// <summary>Optional host BEM prefix overrides.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? ChannelPrefixes { get; init; }
 }
@@ -124,7 +126,13 @@ public sealed class CodexRealtimeCoordinator : IAsyncDisposable
     /// <summary>Attach to the registered call after validating its thread/account ownership.</summary>
     public async Task<CodexRealtimeLifecycleStatus> AttachAsync(CancellationToken ct = default)
     {
-        await ReadBoundAsync(ct).ConfigureAwait(false);
+        var thread = await ReadBoundAsync(ct).ConfigureAwait(false);
+        if (options.ModeInstructions is { } instructions)
+        {
+            var session = thread.RealtimeSessions!.Single(s => s.SessionId == sessionId);
+            if (session.ModeInstructions != instructions)
+                await store.ConfigureRealtimeModeInstructionsAsync(threadId, thread.Revision, sessionId, ownerId, instructions, ct).ConfigureAwait(false);
+        }
         return await controller.AttachAsync(ct).ConfigureAwait(false);
     }
 

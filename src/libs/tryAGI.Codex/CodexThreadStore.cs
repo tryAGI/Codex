@@ -109,6 +109,10 @@ public sealed partial class CodexThreadStore
     /// This does not authorize tools or validate provider output on the caller's behalf.</summary>
     public Task<CodexThreadDocument> SynchronizeOutputAsync(Guid threadId, long expectedRevision, Guid expectedTurnId,
         string ownerId, IReadOnlyList<JsonElement> output, CancellationToken cancellationToken = default)
+        => SynchronizeOutputCoreAsync(threadId, expectedRevision, expectedTurnId, ownerId, output, null, cancellationToken);
+
+    internal Task<CodexThreadDocument> SynchronizeOutputCoreAsync(Guid threadId, long expectedRevision, Guid expectedTurnId,
+        string ownerId, IReadOnlyList<JsonElement> output, CodexRealtimeModeCapture? mode, CancellationToken cancellationToken)
         => ChangeAsync(threadId, expectedRevision, document =>
         {
             var turn = Active(document, expectedTurnId, ownerId);
@@ -117,6 +121,14 @@ public sealed partial class CodexThreadStore
                 throw new InvalidOperationException("Observed native thread output cannot be rewritten.");
             // Format 1 readers reject active output. Signal the changed invariant explicitly;
             // old snapshots remain readable, and older writers fail closed on this format.
+            if (mode is not null)
+            {
+                var index = mode.Transition.OutputIndex;
+                if (index < turn.Output.Length || index >= next.Length ||
+                    !JsonElement.DeepEquals(next[index], mode.Message))
+                    throw new InvalidOperationException("Realtime mode capture was not retained in the exact native input.");
+                turn = turn with { RealtimeModeTransitions = [.. turn.RealtimeModeTransitions ?? [], mode.Transition] };
+            }
             return Replace(document, turn with { Output = next }) with { Format = 2 };
         }, cancellationToken);
 
@@ -294,6 +306,7 @@ public sealed partial class CodexThreadStore
             if (active && value.Format == 1 && turn.Output.Length != 0 || turn.CompletedAt == default(DateTimeOffset))
                 throw new InvalidDataException("Native terminal history is invalid.");
             _ = Items(turn.Input); _ = Items(turn.Output);
+            ValidateRealtimeModeTransitions(turn);
             if (turn.ClientUserMessageIds is { } clients && (clients.Length > MaximumItems || clients.Any(c => c is not null && !ValidToken(c)))
                 || turn.TurnTrigger is { } trigger && !ValidToken(trigger))
                 throw new InvalidDataException("Invalid native user message correlation.");

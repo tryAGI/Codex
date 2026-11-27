@@ -369,6 +369,53 @@ public sealed class ThreadAgentTests
     }
 
     [Fact]
+    public async Task RealtimeModeTransitionsAreDurableAcrossRequestsDetachEndAndReload()
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        var agent = Agent(store, auth, budget, server);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "rtc_call", "v3", "voice-owner", Ct);
+        thread = await store.ConfigureRealtimeModeInstructionsAsync(thread.Id, thread.Revision, "voice", "voice-owner",
+            new("custom start", "custom end"), Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "voice-owner", attachment, Ct);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.ConfigureRealtimeModeInstructionsAsync(thread.Id,
+            thread.Revision, "voice", "voice-owner", new("wrong", "wrong"), Ct));
+        server.Replies.Enqueue(Call("mode_read", "key"));
+        server.Replies.Enqueue(Text("first"));
+        server.Replies.Enqueue(Text("detached"));
+        server.Replies.Enqueue(Text("ended"));
+        server.Replies.Enqueue(Text("next"));
+        async Task<CodexThreadDocument> Run(CodexThreadDocument current, string input)
+        {
+            var id = Guid.NewGuid();
+            var result = await agent.RunAsync(current.Id, current.Revision, id, "owner", Options(current.Id, id),
+                [Input(input)], (_, _) => Task.FromResult(new CodexToolOutput("result")), cancellationToken: Ct);
+            return await store.ReadAsync(result.Thread.Id, Ct);
+        }
+        static string[] ModeMessages(JsonElement request) => request.GetProperty("input").EnumerateArray()
+            .Where(CodexRealtimeModeContext.IsModeFragment).Select(x => x.GetProperty("content").GetString()!).ToArray();
+        thread = await Run(thread, "first");
+        const string start = "<realtime_conversation>\ncustom start\n</realtime_conversation>";
+        const string end = "<realtime_conversation>\ncustom end\n</realtime_conversation>";
+        Assert.Equal([start], ModeMessages(server.Requests[0]));
+        Assert.Equal([start], ModeMessages(server.Requests[1]));
+        Assert.True(Assert.Single(thread.Turns[0].RealtimeModeTransitions!).Active);
+        thread = await store.DetachRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "voice-owner", attachment, Ct);
+        thread = await Run(thread, "while detached");
+        Assert.Equal([start], ModeMessages(server.Requests[2]));
+        Assert.Null(thread.Turns[1].RealtimeModeTransitions);
+        var endId = Guid.NewGuid();
+        thread = (await store.BeginRealtimeEndAsync(thread.Id, thread.Revision, "voice", "voice-owner", null, endId, Ct)).Thread;
+        thread = await store.CompleteRealtimeEndAsync(thread.Id, thread.Revision, "voice", "voice-owner", endId, Ct);
+        thread = await Run(thread, "typed again");
+        Assert.Equal([start, end], ModeMessages(server.Requests[3]));
+        Assert.False(Assert.Single(thread.Turns[2].RealtimeModeTransitions!).Active);
+        thread = await Run(thread, "typed later");
+        Assert.Equal([start, end], ModeMessages(server.Requests[4]));
+        Assert.Null(thread.Turns[3].RealtimeModeTransitions);
+    }
+
+    [Fact]
     public async Task OrdinaryReasoningTurnCanSpeakAndSteerWithoutRebindingInflightResponse()
     {
         var (_, store, thread, auth, budget, server) = await Setup();

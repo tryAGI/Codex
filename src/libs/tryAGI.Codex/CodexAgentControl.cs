@@ -13,6 +13,10 @@ public sealed class CodexAgentControl : IDisposable
     private bool reservingRealtime;
     private Func<CodexRealtimeReasoningObserver?>? captureRealtimeObserver;
     private CodexRealtimeReasoningObserver? capturedRealtimeObserver;
+    private Func<List<JsonElement>, CancellationToken, Task>? captureRealtimeMode;
+
+    internal void BindRealtimeMode(Func<List<JsonElement>, CancellationToken, Task> capture)
+        => captureRealtimeMode = capture;
 
     internal void BindRealtimeObserver(Func<CodexRealtimeReasoningObserver?> capture)
         => captureRealtimeObserver = capture;
@@ -127,6 +131,7 @@ public sealed class CodexAgentControl : IDisposable
         try
         {
             var settings = Capture(initial, history);
+            if (captureRealtimeMode is not null) await captureRealtimeMode(history, ct).ConfigureAwait(false);
             // Capture the exact voice generation with the input, before a later steer can replace it.
             capturedRealtimeObserver = captureRealtimeObserver?.Invoke();
             return settings;

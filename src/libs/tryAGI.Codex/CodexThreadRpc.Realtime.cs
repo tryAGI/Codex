@@ -159,6 +159,7 @@ public sealed partial class CodexThreadRpc
             DirectAudio = transport == "websocket", ClientManagedHandoffs = Flag(p, "clientManagedHandoffs"),
             BackendReasoningStatus = Flag(p, "backendReasoningStatus"), ResponsesAsItems = Flag(p, "codexResponsesAsItems"),
             ResponseItemPrefix = Text(p, "codexResponseItemPrefix"), ChannelMode = mode, ChannelPrefixes = prefixes,
+            ModeInstructions = new(Text(p, "realtimeStartInstructions"), Text(p, "realtimeEndInstructions")),
         });
     }
 

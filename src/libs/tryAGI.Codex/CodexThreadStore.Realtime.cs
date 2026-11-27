@@ -30,6 +30,9 @@ public sealed record CodexStoredRealtimeSession(
 
     /// <summary>Durable start-or-steer receipts. A receipt never grants permission to replay provider dispatch.</summary>
     public CodexStoredRealtimeHandoffAdmission[]? HandoffAdmissions { get; init; }
+
+    /// <summary>Immutable backing model mode instructions for this logical call.</summary>
+    public CodexRealtimeModeInstructions? ModeInstructions { get; init; }
 }
 
 public sealed partial class CodexThreadStore
@@ -213,6 +216,7 @@ public sealed partial class CodexThreadStore
                 session.EndOperationId == Guid.Empty || (session.State == "ending" && session.EndOperationId is null) ||
                 (session.State is "attached" or "detached") && session.EndOperationId is not null)
                 throw new InvalidDataException("Invalid realtime session journal.");
+            CodexRealtimeModeContext.Validate(session.ModeInstructions);
             ValidateRealtimeHandoffAdmissions(session);
             open = session.State != "ended";
         }

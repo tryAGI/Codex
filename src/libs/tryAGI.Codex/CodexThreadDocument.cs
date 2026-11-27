@@ -75,6 +75,9 @@ public sealed record CodexStoredTurn(
 {
     /// <summary>Durable steering inputs subsequently interleaved with model output in the turn timeline.</summary>
     public int[]? RealtimeSteeringInputIndices { get; init; }
+
+    /// <summary>Durable model-visible realtime mode changes, indexed into the stored output timeline.</summary>
+    public CodexStoredRealtimeModeTransition[]? RealtimeModeTransitions { get; init; }
 }
 
 /// <summary>Request digest binds a call ID to its exact input bytes. Unknown outcomes remain
