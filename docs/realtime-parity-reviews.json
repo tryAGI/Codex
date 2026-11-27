@@ -2,6 +2,2894 @@
   "schemaVersion": 1,
   "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
   "rows": {
+    "rust-function:core/src/client.rs:add_responses_lite_header": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: add_responses_lite_header. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:agent_identity_telemetry": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: agent_identity_telemetry. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:api_error_http_status": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: api_error_http_status. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:as_str": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: as_str. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:auth_manager": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: auth_manager. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:auth_owner": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: auth_owner. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_reasoning": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_reasoning. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_request_telemetry": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_request_telemetry. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_responses_compatibility_headers": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_responses_compatibility_headers. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_responses_headers": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_responses_headers. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_responses_options": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_responses_options. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_responses_request": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_responses_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_routing_hint_header": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_routing_hint_header. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_streaming_telemetry": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_streaming_telemetry. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_subagent_headers": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_subagent_headers. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_websocket_headers": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_websocket_headers. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_websocket_telemetry": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_websocket_telemetry. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:build_ws_client_metadata": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: build_ws_client_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:captures_result_bodies": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: captures_result_bodies. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:check_generation_start": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: check_generation_start. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:connect_websocket": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: connect_websocket. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:connection_reused": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: connection_reused. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:create_realtime_call_with_headers": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: create_realtime_call_with_headers. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:current_client_setup": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: current_client_setup. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:deliver": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: deliver. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:drop": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: drop. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:emit_auth_recovery_event": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: emit_auth_recovery_event. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:fmt": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: fmt. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:for_endpoint": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: for_endpoint. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:force_http_fallback": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: force_http_fallback. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:from_recovery": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: from_recovery. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:generate_attestation_header_for": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: generate_attestation_header_for. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:get_incremental_items": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: get_incremental_items. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:get_last_response": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: get_last_response. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:handle_unauthorized": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: handle_unauthorized. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:inference_tools_changed": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: inference_tools_changed. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:into_raw_stream": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: into_raw_stream. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:is_guardian_reviewer": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: is_guardian_reviewer. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:is_local_connector_result_gateway": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: is_local_connector_result_gateway. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:is_websocket_prewarmed": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: is_websocket_prewarmed. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:item_types": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: item_types. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:new": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: new. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:new_session": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: new_session. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:on_request": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: on_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:on_sse_poll": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: on_sse_poll. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:on_ws_receive_failure": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: on_ws_receive_failure. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:on_ws_request": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: on_ws_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:on_ws_text_event": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: on_ws_text_event. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:open_model_response": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: open_model_response. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:preconnect_websocket": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: preconnect_websocket. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:prepare_response_items_for_request": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: prepare_response_items_for_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:prepare_websocket_request": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: prepare_websocket_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:prepared_prompt_for_trace": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: prepared_prompt_for_trace. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:prewarm_auth": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: prewarm_auth. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:prewarm_websocket": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: prewarm_websocket. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:prompt_cache_key": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: prompt_cache_key. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:prompt_cache_key_policy": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: prompt_cache_key_policy. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:provider_client_setup": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: provider_client_setup. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:realtime_client_setup": {
+      "ownerIssue": 27,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: realtime_client_setup. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:realtime_sideband_auth": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: realtime_sideband_auth. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:reasoning_effort_override_enabled": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: reasoning_effort_override_enabled. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:reset": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: reset. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:response_items_equal_ignoring_internal_metadata": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: response_items_equal_ignoring_internal_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:responses_headers": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: responses_headers. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:responses_request_compression": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: responses_request_compression. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:responses_request_properties_mismatch": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: responses_request_properties_mismatch. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:responses_session_id": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: responses_session_id. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:responses_websocket_enabled": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: responses_websocket_enabled. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:sampling_result_bodies": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: sampling_result_bodies. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:sampling_result_destination": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: sampling_result_destination. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:session_derived_cache_key": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: session_derived_cache_key. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:session_telemetry_for_request": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: session_telemetry_for_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:set_connection_reused": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: set_connection_reused. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:set_guardian_metadata": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: set_guardian_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:stamp_ws_stream_request_start_ms": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: stamp_ws_stream_request_start_ms. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:store_cached_websocket_session": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: store_cached_websocket_session. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:stream": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: stream. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:stream_responses_http": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: stream_responses_http. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:stream_responses_websocket": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: stream_responses_websocket. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:summarize_memories": {
+      "ownerIssue": 54,
+      "applicability": "not-applicable",
+      "status": "not-applicable",
+      "implementation": null,
+      "test": null,
+      "rationale": "Separate memory summarization API, not the pinned realtime session or Responses backing-turn contract."
+    },
+    "rust-function:core/src/client.rs:take_cached_websocket_session": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: take_cached_websocket_session. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:try_switch_fallback_transport": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: try_switch_fallback_transport. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:turn_state_with_auth_owner": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: turn_state_with_auth_owner. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:uses_codex_backend": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: uses_codex_backend. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:validate_required_cyber_access_program": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: validate_required_cyber_access_program. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:websocket_connection": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: websocket_connection. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:with_budget_policy": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: with_budget_policy. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:with_executed_tool_calls": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: with_executed_tool_calls. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:with_restored_history": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: with_restored_history. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/client.rs:with_session_context": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Native Responses transport/session lifecycle: with_session_context. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_history.rs:estimated_token_count": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction retained history: estimated_token_count. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_history.rs:is_attached_notice": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction retained history: is_attached_notice. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_history.rs:keep": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction retained history: keep. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_history.rs:newest_history_item_groups": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction retained history: newest_history_item_groups. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_history.rs:rewritten_output_for_context_window": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction retained history: rewritten_output_for_context_window. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_history.rs:trim_function_call_history_to_fit_context_window": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction retained history: trim_function_call_history_to_fit_context_window. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_history.rs:truncated_output_payload": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction retained history: truncated_output_payload. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:admit_turn": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: admit_turn. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:annotated": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: annotated. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:build_v2_compacted_history": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: build_v2_compacted_history. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:build_v2_compacted_history_counts_retained_input_images": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "rationale": "Image budget and retained selection candidate; exact upstream mixed-content cases remain separate."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:build_v2_compacted_history_discards_messages_before_truncating": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_discards_messages_before_truncating. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:build_v2_compacted_history_filters_to_installed_retention_shape": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_filters_to_installed_retention_shape. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:build_v2_compacted_history_preserves_retained_metadata_sidecar": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_preserves_retained_metadata_sidecar. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:build_without_metadata": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: build_without_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:collect_compaction_output": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: collect_compaction_output. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:collect_compaction_output_accepts_additional_output_items": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: collect_compaction_output_accepts_additional_output_items. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:collect_queued_complete_response": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: collect_queued_complete_response. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:collect_queued_incomplete_usage_on_cancellation": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: collect_queued_incomplete_usage_on_cancellation. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:install": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: install. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:is_client_authored_developer_message": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: is_client_authored_developer_message. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:is_retained_for_remote_compaction_v2": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: is_retained_for_remote_compaction_v2. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:message": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: message. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:raw": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: raw. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:report_usage": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: report_usage. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:response_stream": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: response_stream. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:retained_client_items": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: retained_client_items. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:retained_history_truncation_charges_image_only_messages": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "rationale": "Image-only charge candidate."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:retained_history_truncation_drops_image_only_messages_after_budget_is_spent": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "rationale": "Image-only exhaustion and no backfill candidate."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:retained_history_truncation_keeps_newest_messages_first": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation",
+      "rationale": "Newest-first selection and UTF8 middle truncation candidate."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:retained_history_truncation_preserves_images_and_truncates_later_text_parts": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.MixedContentPreservesImagesKindsAndMarksRetainedSourcesIncomplete",
+      "rationale": "Mixed image/text retention candidate."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:retained_history_truncation_preserves_metadata": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice",
+      "rationale": "Retention metadata and attached notice candidate."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:retained_input_image_count": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: retained_input_image_count. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:retained_message_token_count": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: retained_message_token_count. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:run_inline_remote_auto_compact_task": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: run_inline_remote_auto_compact_task. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:run_remote_compact_task": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: run_remote_compact_task. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:run_remote_compact_task_inner": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: run_remote_compact_task_inner. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:run_remote_compaction_request_v2": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: run_remote_compaction_request_v2. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:select_retained_items": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: select_retained_items. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:should_retain_client_item": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: should_retain_client_item. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:truncate_message_text_to_token_budget": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: truncate_message_text_to_token_budget. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:truncate_retained_messages": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: truncate_retained_messages. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:truncate_retained_messages_for_remote_compaction": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: truncate_retained_messages_for_remote_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2.rs:truncate_without_metadata": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: truncate_without_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_counts_retained_input_images": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "rationale": "Image budget and retained selection candidate; exact upstream mixed-content cases remain separate."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_discards_messages_before_truncating": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_discards_messages_before_truncating. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_filters_to_installed_retention_shape": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_filters_to_installed_retention_shape. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_preserves_retained_metadata_sidecar": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: build_v2_compacted_history_preserves_retained_metadata_sidecar. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:collect_compaction_output_accepts_additional_output_items": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: collect_compaction_output_accepts_additional_output_items. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:collect_queued_complete_response": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: collect_queued_complete_response. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:collect_queued_incomplete_usage_on_cancellation": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction output and retained context: collect_queued_incomplete_usage_on_cancellation. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_charges_image_only_messages": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "rationale": "Image-only charge candidate."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_drops_image_only_messages_after_budget_is_spent": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "rationale": "Image-only exhaustion and no backfill candidate."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_keeps_newest_messages_first": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.NewestFirstWithRustUtf8MiddleTruncation",
+      "rationale": "Newest-first selection and UTF8 middle truncation candidate."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_preserves_images_and_truncates_later_text_parts": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.MixedContentPreservesImagesKindsAndMarksRetainedSourcesIncomplete",
+      "rationale": "Mixed image/text retention candidate."
+    },
+    "rust-test:core/src/compact_remote_v2.rs:retained_history_truncation_preserves_metadata": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice",
+      "rationale": "Retention metadata and attached notice candidate."
+    },
+    "rust-function:core/src/compact_remote_v2_attempt.rs:capture_background_input": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction attempt capture and installation: capture_background_input. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2_attempt.rs:run_background_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction attempt capture and installation: run_background_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2_attempt.rs:run_remote_compact_v2_attempt": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction attempt capture and installation: run_remote_compact_v2_attempt. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2_installation.rs:build_and_install_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction installation and atomic checkpoint: build_and_install_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2_installation.rs:reviewer_compaction_hash": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction installation and atomic checkpoint: reviewer_compaction_hash. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2_installation.rs:run_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction installation and atomic checkpoint: run_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2_media.rs:content_item_token_count": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction media selection and budget: content_item_token_count. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2_media.rs:trailing_media_start": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction media selection and budget: trailing_media_start. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-function:core/src/compact_remote_v2_media.rs:truncate_message_to_token_budget": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction media selection and budget: truncate_message_to_token_budget. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:direct_serialization_preserves_websocket_request_payload": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: direct_serialization_preserves_websocket_request_payload. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:large_turn_is_one_text_message_in_bounded_frames": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: large_turn_is_one_text_message_in_bounded_frames. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:merge_request_headers_matches_http_precedence": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: merge_request_headers_matches_http_precedence. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:parse_wrapped_websocket_error_event_ignores_non_error_payloads": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: parse_wrapped_websocket_error_event_ignores_non_error_payloads. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:parse_wrapped_websocket_error_event_maps_to_transport_http": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: parse_wrapped_websocket_error_event_maps_to_transport_http. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:parse_wrapped_websocket_error_event_with_connection_limit_maps_retryable": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: parse_wrapped_websocket_error_event_with_connection_limit_maps_retryable. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:parse_wrapped_websocket_error_event_with_status_maps_invalid_request": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: parse_wrapped_websocket_error_event_with_status_maps_invalid_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:parse_wrapped_websocket_error_event_without_status_is_not_mapped": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: parse_wrapped_websocket_error_event_without_status_is_not_mapped. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:websocket_config_enables_permessage_deflate": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: websocket_config_enables_permessage_deflate. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:websocket_safety_buffering_event_controls_visibility_when_header_disables_it": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: websocket_safety_buffering_event_controls_visibility_when_header_disables_it. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:websocket_safety_buffering_uses_event_before_header_fallback": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: websocket_safety_buffering_uses_event_before_header_fallback. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:wrapped_context_length_error_respects_http_status": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: wrapped_context_length_error_respects_http_status. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:wrapped_websocket_retry_after_uses_http_header_validation": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: wrapped_websocket_retry_after_uses_http_header_validation. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/endpoint/responses_websocket.rs:wrapped_websocket_usage_limit_preserves_optional_window": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket protocol: wrapped_websocket_usage_limit_preserves_optional_window. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:command_gateway_stops_after_a_second_unauthorized_websocket_upgrade": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: command_gateway_stops_after_a_second_unauthorized_websocket_upgrade. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_lite_websocket_uses_incremental_create_on_prefix": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_lite_websocket_uses_incremental_create_on_prefix. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_connection_limit_error_reconnects_and_completes": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_connection_limit_error_reconnects_and_completes. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_creates_on_non_prefix": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.ChangedPropertiesOrTurnDoNotUsePriorResponseId",
+      "rationale": "Candidate prefix validation; independently verify actual nonprefix input rather than just changed settings."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_creates_when_instructions_change": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.ChangedPropertiesOrTurnDoNotUsePriorResponseId",
+      "rationale": "Non-input request property mismatch candidate; exact instruction-change case still to port."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_emits_rate_limit_events": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_emits_rate_limit_events. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_emits_reasoning_included_event": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_emits_reasoning_included_event. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_emits_websocket_telemetry_events": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_emits_websocket_telemetry_events. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_forwards_turn_metadata_on_initial_and_incremental_create": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation",
+      "rationale": "Exact metadata candidate; compare all initial/incremental Rust fields."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_includes_timing_metrics_header_when_runtime_metrics_enabled": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_includes_timing_metrics_header_when_runtime_metrics_enabled. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_invalid_request_error_with_status_is_forwarded": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_invalid_request_error_with_status_is_forwarded. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_omits_routing_hint_for_provider_with_own_credentials": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_omits_routing_hint_for_provider_with_own_credentials. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_omits_timing_metrics_header_when_runtime_metrics_disabled": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_omits_timing_metrics_header_when_runtime_metrics_disabled. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_omits_unprefixed_item_ids_without_mutating_prompt": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_omits_unprefixed_item_ids_without_mutating_prompt. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_preconnect_reuses_connection_without_replacing_turn_trace": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_preconnect_reuses_connection_without_replacing_turn_trace. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_preserves_credit_usage_metadata": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_preserves_credit_usage_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_preserves_raw_tool_metadata_for_openai_custom_endpoint": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_preserves_raw_tool_metadata_for_openai_custom_endpoint. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_prewarm_reuses_advisory_model_and_tier_routing_hint": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_prewarm_reuses_advisory_model_and_tier_routing_hint. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_reconnects_after_account_switch": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesRouting.cs::CodexResponsesRouting",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesRoutingTests.cs::CodexResponsesRoutingTests.TurnRouteAndCredentialChangesCannotReplayState",
+      "rationale": "Credential-scoped routing fence candidate; actual connection reuse across account change still needs explicit comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_request_prewarm_traces_logical_request": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_request_prewarm_traces_logical_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_request_prewarm_uses_caller_supplied_metadata": {
+      "ownerIssue": 56,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.RustPrewarmAndTurnMetadataUseSequentialCutoffWithoutBreakingContinuation",
+      "rationale": "Prewarm metadata candidate; exact caller-supplied field assertions pending."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_restored_history_metric": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_restored_history_metric. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_resume_prewarm_reuses_and_repairs_connection": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_resume_prewarm_reuses_and_repairs_connection. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_reuses_connection_after_session_drop": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_reuses_connection_after_session_drop. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_reuses_connection_with_per_turn_trace_payloads": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_reuses_connection_with_per_turn_trace_payloads. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_sends_canonical_turn_metadata": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponses.cs::CodexClient.StreamResponseAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesIdentityTests.cs::CodexResponsesIdentityTests.DurableIdentityMatchesBodyHeadersAndDiagnosticsBeforeDispatch",
+      "rationale": "Identity correlation candidate; canonical metadata field-by-field review pending."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_sends_responses_lite_metadata_per_request": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_sends_responses_lite_metadata_per_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_streams_request": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_streams_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_streams_with_system_proxy_feature": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_streams_with_system_proxy_feature. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_streams_without_feature_flag_when_provider_supports_websockets": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_streams_without_feature_flag_when_provider_supports_websockets. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_usage_limit_error_emits_rate_limit_event": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_usage_limit_error_emits_rate_limit_event. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_after_error_uses_full_create_without_previous_response_id": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_v2_after_error_uses_full_create_without_previous_response_id. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_incremental_requests_are_reused_across_turns": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_v2_incremental_requests_are_reused_across_turns. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_requests_use_v2_when_provider_supports_websockets": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_v2_requests_use_v2_when_provider_supports_websockets. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_sets_openai_beta_header": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_v2_sets_openai_beta_header. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_surfaces_terminal_error_without_close_handshake": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_v2_surfaces_terminal_error_without_close_handshake. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets.rs:responses_websocket_v2_wins_when_both_features_enabled": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket integration: responses_websocket_v2_wins_when_both_features_enabled. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/websocket_fallback.rs:forbidden_responses_retry_only_without_an_explicit_access_denial": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses fallback and retry boundary: forbidden_responses_retry_only_without_an_explicit_access_denial. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/websocket_fallback.rs:websocket_fallback_hides_first_websocket_retry_stream_error": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses fallback and retry boundary: websocket_fallback_hides_first_websocket_retry_stream_error. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/websocket_fallback.rs:websocket_fallback_is_sticky_across_turns": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.OpenAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.FailedHandshakeFallsBackBeforeGenerationOnly",
+      "rationale": "Native pre-dispatch fallback candidate; cross-turn lifetime semantics still open."
+    },
+    "rust-test:core/tests/suite/websocket_fallback.rs:websocket_fallback_switches_to_http_after_retries_exhausted": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.OpenAsync",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.FailedHandshakeFallsBackBeforeGenerationOnly",
+      "rationale": "Native fallback is conservative before dispatch; do not equate it to Rust retry policy until reviewed."
+    },
+    "rust-test:core/tests/suite/websocket_fallback_close.rs:retry_transport": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses fallback and close: retry_transport. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_history_tests.rs:rewritten_output_preserves_harness_metadata": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Retained history trimming: rewritten_output_preserves_harness_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2_installation_tests.rs:prepared_prefix_rejection_respects_caller_intent": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Checkpoint installation: prepared_prefix_rejection_respects_caller_intent. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:file_audio_cutoff_does_not_backfill_older_uncharged_media": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction media budget: file_audio_cutoff_does_not_backfill_older_uncharged_media. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:file_audio_is_charged_and_atomic_in_both_image_budget_modes": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction media budget: file_audio_is_charged_and_atomic_in_both_image_budget_modes. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:image_only_boundary_is_atomic_and_does_not_backfill_older_messages": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "rationale": "Atomic image-only boundary candidate."
+    },
+    "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:image_treatment_preserves_client_developer_boundary_behavior": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction media budget: image_treatment_preserves_client_developer_boundary_behavior. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:image_treatment_preserves_text_only_boundary_behavior": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction media budget: image_treatment_preserves_text_only_boundary_behavior. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:later_image_parts_preserve_labels_audio_and_annotations": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction media budget: later_image_parts_preserve_labels_audio_and_annotations. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/src/compact_remote_v2_media_budget_tests.rs:older_media_keeps_both_labels_or_is_dropped_after_file_audio_fits": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction media budget: older_media_keeps_both_labels_or_is_dropped_after_file_audio_fits. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:additional_context_survives_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: additional_context_survives_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_accounts_for_encrypted_reasoning": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: auto_compact_accounts_for_encrypted_reasoning. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_accounts_for_unreported_reasoning": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: auto_compact_accounts_for_unreported_reasoning. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_allows_multiple_attempts_when_interleaved_with_other_turn_events": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: auto_compact_allows_multiple_attempts_when_interleaved_with_other_turn_events. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_body_after_prefix_counts_growth_after_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: auto_compact_body_after_prefix_counts_growth_after_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_body_after_prefix_ignores_starting_window_prefix": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: auto_compact_body_after_prefix_ignores_starting_window_prefix. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_body_after_prefix_still_caps_at_context_window": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: auto_compact_body_after_prefix_still_caps_at_context_window. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_clamps_config_limit_to_context_window": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: auto_compact_clamps_config_limit_to_context_window. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_persists_rollout_entries": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadCompaction.cs::CodexThreadCompaction",
+      "test": "src/tests/tryAGI.Codex.Tests/ThreadCompactionCheckpointTests.cs::ThreadCompactionCheckpointTests.CasInstallRestartContinuationAndForkPreserveOriginalHistory",
+      "rationale": "Durable checkpoint/cold resume candidate, not full rollout-format parity."
+    },
+    "rust-test:core/tests/suite/compact.rs:auto_compact_runs_after_resume_when_token_usage_is_over_limit": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: auto_compact_runs_after_resume_when_token_usage_is_over_limit. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:body_after_prefix_model_switch_budget_compacts_with_next_model": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: body_after_prefix_model_switch_budget_compacts_with_next_model. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:compact_hooks_respect_matchers_and_post_runs_after_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: compact_hooks_respect_matchers_and_post_runs_after_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:explicit_denial_stops_compaction_on_model_downshift": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: explicit_denial_stops_compaction_on_model_downshift. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:failed_compaction_preserves_history_after_restart": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadCompaction.cs::CodexThreadCompaction",
+      "test": "src/tests/tryAGI.Codex.Tests/ThreadCompactionCheckpointTests.cs::ThreadCompactionCheckpointTests.CancelledInvalidAndAmbiguousWritesNeverAuthorizeAnotherInference",
+      "rationale": "Failure and durable history candidate; exact restart path still to compare."
+    },
+    "rust-test:core/tests/suite/compact.rs:foreground_compaction_only_installs_and_bills_after_its_post_hook": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: foreground_compaction_only_installs_and_bills_after_its_post_hook. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_compact_emits_context_compaction_items": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_compact_emits_context_compaction_items. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_compact_records_durable_and_local_token_usage": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_compact_records_durable_and_local_token_usage. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_compact_retries_after_context_window_error": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_compact_retries_after_context_window_error. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_compact_twice_preserves_latest_user_messages": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_compact_twice_preserves_latest_user_messages. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_compact_uses_custom_prompt": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_compact_uses_custom_prompt. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_compaction_refreshes_global_instructions_for_next_turn": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_compaction_refreshes_global_instructions_for_next_turn. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_local_compaction_retries_only_when_the_error_allows_it": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_local_compaction_retries_only_when_the_error_allows_it. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_pre_compact_block_decision_does_not_block_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_pre_compact_block_decision_does_not_block_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:manual_remote_compact_advice_respects_retry_limit": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: manual_remote_compact_advice_respects_retry_limit. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:mid_turn_compaction_uses_refreshed_global_instructions": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: mid_turn_compaction_uses_refreshed_global_instructions. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:multiple_auto_compact_per_task_runs_after_token_limit_hit": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: multiple_auto_compact_per_task_runs_after_token_limit_hit. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:paginated_compaction_cold_resume_from_bounded_suffix": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: paginated_compaction_cold_resume_from_bounded_suffix. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_advised_errors_fall_back_then_retry_on_selected_model": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_advised_errors_fall_back_then_retry_on_selected_model. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_falls_back_after_previous_model_invalid_request_on_downshift": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_falls_back_after_previous_model_invalid_request_on_downshift. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_falls_back_from_retired_previous_model_after_rename": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_falls_back_from_retired_previous_model_after_rename. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_falls_back_when_previous_model_is_not_found": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_falls_back_when_previous_model_is_not_found. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_keeps_unknown_previous_model_for_api_key_auth_and_custom_provider": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_keeps_unknown_previous_model_for_api_key_auth_and_custom_provider. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_recovers_comp_hash_after_resume": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_recovers_comp_hash_after_resume. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_replays_only_recoverable_errors": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_replays_only_recoverable_errors. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_runs_after_resume_and_switch_to_smaller_model": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_runs_after_resume_and_switch_to_smaller_model. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_runs_on_switch_to_smaller_context_model": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_runs_on_switch_to_smaller_context_model. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_runs_when_comp_hash_changes": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_runs_when_comp_hash_changes. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_skips_missing_comp_hash_after_resume": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_skips_missing_comp_hash_after_resume. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:pre_sampling_compact_skips_when_either_comp_hash_is_missing": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: pre_sampling_compact_skips_when_either_comp_hash_is_missing. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:previous_model_compaction_resolves_selected_settings": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: previous_model_compaction_resolves_selected_settings. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:reasoning_effort_override_remote_v2_compaction_resets_pinned_effort": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: reasoning_effort_override_remote_v2_compaction_resets_pinned_effort. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:remote_v2_compaction_refreshes_instructions_and_preserves_them_on_cold_resume": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: remote_v2_compaction_refreshes_instructions_and_preserves_them_on_cold_resume. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:snapshot_request_shape_manual_compact_without_previous_user_messages": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: snapshot_request_shape_manual_compact_without_previous_user_messages. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:snapshot_request_shape_mid_turn_continuation_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: snapshot_request_shape_mid_turn_continuation_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:snapshot_request_shape_pre_turn_compaction_context_window_exceeded": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: snapshot_request_shape_pre_turn_compaction_context_window_exceeded. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:summarize_context_three_requests_and_instructions": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Automatic/manual compaction lifecycle: summarize_context_three_requests_and_instructions. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact.rs:terminal_compaction_failure_preserves_usage_and_history": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexThreadCompaction.cs::CodexThreadCompaction",
+      "test": "src/tests/tryAGI.Codex.Tests/ThreadCompactionCheckpointTests.cs::ThreadCompactionCheckpointTests.ThresholdCompactionRunsBeforeNewTurnAndRecordsUsageEvenOnFailure",
+      "rationale": "Failure accounting and retained history candidate."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:active_realtime_refreshes_changed_start_instructions_only_after_compaction": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction integration: active_realtime_refreshes_changed_start_instructions_only_after_compaction. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:provider_automatic_compaction_uses_v2_responses_endpoint": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction integration: provider_automatic_compaction_uses_v2_responses_endpoint. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_compact_v2_budgets_persisted_file_audio_atomically": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction integration: remote_compact_v2_budgets_persisted_file_audio_atomically. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_compact_v2_charges_retained_images_to_token_budget": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.ImageOnlyBoundaryHasRustBudgetAndDoesNotBackfill",
+      "rationale": "Image budget primitive; remote request lifecycle still needs mapping."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_compact_v2_records_usage_before_output_validation": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexCompaction.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs::CodexCompactionTests.CheckpointWaitsForDurableFinalUsage",
+      "rationale": "Accounting-before-install candidate; exact invalid-output terminal receipt case still required."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_compact_v2_retains_metadata_from_resumed_history": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction integration: remote_compact_v2_retains_metadata_from_resumed_history. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_compact_v2_retains_only_client_developer_messages_when_enabled": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexRetainedContextTests.cs::CodexRetainedContextTests.RetentionUsesMetadataAndKeepsAttachedResizeNotice",
+      "rationale": "Client-developer retention setting candidate."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_compact_v2_retries_failures_with_stream_retry_budget": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction integration: remote_compact_v2_retries_failures_with_stream_retry_budget. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_compact_v2_reuses_compaction_trigger_for_followups": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexCompaction.cs::CodexClient",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexCompactionTests.cs::CodexCompactionTests.UsesRustTriggerAndRetainsOriginalHistoryAndIndependentExecutedIds",
+      "rationale": "Compaction trigger and original history candidate."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_compact_v2_rewrites_multiple_trailing_function_call_outputs": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction integration: remote_compact_v2_rewrites_multiple_trailing_function_call_outputs. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_mid_turn_compact_v2_sends_turn_state_over_http": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction integration: remote_mid_turn_compact_v2_sends_turn_state_over_http. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote.rs:remote_mid_turn_compact_v2_sends_turn_state_over_websocket": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexResponsesWebSocketSession.cs::CodexResponsesWebSocketSession.CreateFrame",
+      "test": "src/tests/tryAGI.Codex.Tests/CodexResponsesWebSocketTests.cs::CodexResponsesWebSocketTests.PrewarmMetadataCapturesStickyStateForSubsequentRequests",
+      "rationale": "Sticky routing primitive; exact mid-turn compaction request must be independently captured."
+    },
+    "rust-test:core/tests/suite/compact_remote_trimming.rs:remote_compact_v2_token_estimate_ignores_message_bookkeeping_and_json_escaping": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction retained context trimming: remote_compact_v2_token_estimate_ignores_message_bookkeeping_and_json_escaping. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote_trimming.rs:remote_compact_v2_trim_estimate_uses_session_base_instructions": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction retained context trimming: remote_compact_v2_trim_estimate_uses_session_base_instructions. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/compact_remote_trimming.rs:remote_compact_v2_trims_tool_search_output_to_empty_tools_array": {
+      "ownerIssue": 45,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Remote compaction retained context trimming: remote_compact_v2_trims_tool_search_output_to_empty_tools_array. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/scenarios_compaction_tests.rs:interrupt_during_remote_compaction_preserves_summary_on_resume": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction behavioral scenario: interrupt_during_remote_compaction_preserves_summary_on_resume. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/scenarios_compaction_tests.rs:remote_slash_compact_preserves_context_across_windows": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction behavioral scenario: remote_slash_compact_preserves_context_across_windows. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/step_settings_compaction.rs:compaction_preserves_updated_summary": {
+      "ownerIssue": 46,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Compaction settings lifecycle: compaction_preserves_updated_summary. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/tests/responses_websocket_logging.rs:connector_results_reach_websocket_without_payload_logs": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses transport log privacy: connector_results_reach_websocket_without_payload_logs. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/tests/responses_websocket_probe.rs:probe_distinguishes_untrusted_certificates_from_io_failures": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket probe: probe_distinguishes_untrusted_certificates_from_io_failures. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/tests/responses_websocket_probe.rs:probe_preserves_evidence_and_redacts_wire_secrets": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses WebSocket probe: probe_preserves_evidence_and_redacts_wire_secrets. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets_runtime_auth.rs:gateway_refresh_failure_blocks_runtime_inference": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses runtime authentication: gateway_refresh_failure_blocks_runtime_inference. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets_runtime_auth.rs:http_reprepares_request_when_account_switches_during_budget_check": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses runtime authentication: http_reprepares_request_when_account_switches_during_budget_check. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets_runtime_auth.rs:http_requests_keep_matching_runtime_and_credentials_across_retries_and_account_changes": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses runtime authentication: http_requests_keep_matching_runtime_and_credentials_across_retries_and_account_changes. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets_runtime_auth.rs:mismatched_organization_never_sends_model_request": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses runtime authentication: mismatched_organization_never_sends_model_request. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets_runtime_auth.rs:model_runtime_auth_strips_credentials_on_cross_origin_redirects": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses runtime authentication: model_runtime_auth_strips_credentials_on_cross_origin_redirects. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets_runtime_auth.rs:paused_runtime_cannot_continue_on_an_admitted_websocket": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses runtime authentication: paused_runtime_cannot_continue_on_an_admitted_websocket. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets_runtime_auth.rs:websocket_reconnects_for_replacement_and_account_switch_within_a_turn": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses runtime authentication: websocket_reconnects_for_replacement_and_account_switch_within_a_turn. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/client_websockets_runtime_auth.rs:websocket_sends_after_external_auth_changes_during_request_setup": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses runtime authentication: websocket_sends_after_external_auth_changes_during_request_setup. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/responses_api_proxy_headers.rs:responses_api_parent_and_subagent_requests_include_identity_headers_and_product_metadata": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses proxy headers: responses_api_parent_and_subagent_requests_include_identity_headers_and_product_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/responses_system_proxy.rs:regular_responses_turn_honors_respect_system_proxy": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses transport proxy: regular_responses_turn_honors_respect_system_proxy. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/responses_system_proxy.rs:responses_beta_header_tracks_system_proxy_opt_in": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses transport proxy: responses_beta_header_tracks_system_proxy_opt_in. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:core/tests/suite/token_usage_rollout.rs:observed_response_usage_accumulates_per_turn_and_thread": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Observed usage and accounting: observed_response_usage_accumulates_per_turn_and_thread. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:content_policy_errors_without_type_preserve_their_classification": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: content_policy_errors_without_type_preserve_their_classification. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:context_window_error_is_fatal": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: context_window_error_is_fatal. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:context_window_error_with_newline_is_fatal": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: context_window_error_with_newline_is_fatal. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:cyber_policy_error_is_fatal": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: cyber_policy_error_is_fatal. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:cyber_policy_error_uses_fallback_for_empty_message": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: cyber_policy_error_uses_fallback_for_empty_message. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:emits_completed_without_stream_end": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: emits_completed_without_stream_end. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:error_when_missing_completed": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: error_when_missing_completed. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:failed_response_classification_uses_error_code": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: failed_response_classification_uses_error_code. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:incomplete_response_retains_partial_output_on_the_error": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: incomplete_response_retains_partial_output_on_the_error. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:malformed_failed_responses_use_stream_error": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: malformed_failed_responses_use_stream_error. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:malformed_misalignment_details_preserve_the_fatal_policy_error": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: malformed_misalignment_details_preserve_the_fatal_policy_error. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:misalignment_policy_violation_error_is_fatal": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: misalignment_policy_violation_error_is_fatal. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:misalignment_policy_violation_preserves_public_continuation_details": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: misalignment_policy_violation_preserves_public_continuation_details. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:misalignment_policy_violation_uses_fallback_for_blank_message": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: misalignment_policy_violation_uses_fallback_for_blank_message. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:parses_cache_write_token_usage": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: parses_cache_write_token_usage. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:parses_reasoning_summary_done": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: parses_reasoning_summary_done. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:parses_tool_call_input_deltas": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: parses_tool_call_input_deltas. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:parses_tool_search_call_items": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: parses_tool_search_call_items. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:partial_answer_phase_survives_item_start_and_completion": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: partial_answer_phase_survives_item_start_and_completion. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:process_sse_emits_all_safety_buffering_notifications_without_dropping_response_events": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: process_sse_emits_all_safety_buffering_notifications_without_dropping_response_events. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:process_sse_emits_model_verification_field": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: process_sse_emits_model_verification_field. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:process_sse_emits_server_model_from_response_headers_payload": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: process_sse_emits_server_model_from_response_headers_payload. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:process_sse_emits_turn_moderation_metadata_field": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: process_sse_emits_turn_moderation_metadata_field. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:process_sse_ignores_response_model_field_in_payload": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: process_sse_ignores_response_model_field_in_payload. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:quota_exceeded_error_is_fatal": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: quota_exceeded_error_is_fatal. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:rate_limit_error_preserves_retry_delay": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: rate_limit_error_preserves_retry_delay. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:responses_stream_event_model_verification_ignores_non_array_field": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: responses_stream_event_model_verification_ignores_non_array_field. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:responses_stream_event_model_verification_ignores_unknown_field": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: responses_stream_event_model_verification_ignores_unknown_field. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:responses_stream_event_model_verification_reads_metadata_field": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: responses_stream_event_model_verification_reads_metadata_field. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:responses_stream_event_response_model_prefers_response_headers": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: responses_stream_event_response_model_prefers_response_headers. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:responses_stream_event_response_model_reads_top_level_headers": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: responses_stream_event_response_model_reads_top_level_headers. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:safety_buffering_falls_back_to_response_metadata": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: safety_buffering_falls_back_to_response_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:safety_buffering_ignores_metadata_field_for_other_event_kinds": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: safety_buffering_ignores_metadata_field_for_other_event_kinds. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:safety_buffering_ignores_response_metadata_without_safety_buffering_type": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: safety_buffering_ignores_response_metadata_without_safety_buffering_type. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:safety_buffering_prefers_wire_retry_model_and_only_falls_back_when_omitted": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: safety_buffering_prefers_wire_retry_model_and_only_falls_back_when_omitted. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:safety_buffering_top_level_presence_wins_over_response_metadata": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: safety_buffering_top_level_presence_wins_over_response_metadata. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:spawn_response_stream_emits_header_events": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: spawn_response_stream_emits_header_events. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:spawn_response_stream_ignores_model_verification_header": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: spawn_response_stream_ignores_model_verification_header. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:statusless_policy_error_events_are_terminal": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: statusless_policy_error_events_are_terminal. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:statusless_policy_errors_exit_before_sse_idle_timeout": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: statusless_policy_errors_exit_before_sse_idle_timeout. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:table_driven_event_kinds": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: table_driven_event_kinds. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses.rs:typed_errors_handle_missing_or_blank_message": {
+      "ownerIssue": 44,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses stream projection: typed_errors_handle_missing_or_blank_message. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_parser_tests.rs:test_try_parse_retry_delay": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error parsing: test_try_parse_retry_delay. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_parser_tests.rs:test_try_parse_retry_delay_azure": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error parsing: test_try_parse_retry_delay_azure. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_parser_tests.rs:test_try_parse_retry_delay_no_delay": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error parsing: test_try_parse_retry_delay_no_delay. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:audio_validation_codes_map_to_non_retryable_audio_input_errors_on_all_transports": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: audio_validation_codes_map_to_non_retryable_audio_input_errors_on_all_transports. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:overload_advice_survives_keep_open_sse_in_both_event_forms": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: overload_advice_survives_keep_open_sse_in_both_event_forms. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:policy_capacity_classification_preserves_overload_retry_behavior": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: policy_capacity_classification_preserves_overload_retry_behavior. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:rate_limit_plaintext_loses_to_valid_error_header": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: rate_limit_plaintext_loses_to_valid_error_header. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:retry_header_does_not_override_terminal_errors": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: retry_header_does_not_override_terminal_errors. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:retry_header_survives_other_failed_responses": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: retry_header_survives_other_failed_responses. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:retryable_failed_response_preserves_advice_before_sse_eof": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: retryable_failed_response_preserves_advice_before_sse_eof. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:statusless_model_errors_have_no_http_status": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: statusless_model_errors_have_no_http_status. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:streamed_retry_after_uses_http_header_validation": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: streamed_retry_after_uses_http_header_validation. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:terminal_codes_exit_keep_open_sse_in_both_event_forms": {
+      "ownerIssue": 47,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: terminal_codes_exit_keep_open_sse_in_both_event_forms. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "rust-test:codex-api/src/sse/responses_error_tests.rs:terminal_failure_with_retry_header_ends_stream_immediately": {
+      "ownerIssue": 43,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": null,
+      "test": null,
+      "rationale": "Responses error and usage metadata: terminal_failure_with_retry_header_ends_stream_immediately. Applicable backing reasoning/compaction candidate; exact observable behavior still requires independent comparison."
+    },
+    "live-scenario:core/tests/suite/realtime_conversation.rs:native-websocket.connect": {
+      "ownerIssue": 51,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeDirect.cs::CodexClient.CreateDirectRealtimeSessionController",
+      "test": "src/tests/tryAGI.Codex.Tests/NativeRealtimeLiveAcceptanceTests.cs::NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech",
+      "rationale": "Public direct OAuth V3 readiness and provider session receipt. Opt-in harness compiled only; no provider execution or acceptance evidence. Interruption/reconnect and playback remain separate."
+    },
+    "live-scenario:core/tests/suite/realtime_conversation.rs:native-websocket.audio-delegation-reasoning-tool-feedback-audio": {
+      "ownerIssue": 51,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeDirect.cs::CodexClient.CreateDirectRealtimeSessionController",
+      "test": "src/tests/tryAGI.Codex.Tests/NativeRealtimeLiveAcceptanceTests.cs::NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech",
+      "rationale": "Two actual prerecorded clips, one isolated native tool, exact randomized phrase in backing output and provider transcript, nonzero received PCM. Opt-in harness compiled only; no provider execution or acceptance evidence. Interruption/reconnect and playback remain separate."
+    },
+    "live-scenario:core/tests/suite/realtime_conversation.rs:native-websocket.follow-up": {
+      "ownerIssue": 51,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeDirect.cs::CodexClient.CreateDirectRealtimeSessionController",
+      "test": "src/tests/tryAGI.Codex.Tests/NativeRealtimeLiveAcceptanceTests.cs::NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech",
+      "rationale": "Second delegated turn on the same thread must recall the first tool phrase without another tool call. Opt-in harness compiled only; no provider execution or acceptance evidence. Interruption/reconnect and playback remain separate."
+    },
+    "live-scenario:core/tests/suite/realtime_conversation.rs:native-websocket.reasoning-initiated-speech": {
+      "ownerIssue": 51,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeDirect.cs::CodexClient.CreateDirectRealtimeSessionController",
+      "test": "src/tests/tryAGI.Codex.Tests/NativeRealtimeLiveAcceptanceTests.cs::NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech",
+      "rationale": "Host-triggered ordinary reasoning turn through native RPC, no new voice input or delegation, receipt of phrase and PCM. Opt-in harness compiled only; no provider execution or acceptance evidence. Interruption/reconnect and playback remain separate."
+    },
+    "live-scenario:core/tests/suite/realtime_conversation.rs:native-websocket.clean-shutdown": {
+      "ownerIssue": 51,
+      "applicability": "applicable",
+      "status": "unverified",
+      "implementation": "src/libs/tryAGI.Codex/CodexRealtimeDirect.cs::CodexClient.CreateDirectRealtimeSessionController",
+      "test": "src/tests/tryAGI.Codex.Tests/NativeRealtimeLiveAcceptanceTests.cs::NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech",
+      "rationale": "Exactly one durable end operation and pump settlement; no call replay after uncertainty. Opt-in harness compiled only; no provider execution or acceptance evidence. Interruption/reconnect and playback remain separate."
+    },
     "rust-test:core/tests/suite/realtime_attachment.rs:attachment_deadline_releases_a_pending_handshake": {
       "ownerIssue": 42,
       "applicability": "applicable",

@@ -50,3 +50,28 @@ The acceptance command does not auto-select rows. It validates the tested commit
 The parity report workflow checks matrix consistency, executes the credential-free conformance suite and records JSON report/receipt artifacts. The normal build/publish workflow also computes release readiness and requires both that result and the owner's NuGet publication switch for every package publication step. This does not block ordinary compilation/test runs while acceptance is incomplete. The repository's `NUGET_RELEASES` variable was temporarily set to false on 2026-11-27, because the normal publish workflow otherwise releases automatically on main pushes. Restore it only after the full acceptance/release decision; an ordinary green build is not final parity acceptance.
 
 Do not perform live tests automatically in this workflow. Run the opt-in native direct and WebRTC tests only after offline acceptance, using the specifically authorized provider/credential domain, bounded call count and usage budget. Store sanitized correlated test evidence, not credentials, raw customer media or arbitrary model text. A received PCM frame is not proof of playback. Preserve #25 open until all applicable scenarios, CI, provenance and the actual NuGet package are verified.
+
+### Direct WebSocket probe (#51)
+
+The compiled opt-in test **NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech** uses the public direct WebSocket factory, an account-bound native thread/coordinator, one local effect-free tool and the native thread RPC. It has its own xUnit category, LiveRealtimeParity; the existing Category=Live workflow and the credential-free parity runner do not select it.
+
+Prepare two short, synthetic spoken prompts with an approved local media source:
+
+1. "Ask the backing agent for the verification phrase."
+2. "Ask the backing agent to repeat the same verification phrase from the previous turn."
+
+Convert each recording locally to raw little-endian signed PCM16, 24 kHz, mono, at most eight seconds. For example, use `ffmpeg -i first.wav -f s16le -ac 1 -ar 24000 first.pcm`. Do not use customer recordings or a WAV container as the PCM input.
+
+Only after offline acceptance and separate authorization of the exact route and its cost limits, supply the existing short-lived ChatGPT credentials privately as CODEX_ACCESS_TOKEN and CODEX_ACCOUNT_ID; do not print them, use shell literals containing them, or commit them. Set an explicit supported CODEX_MODEL. Set CODEX_NATIVE_REALTIME_PCM_FIRST and CODEX_NATIVE_REALTIME_PCM_FOLLOWUP to the prepared input files and CODEX_NATIVE_REALTIME_TRACE to a fresh, private output path. The test will not overwrite a trace.
+
+The manual runner command (on the shared development host) is:
+
+```sh
+export CODEX_NATIVE_REALTIME_REVISION="$(git rev-parse HEAD)"
+# Set the separate opt-in only after the offline gate and provider budget authorization.
+CODEX_NATIVE_REALTIME_LIVE=1 host-build-admission -- dotnet test src/tests/tryAGI.Codex.Tests/tryAGI.Codex.Tests.csproj --filter 'Category=LiveRealtimeParity'
+```
+
+The probe limits execution to one direct session, two paced input clips, five admitted reasoning requests, one tool invocation, 90 seconds of active test time and bounded cleanup. These are dispatch/time bounds, **not** a provider-enforced monetary or token/credit cap. Do not run if a strict provider-side usage ceiling is required and not separately enforced. There is no automatic credential fallback or new-session retry. The backing reasoning transport in this probe is SSE; Responses WebSocket acceptance is a separate test. The two delegated turns must share one stored thread; the tool returns a randomized phrase, the backing reasoning output and assistant transcript must contain that phrase, and provider PCM must actually be received. A third, host-triggered ordinary reasoning turn must produce standalone speech without any new voice input or delegation. This is not evidence of autonomous event delivery by another application.
+
+The sanitized trace contains hashed provider session/delegation/request/response IDs, local thread and turn IDs, input digests, actual observed PCM counts, explicit reported usage (or null), and cleanup state. It excludes raw credentials, audio, arbitrary transcripts and model text. The process-local CAS test journal is not production crash-recovery storage. The trace deliberately marks interruption and reconnect as not-run and does not claim audio playback. A declared revision in a trace is not sufficient certification: retain the exact successful test artifact, verify the immutable source and review the actual coverage. The live gate remains fail-closed until the live evidence verifier is implemented and all required routes/scenarios are verified.
