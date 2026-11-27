@@ -4375,10 +4375,14 @@
     "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_preserves_retained_metadata_sidecar": {
       "ownerIssue": 45,
       "applicability": "applicable",
-      "status": "unverified",
-      "implementation": "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
-      "test": "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.ExistingRetainedEnvelopeMetadataAndResizeNoticeAreNotReclassified",
-      "rationale": "Pinned Rust compact_remote_v2.rs:1087 expects compaction_without_file_error_sources=true on new checkpoint envelope. Existing retained sidecars and notices are mapped to independent fixture; marker semantics not found on reviewed published revision d473fa4, reported to #45. Do not certify the full row until exact durable sidecar behavior is verified."
+      "status": "source-reviewed",
+      "implementation": [
+        "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+        "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContextSelection.WithCheckpoint",
+        "src/libs/tryAGI.Codex/CodexCompactionProvenance.cs::CodexCompactionProvenance.CheckpointMetadata"
+      ],
+      "test": "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.InstalledCheckpointHasExactDerivedHarnessMetadata",
+      "rationale": "Pinned Rust compact_remote_v2.rs:1087–1160 exact retained envelope order, client-developer feature off/on, existing sidecars and host-derived compaction_without_file_error_sources marker on the new ciphertext. Both feature cases independently assert the complete JSON projection and distinct sidecar."
     },
     "rust-test:core/src/compact_remote_v2.rs:collect_compaction_output_accepts_additional_output_items": {
       "ownerIssue": 45,
@@ -13904,6 +13908,65 @@
     }
   },
   "scenarios": [
+    {
+      "id": "native-compaction-file-provenance-survives-cold-recompaction",
+      "anchor": "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_preserves_retained_metadata_sidecar",
+      "ownerIssue": 45,
+      "status": "source-reviewed",
+      "implementation": [
+        "src/libs/tryAGI.Codex/CodexRetainedContext.cs::CodexRetainedContext.Select",
+        "src/libs/tryAGI.Codex/CodexCompactionProvenance.cs::CodexCompactionProvenance.InputWithoutFileErrorSources",
+        "src/libs/tryAGI.Codex/CodexThreadStore.Compaction.cs::CodexThreadStore.InstallCompactionAsync"
+      ],
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RustParityCompactionShapeTests.cs::RustParityCompactionShapeTests.DroppedFileSourceCannotBecomeClearAfterColdCompaction",
+        "src/tests/tryAGI.Codex.Tests/CodexCompactionProvenanceTests.cs::CodexCompactionProvenanceTests.OpaqueCheckpointNeedsTrustedProvenanceAndCannotSelfAssertIt",
+        "src/tests/tryAGI.Codex.Tests/CodexCompactionProvenanceTests.cs::CodexCompactionProvenanceTests.SourceAnnotationCannotForgeCheckpointProvenance"
+      ],
+      "rationale": "Rust compact_remote_v2.rs:571–574 derives no-file-error provenance from the entire source before filtering; history_rejected_audio.rs:110–139 trusts opaque summaries only with the host marker. C# cold re-compaction preserves the result after a file source was omitted, preserves original journal and never trusts raw or caller-forged marker."
+    },
+    {
+      "id": "native-compaction-retained-occurrence-metadata",
+      "anchor": "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_preserves_retained_metadata_sidecar",
+      "ownerIssue": 45,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexRetainedJournalMetadata.cs::CodexRetainedJournalMetadata",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/RetainedJournalMetadataTests.cs::RetainedJournalMetadataTests.ExactOccurrenceMetadataSurvivesRestartAndRepeatedCompaction",
+        "src/tests/tryAGI.Codex.Tests/RetainedJournalMetadataTests.cs::RetainedJournalMetadataTests.SettledToolExchangeIsRetainedAtomicallyWithoutDispatchAuthority",
+        "src/tests/tryAGI.Codex.Tests/RetainedJournalMetadataTests.cs::RetainedJournalMetadataTests.MetadataChangesInvalidateSpeculationAndCoveredProjection",
+        "src/tests/tryAGI.Codex.Tests/RetainedJournalMetadataTests.cs::RetainedJournalMetadataTests.TamperedPositionsAndDigestAreRejectedAndNoWriteOccurs"
+      ],
+      "rationale": "Native durability extension to the Rust envelope contract: exact occurrence metadata survives reload and repeated checkpoints, explicitly settled tool exchanges are atomic without execution authority, metadata revision changes fence stale adoption and tampered positions/digests are rejected."
+    },
+    {
+      "id": "native-normal-terminal-recovery-without-redispatch",
+      "anchor": "rust-test:core/tests/suite/client.rs:resume_sends_prior_items",
+      "ownerIssue": 46,
+      "status": "source-reviewed",
+      "implementation": [
+        "src/libs/tryAGI.Codex/CodexInferenceRecovery.cs::CodexInferenceRecovery.RecoverOutput",
+        "src/libs/tryAGI.Codex/CodexThreadStore.cs::CodexThreadStore.RecoverInterruptedAsync"
+      ],
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/NativeMailSamplingTests.cs::NativeMailSamplingTests.LostProcessRecoversExactValidatedOutputBeforeAccountingWithoutRedispatch",
+        "src/tests/tryAGI.Codex.Tests/NativeMailSamplingTests.cs::NativeMailSamplingTests.UnknownInferenceRemainsUnknownWithoutRecoveredOutput"
+      ],
+      "rationale": "Narrow native recovery safety scenario related to resumed history, not full Rust rollout import parity. Full/sparse validated terminal snapshot before ledger acknowledgement restores exact output and sampled occurrence with no provider replay; unobserved terminal remains unknown, cannot authorize dispatch."
+    },
+    {
+      "id": "native-mail-sampling-remains-exact-across-compaction",
+      "anchor": "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_preserves_retained_metadata_sidecar",
+      "ownerIssue": 45,
+      "status": "source-reviewed",
+      "implementation": "src/libs/tryAGI.Codex/CodexNativeMailSampling.cs::CodexNativeMailSampling",
+      "test": [
+        "src/tests/tryAGI.Codex.Tests/NativeMailSamplingTests.cs::NativeMailSamplingTests.SamplingAndInferenceReceiptShareOneCommitEvenWhenAcknowledgementIsLost",
+        "src/tests/tryAGI.Codex.Tests/NativeMailSamplingTests.cs::NativeMailSamplingTests.LaterSampleDoesNotAcknowledgeOlderMailOmittedByCompaction",
+        "src/tests/tryAGI.Codex.Tests/NativeMailSamplingTests.cs::NativeMailSamplingTests.IncompleteOrRejectedTerminalNeverProvesSampling"
+      ],
+      "rationale": "Narrow durability and pending input extension: successful normal inference samples exact occurrences in its settlement CAS, even on lost acknowledgement; compaction and rejected terminals are not delivery, later sampled mail cannot acknowledge earlier omitted mail."
+    },
     {
       "id": "native-retained-envelope-existing-metadata",
       "anchor": "rust-test:core/src/compact_remote_v2.rs:build_v2_compacted_history_preserves_retained_metadata_sidecar",
