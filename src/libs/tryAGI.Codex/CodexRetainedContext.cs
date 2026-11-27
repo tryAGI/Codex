@@ -20,7 +20,8 @@ public sealed record CodexRetainedContextOptions
     public bool RetainClientDeveloperMessages { get; init; }
     /// <summary>Retain client-authored standalone tool outputs.</summary>
     public bool RetainClientToolOutputs { get; init; }
-    /// <summary>Last known sampled history sequence, if the host tracks pending agent mail.</summary>
+    /// <summary>Optional trusted normal-inference sampling watermark. Existing durable
+    /// sampling evidence takes precedence over an older host hint. Compaction never advances it.</summary>
     public long? SampledThroughSequence { get; init; }
     /// <summary>Optional host image-token estimator, including formats not recognized by the bounded SDK header reader.</summary>
     public Func<JsonElement, int?>? EstimateImageTokens { get; init; }
@@ -37,15 +38,28 @@ public sealed record CodexRetainedContextOptions
 public sealed record CodexRetainedContextSelection(IReadOnlyList<CodexRetainedContextEntry> Entries,
     int BudgetedTokens, int RetainedImageCount, long? PendingSequence)
 {
-    /// <summary>Insert an opaque new compaction checkpoint before pending mail, otherwise append it.</summary>
+    /// <summary>Greatest previously sampled sequence proven by normal inference, never by compaction.</summary>
+    public long SampledThroughSequence { get; init; }
+    /// <summary>Unsequenced legacy agent mail has no delivery evidence and remains pending.</summary>
+    public bool HasUnsequencedPendingMail { get; init; }
+    /// <summary>All captured input is free of competing file/audio sources, including inherited opaque checkpoints.</summary>
+    public bool CheckpointInputWithoutFileErrorSources { get; init; }
+    internal int? PendingInsertIndex { get; init; }
+
+    /// <summary>Insert an opaque new compaction checkpoint before pending mail and carry existing host provenance.</summary>
     public IReadOnlyList<CodexRetainedContextEntry> WithCheckpoint(CodexRetainedContextEntry checkpoint)
     {
         if (CodexRealtimeProtocol.Text(checkpoint.Item, "type") is not ("compaction" or "context_compaction"))
             throw new ArgumentException("Expected a compaction checkpoint.", nameof(checkpoint));
         var result = Entries.Select(CodexRetainedContext.Clone).ToList();
-        var index = PendingSequence is { } sequence
-            ? result.FindIndex(entry => CodexRetainedContext.Sequence(entry) is { } n && n >= sequence) : -1;
-        result.Insert(index < 0 ? result.Count : index, CodexRetainedContext.Clone(checkpoint));
+        var index = PendingInsertIndex ?? (PendingSequence is { } sequence
+            ? result.FindIndex(entry => CodexRetainedContext.Sequence(entry) is { } n && n >= sequence) : -1);
+        // Host-provided sequence metadata must not split a retained atomic tool pair.
+        if (index > 0 && index < result.Count &&
+            CodexRetainedJournalMetadata.Pair(result[index - 1].Item, result[index].Item)) index--;
+        var metadata = CodexCompactionProvenance.CheckpointMetadata(checkpoint,
+            SampledThroughSequence, CheckpointInputWithoutFileErrorSources);
+        result.Insert(index < 0 ? result.Count : index, new(checkpoint.Item.Clone(), metadata));
         return result;
     }
 }
@@ -60,15 +74,27 @@ public static class CodexRetainedContext
         ArgumentNullException.ThrowIfNull(history);
         options ??= new();
         ArgumentOutOfRangeException.ThrowIfNegative(options.MaximumTokens);
+        if (options.SampledThroughSequence is < 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "Sampling watermark must be nonnegative.");
         if (history.Any(e => e.Item.ValueKind != JsonValueKind.Object ||
             e.Metadata is { ValueKind: not (JsonValueKind.Object or JsonValueKind.Null) }))
             throw new ArgumentException("History and metadata entries must be objects.", nameof(history));
 
         var remaining = options.MaximumTokens;
         var selected = new SortedDictionary<int, CodexRetainedContextEntry>();
-        var pending = options.SampledThroughSequence is { } sampled
-            ? history.Where(e => Type(e.Item) == "agent_message" && Sequence(e) is { } n && n > sampled)
-                .Select(Sequence).FirstOrDefault() : null;
+        var sampled = Math.Max(options.SampledThroughSequence ?? 0,
+            CodexCompactionProvenance.SampledThrough(history));
+        var pending = history.Where(e => Type(e.Item) == "agent_message" && Sequence(e) is { } n && n > sampled)
+            .Select(Sequence).FirstOrDefault();
+        // A legacy item without a sequence has no proof of delivery. Keep bounded
+        // mail pending rather than inventing a normal-inference acknowledgement.
+        var firstUnsequenced = -1;
+        for (var index = 0; index < history.Count; index++)
+            if (Type(history[index].Item) == "agent_message" && Sequence(history[index]) is null)
+            {
+                firstUnsequenced = index;
+                break;
+            }
 
         for (var end = history.Count - 1; end >= 0 && remaining > 0;)
         {
@@ -128,14 +154,33 @@ public static class CodexRetainedContext
         }
 
         var entries = selected.Values.ToArray();
+        var insert = -1;
+        var position = 0;
+        foreach (var entry in selected)
+        {
+            if (firstUnsequenced >= 0 && entry.Key >= firstUnsequenced ||
+                pending is { } first && Sequence(entry.Value) is { } sequence && sequence >= first)
+            {
+                insert = position;
+                break;
+            }
+            position++;
+        }
         return new(entries, options.MaximumTokens - remaining,
-            entries.Sum(e => Parts(e.Item).Count(p => Type(p) == "input_image")), pending);
+            entries.Sum(e => Parts(e.Item).Count(p => Type(p) == "input_image")), pending)
+        {
+            SampledThroughSequence = sampled,
+            HasUnsequencedPendingMail = firstUnsequenced >= 0,
+            PendingInsertIndex = insert,
+            CheckpointInputWithoutFileErrorSources = CodexCompactionProvenance.InputWithoutFileErrorSources(history),
+        };
     }
 
     internal static CodexRetainedContextEntry Clone(CodexRetainedContextEntry e) =>
         new(e.Item.Clone(), e.Metadata?.Clone());
     internal static long? Sequence(CodexRetainedContextEntry e) =>
-        Property(e.Metadata, "history_sequence") is { ValueKind: JsonValueKind.Number } n && n.TryGetInt64(out var value) ? value : null;
+        Property(e.Metadata, "history_sequence") is { ValueKind: JsonValueKind.Number } n &&
+            n.TryGetInt64(out var value) && value > 0 ? value : null;
 
     private static JsonElement? Property(JsonElement? e, string key) =>
         e is { ValueKind: JsonValueKind.Object } item && item.TryGetProperty(key, out var value) ? value : null;
@@ -162,7 +207,7 @@ public static class CodexRetainedContext
         if (Type(item) == "agent_message")
         {
             if (FullTokens(item, options) > 10_000) return false;
-            if (pending is { } first && Sequence(e) is { } sequence && sequence >= first) return true;
+            if (Sequence(e) is not { } sequence || pending is { } first && sequence >= first) return true;
             var text = Parts(item).FirstOrDefault();
             var message = text.ValueKind == JsonValueKind.Object ? Text(text, "text") : null;
             if (message?.StartsWith("Message Type: FINAL_ANSWER\n", StringComparison.Ordinal) == true) return false;

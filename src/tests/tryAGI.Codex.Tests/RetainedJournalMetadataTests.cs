@@ -63,7 +63,8 @@ public sealed class RetainedJournalMetadataTests
         var checkpoint = thread.CompactionCheckpoint!;
         Assert.Equal(4, checkpoint.Projection.Length);
         Assert.Equal(4, checkpoint.ProjectionMetadata!.Length);
-        Assert.Null(checkpoint.ProjectionMetadata[3]);
+        Assert.True(checkpoint.ProjectionMetadata[3]!.Value.GetProperty("compaction_without_file_error_sources").GetBoolean());
+        Assert.False(checkpoint.Projection[3].TryGetProperty("compaction_without_file_error_sources", out _));
         var malformed = checkpoint with
         {
             Projection = [.. checkpoint.Projection, Json("""{"type":"compaction","encrypted_content":""}""")],

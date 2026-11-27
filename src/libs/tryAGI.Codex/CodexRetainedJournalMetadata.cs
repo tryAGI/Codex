@@ -42,9 +42,14 @@ internal static class CodexRetainedJournalMetadata
     {
         if (metadata.ValueKind != JsonValueKind.Object || Encoding.UTF8.GetByteCount(metadata.GetRawText()) > MaximumMetadataBytes)
             return false;
-        foreach (var name in new[] { "retain_across_windows", "client_authored" })
+        foreach (var name in new[] { "retain_across_windows", "client_authored", CodexCompactionProvenance.ClearFileSources })
             if (metadata.TryGetProperty(name, out var flag) &&
                 flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False or JsonValueKind.Null))
+                return false;
+        foreach (var name in new[] { "history_sequence", CodexCompactionProvenance.SampledSequence })
+            if (metadata.TryGetProperty(name, out var sequence) && sequence.ValueKind != JsonValueKind.Null &&
+                (sequence.ValueKind != JsonValueKind.Number || !sequence.TryGetInt64(out var number) ||
+                 number < (name == "history_sequence" ? 1 : 0)))
                 return false;
         return true;
     }
@@ -83,7 +88,8 @@ internal static class CodexRetainedJournalMetadata
             if (entry is null || entry.Index < 0 || !positions.Add((entry.Output, entry.Index)) ||
                 entry.Index >= (entry.Output ? turn.Output.Length : turn.Input.Length) ||
                 !entry.Output && (turn.RealtimeSteeringInputIndices ?? []).Contains(entry.Index) ||
-                !ValidMetadata(entry.Metadata))
+                !ValidMetadata(entry.Metadata) ||
+                entry.Metadata.TryGetProperty(CodexCompactionProvenance.ClearFileSources, out _))
                 throw new InvalidDataException("Invalid native retention annotation position or metadata.");
             bytes += Encoding.UTF8.GetByteCount(entry.Metadata.GetRawText());
             if (bytes > MaximumTurnMetadataBytes)
@@ -145,7 +151,10 @@ internal static class CodexRetainedJournalMetadata
         var projection = checkpoint.Projection;
         var annotations = checkpoint.ProjectionMetadata;
         if (annotations is not null && (annotations.Length != projection.Length ||
-            annotations.Any(metadata => metadata is { } value && !ValidMetadata(value))))
+            annotations.Where((metadata, index) => metadata is { } value &&
+                (!ValidMetadata(value) ||
+                 value.TryGetProperty(CodexCompactionProvenance.ClearFileSources, out _) &&
+                 !CodexThreadCompaction.IsCheckpoint(projection[index]))).Any()))
             return false;
 
         // Only inspect original history for structured retained items. Ordinary message-only
