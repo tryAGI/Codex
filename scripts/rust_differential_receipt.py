@@ -16,7 +16,9 @@ from realtime_parity_evidence import ROOT, PIN, PROJECT, source_revision, requir
 TAG = "rust-v0.172.0"
 ASSET = "codex-package-x86_64-unknown-linux-musl.tar.gz"
 ASSET_SHA256 = "63e3b00065ed7f62166d0522e17f663cb866a31d80d03e63365482ed34a1d991"
-CLASSES = ("RustFileSystemDifferentialTests",)
+SCOPES = {"filesystem": ("RustFileSystemDifferentialTests", 5),
+          "thread-lifecycle": ("RustThreadLifecycleDifferentialTests", 2),
+          "model-catalog": ("RustModelCatalogDifferentialTests", 1)}
 
 
 def sha(path):
@@ -32,7 +34,8 @@ def network_namespace(parent):
     return current
 
 
-def run(archive, output, parent_namespace):
+def run(archive, output, parent_namespace, scope="filesystem"):
+    test_class, expected_cases = SCOPES[scope]
     if os.uname().sysname != "Linux" or os.uname().machine != "x86_64":
         raise ValueError("Initial differential runner supports Linux x64 only")
     namespace = network_namespace(parent_namespace)
@@ -59,7 +62,7 @@ def run(archive, output, parent_namespace):
         home.mkdir()
         (home / "codex").mkdir()
         # No inherited auth, provider or GitHub credentials. The only network
-        # interface is loopback, and the fixture issues filesystem RPCs only.
+        # interface is loopback, and fixtures use synthetic data only.
         env = {"PATH": str(executable.parent) + os.pathsep + os.environ["PATH"],
                "HOME": str(home), "CODEX_HOME": str(home / "codex"),
                "DOTNET_CLI_HOME": str(home), "DOTNET_NOLOGO": "1",
@@ -75,7 +78,7 @@ def run(archive, output, parent_namespace):
             raise ValueError(f"Unexpected Rust binary version: {version}")
         completed = subprocess.run(
             ["dotnet", "test", PROJECT, "--no-restore", "--no-build",
-             "--filter", "FullyQualifiedName~RustFileSystemDifferentialTests",
+             "--filter", "FullyQualifiedName~" + test_class + ".",
              "--results-directory", str(root), "--logger", "trx;LogFileName=differential.trx"],
             cwd=ROOT, env=env, timeout=240)
         trx = root / "differential.trx"
@@ -86,19 +89,18 @@ def run(archive, output, parent_namespace):
             diagnostic = "No completed differential test artifact"
         else:
             try:
-                cases = parse_trx(raw, offline_classes=CLASSES)
+                cases = parse_trx(raw, offline_classes=(test_class,))
             except ValueError as error:
                 diagnostic = str(error)
         after_commit, after_tree = source_revision()
         clean_after = source_is_clean()
         namespace_after = network_namespace(parent_namespace)
-        expected_cases = 5
         eligible = (before_commit == after_commit and before_tree == after_tree and clean_after
                     and namespace == namespace_after and sha(executable) == executable_digest
                     and sha(archive) == ASSET_SHA256 and completed.returncode == 0
                     and diagnostic is None and len(cases) == expected_cases
                     and all(c["outcome"] == "Passed" for c in cases.values()))
-        receipt = {"schemaVersion": 1, "lane": "rust-runtime-differential", "scope": "filesystem",
+        receipt = {"schemaVersion": 1, "lane": "rust-runtime-differential", "scope": scope,
                    "upstreamCommit": PIN, "upstreamRelease": TAG, "releaseAsset": ASSET,
                    "releaseAssetSha256": ASSET_SHA256, "rustExecutableSha256": executable_digest,
                    "rustVersion": version, "platform": "linux-x64",
@@ -123,8 +125,9 @@ def main():
     parser.add_argument("--archive", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--parent-netns", required=True)
+    parser.add_argument("--scope", choices=tuple(SCOPES), default="filesystem")
     args = parser.parse_args()
-    return run(args.archive.resolve(), args.output.resolve(), args.parent_netns)
+    return run(args.archive.resolve(), args.output.resolve(), args.parent_netns, args.scope)
 
 
 if __name__ == "__main__":
