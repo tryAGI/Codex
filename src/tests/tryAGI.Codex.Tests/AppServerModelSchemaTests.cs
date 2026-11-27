@@ -25,6 +25,16 @@ public sealed class AppServerModelSchemaTests
         { nameof(CodexAppServerTurnNotification), "TurnCompletedNotification", false },
         { nameof(CodexAppServerAgentMessageDelta), "AgentMessageDeltaNotification", false },
         { nameof(CodexAppServerErrorNotification), "ErrorNotification", false },
+        { nameof(CodexAppServerThreadIdParams), "ThreadArchiveParams", true },
+        { nameof(CodexAppServerThreadIdParams), "ThreadUnarchiveParams", true },
+        { nameof(CodexAppServerThreadUnarchiveResponse), "ThreadUnarchiveResponse", false },
+        { nameof(CodexAppServerThreadSetNameParams), "ThreadSetNameParams", true },
+        { nameof(CodexAppServerEmpty), "ThreadArchiveResponse", false },
+        { nameof(CodexAppServerEmpty), "ThreadSetNameResponse", false },
+        { nameof(CodexAppServerThreadNotification), "ThreadArchivedNotification", false },
+        { nameof(CodexAppServerThreadNotification), "ThreadUnarchivedNotification", false },
+        { nameof(CodexAppServerThreadNotification), "ThreadClosedNotification", false },
+        { nameof(CodexAppServerThreadNameNotification), "ThreadNameUpdatedNotification", false },
     };
 
     [Theory]

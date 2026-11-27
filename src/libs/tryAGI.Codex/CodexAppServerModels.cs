@@ -134,6 +134,28 @@ public sealed record CodexAppServerAgentMessageDelta(string ThreadId, string Tur
 /// <param name="WillRetry">The server retries by itself.</param>
 public sealed record CodexAppServerErrorNotification(string ThreadId, string TurnId, CodexAppServerTurnError Error, bool WillRetry) : CodexAppServerPayload;
 
+/// <summary>Parameters shared by thread archive and unarchive requests.</summary>
+/// <param name="ThreadId">Thread to update.</param>
+public sealed record CodexAppServerThreadIdParams(string ThreadId) : CodexAppServerPayload;
+
+/// <summary>Result of <c>thread/unarchive</c>.</summary>
+/// <param name="Thread">The restored thread.</param>
+public sealed record CodexAppServerThreadUnarchiveResponse(CodexAppServerThread Thread) : CodexAppServerPayload;
+
+/// <summary>Parameters of <c>thread/name/set</c>.</summary>
+/// <param name="ThreadId">Thread to rename.</param>
+/// <param name="Name">New thread name.</param>
+public sealed record CodexAppServerThreadSetNameParams(string ThreadId, string Name) : CodexAppServerPayload;
+
+/// <summary>Thread archive, unarchive and close notifications.</summary>
+/// <param name="ThreadId">Affected thread.</param>
+public sealed record CodexAppServerThreadNotification(string ThreadId) : CodexAppServerPayload;
+
+/// <summary>Notification that a thread name changed.</summary>
+/// <param name="ThreadId">Affected thread.</param>
+/// <param name="ThreadName">Current name, if assigned.</param>
+public sealed record CodexAppServerThreadNameNotification(string ThreadId, string? ThreadName = null) : CodexAppServerPayload;
+
 /// <summary>A typed App Server request method.</summary>
 /// <typeparam name="TParams">Parameter type.</typeparam>
 /// <typeparam name="TResult">Result type.</typeparam>
@@ -168,6 +190,18 @@ public static class CodexAppServerMethods
     public static CodexAppServerMethod<CodexAppServerThreadStartParams, CodexAppServerThreadStartResponse> ThreadStart { get; } =
         new("thread/start", CodexAppServerJson.Default.CodexAppServerThreadStartParams, CodexAppServerJson.Default.CodexAppServerThreadStartResponse);
 
+    /// <summary><c>thread/archive</c>.</summary>
+    public static CodexAppServerMethod<CodexAppServerThreadIdParams, CodexAppServerEmpty> ThreadArchive { get; } =
+        new("thread/archive", CodexAppServerJson.Default.CodexAppServerThreadIdParams, CodexAppServerJson.Default.CodexAppServerEmpty);
+
+    /// <summary><c>thread/unarchive</c>.</summary>
+    public static CodexAppServerMethod<CodexAppServerThreadIdParams, CodexAppServerThreadUnarchiveResponse> ThreadUnarchive { get; } =
+        new("thread/unarchive", CodexAppServerJson.Default.CodexAppServerThreadIdParams, CodexAppServerJson.Default.CodexAppServerThreadUnarchiveResponse);
+
+    /// <summary><c>thread/name/set</c>.</summary>
+    public static CodexAppServerMethod<CodexAppServerThreadSetNameParams, CodexAppServerEmpty> ThreadSetName { get; } =
+        new("thread/name/set", CodexAppServerJson.Default.CodexAppServerThreadSetNameParams, CodexAppServerJson.Default.CodexAppServerEmpty);
+
     /// <summary><c>turn/start</c>.</summary>
     public static CodexAppServerMethod<CodexAppServerTurnStartParams, CodexAppServerTurnStartResponse> TurnStart { get; } =
         new("turn/start", CodexAppServerJson.Default.CodexAppServerTurnStartParams, CodexAppServerJson.Default.CodexAppServerTurnStartResponse);
@@ -180,6 +214,22 @@ public static class CodexAppServerMethods
 /// <summary>Typed core App Server notifications.</summary>
 public static class CodexAppServerNotifications
 {
+    /// <summary><c>thread/archived</c>.</summary>
+    public static CodexAppServerNotificationType<CodexAppServerThreadNotification> ThreadArchived { get; } =
+        new("thread/archived", CodexAppServerJson.Default.CodexAppServerThreadNotification);
+
+    /// <summary><c>thread/unarchived</c>.</summary>
+    public static CodexAppServerNotificationType<CodexAppServerThreadNotification> ThreadUnarchived { get; } =
+        new("thread/unarchived", CodexAppServerJson.Default.CodexAppServerThreadNotification);
+
+    /// <summary><c>thread/closed</c>.</summary>
+    public static CodexAppServerNotificationType<CodexAppServerThreadNotification> ThreadClosed { get; } =
+        new("thread/closed", CodexAppServerJson.Default.CodexAppServerThreadNotification);
+
+    /// <summary><c>thread/name/updated</c>.</summary>
+    public static CodexAppServerNotificationType<CodexAppServerThreadNameNotification> ThreadNameUpdated { get; } =
+        new("thread/name/updated", CodexAppServerJson.Default.CodexAppServerThreadNameNotification);
+
     /// <summary><c>turn/started</c>.</summary>
     public static CodexAppServerNotificationType<CodexAppServerTurnNotification> TurnStarted { get; } =
         new("turn/started", CodexAppServerJson.Default.CodexAppServerTurnNotification);
@@ -209,4 +259,9 @@ public static class CodexAppServerNotifications
 [JsonSerializable(typeof(CodexAppServerTurnNotification))]
 [JsonSerializable(typeof(CodexAppServerAgentMessageDelta))]
 [JsonSerializable(typeof(CodexAppServerErrorNotification))]
+[JsonSerializable(typeof(CodexAppServerThreadIdParams))]
+[JsonSerializable(typeof(CodexAppServerThreadUnarchiveResponse))]
+[JsonSerializable(typeof(CodexAppServerThreadSetNameParams))]
+[JsonSerializable(typeof(CodexAppServerThreadNotification))]
+[JsonSerializable(typeof(CodexAppServerThreadNameNotification))]
 public partial class CodexAppServerJson : JsonSerializerContext;
