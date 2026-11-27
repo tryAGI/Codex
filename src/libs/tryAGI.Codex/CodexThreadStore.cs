@@ -207,6 +207,7 @@ public sealed partial class CodexThreadStore
         => ChangeTurnAsync(threadId, expectedRevision, turnId, lostOwnerId, turn => turn with
         {
             Status = "interrupted", CompletedAt = time.GetUtcNow(),
+            Output = CodexInferenceRecovery.RecoverOutput(turn),
             Dispatches = turn.Dispatches.Select(d => d.State == "dispatching" ? d with { State = "unknown" } : d).ToArray()
         }, cancellationToken);
 

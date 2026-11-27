@@ -202,6 +202,7 @@ public static class CodexThreadCompaction
                     writer.WritePropertyName("result");
                     if (receipt.Result is { } result) result.WriteTo(writer); else writer.WriteNullValue();
                     CodexNativeMailSampling.WriteReceipt(writer, receipt);
+                    CodexInferenceRecovery.WriteReceipt(writer, receipt);
                     writer.WriteEndObject();
                 }
                 writer.WriteEndArray();
@@ -262,6 +263,7 @@ public static class CodexThreadCompaction
                 writer.WritePropertyName("result");
                 if (receipt.Result is { } result) result.WriteTo(writer); else writer.WriteNullValue();
                 CodexNativeMailSampling.WriteReceipt(writer, receipt);
+                CodexInferenceRecovery.WriteReceipt(writer, receipt);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();

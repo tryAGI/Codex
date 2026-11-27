@@ -182,29 +182,31 @@ internal static class CodexNativeMailSampling
 internal interface ICodexValidatedResponseObserver
 {
     Task CompleteValidatedAsync(string requestId, CodexResponseOptions settings, string responseId,
-        JsonElement response, CancellationToken cancellationToken);
+        JsonElement response, IReadOnlyList<JsonElement> output, CancellationToken cancellationToken);
 }
 
 public sealed partial class CodexThreadStore
 {
     // Publish the successful receipt and its sampling evidence in the SAME CAS.
     // No independently committed successful result can lose the associated proof.
-    internal Task<CodexThreadDocument> SettleNativeMailSamplingAsync(Guid threadId, long revision,
-        Guid turnId, string owner, string requestId, JsonElement response, CodexStoredMailSampling sampling,
-        CancellationToken ct)
+    internal Task<CodexThreadDocument> SettleValidatedInferenceAsync(Guid threadId, long revision,
+        Guid turnId, string owner, string requestId, JsonElement response, CodexStoredInferenceCompletion completion,
+        CodexStoredMailSampling? sampling, CancellationToken ct)
         => ChangeAsync(threadId, revision, document =>
         {
             var turn = Active(document, turnId, owner);
             var receipt = turn.Dispatches.SingleOrDefault(item => item.CallId == requestId);
-            if (receipt is not { Kind: "inference", State: "dispatching" or "unknown", MailSampling: null })
-                throw new InvalidOperationException("Native sampling requires an unsettled validated inference receipt.");
+            if (receipt is not { Kind: "inference", State: "dispatching" or "unknown", MailSampling: null, InferenceCompletion: null })
+                throw new InvalidOperationException("Expected an unsettled validated inference receipt.");
             var updated = turn with
             {
                 Dispatches = turn.Dispatches.Select(item => item.CallId == requestId
-                    ? item with { State = "succeeded", Result = response.Clone(), MailSampling = sampling } : item).ToArray(),
+                    ? item with { State = "succeeded", Result = response.Clone(), MailSampling = sampling,
+                        InferenceCompletion = completion } : item).ToArray(),
             };
             var next = Replace(document, updated);
             CodexNativeMailSampling.Validate(next);
+            CodexInferenceRecovery.Validate(updated);
             return PromoteRealtimeArtifacts(next, turn, updated);
         }, ct);
 }

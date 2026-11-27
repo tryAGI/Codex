@@ -271,7 +271,7 @@ public sealed partial class CodexClient
                     // may settle model-visible sampling evidence with its receipt.
                     if (validated && correlation.ResponseId is { } responseId && nativeObserver is not null)
                         await nativeObserver.CompleteValidatedAsync(accountingId, settings, responseId,
-                            accountingResponse, save.Token).ConfigureAwait(false);
+                            accountingResponse, outputValidation.CompletedOutput!, save.Token).ConfigureAwait(false);
                     else
                         await usageObserver.CompleteAsync(accountingId, settings.Model, accountingResponse, save.Token).ConfigureAwait(false);
                     accountingComplete = true;

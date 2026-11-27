@@ -309,9 +309,11 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private CodexStoredContextWindowObservation? contextObservation;
         private bool observedForegroundCompletion;
         private readonly bool allowMailSampling;
-        private string? preparedMailRequestId;
+        private string? preparedInferenceRequestId;
+        private int preparedInferenceOutputCount;
         private IReadOnlyList<JsonElement>? preparedMailInput;
         private readonly Dictionary<string, CodexStoredMailSampling> observedMailSampling = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, CodexStoredInferenceCompletion> observedInferenceCompletions = new(StringComparer.Ordinal);
         internal CodexContextWindowStatus? ContextWindow { get; private set; }
         private readonly SemaphoreSlim gate = new(1, 1);
         private readonly ConcurrentDictionary<string, JsonElement> observed = new(StringComparer.Ordinal);
@@ -443,17 +445,20 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             contextObservation = CodexContextWindow.Capture(settings, Current.CompactionCheckpoint, authOwner, input, terminal, contextObservation);
         }
 
-        private async Task CaptureMailSamplingAsync(string requestId, CodexResponseOptions settings,
-            string responseId, JsonElement response, CancellationToken ct)
+        private async Task CaptureInferenceCompletionAsync(string requestId, CodexResponseOptions settings,
+            string responseId, JsonElement response, IReadOnlyList<JsonElement> output, CancellationToken ct)
         {
-            if (!allowMailSampling || preparedMailRequestId != requestId || preparedMailInput is not { } input ||
-                settings.RequestKind != "turn" || CodexRealtimeProtocol.Text(response, "id") != responseId ||
-                CodexRealtimeProtocol.Text(response, "model") is { } model && model != settings.Model) return;
+            if (projection is not null || preparedInferenceRequestId != requestId ||
+                settings.RequestKind != "turn" || CodexRealtimeProtocol.Text(response, "id") != responseId) return;
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 var receipt = Turn.Dispatches.SingleOrDefault(item => item.CallId == requestId);
-                if (receipt is not { Kind: "inference", State: "dispatching", MailSampling: null }) return;
+                if (receipt is not { Kind: "inference", State: "dispatching", MailSampling: null, InferenceCompletion: null } ||
+                    Turn.Output.Length != preparedInferenceOutputCount) return;
+                observedInferenceCompletions.Add(requestId, CodexInferenceRecovery.Capture(Turn, responseId, response, output));
+                if (!allowMailSampling || preparedMailInput is not { } input ||
+                    CodexRealtimeProtocol.Text(response, "model") is { } model && model != settings.Model) return;
                 var metadata = new List<JsonElement?>();
                 var projected = CodexThreadCompaction.Project(Current, Current.CompactionCheckpoint, settings.Model,
                     CodexThreadCompaction.ScopeHash(settings), Current.Turns.Length,
@@ -679,7 +684,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                         "inference", request, ct), result => result.Thread, ct).ConfigureAwait(false);
                     if (!admission.Admitted) throw new CodexProtocolException("Inference identity already dispatched; replay refused.");
                     preparedMailInput = allowMailSampling && input.Any(CodexNativeMailSampling.IsMail) ? input : null;
-                    preparedMailRequestId = preparedMailInput is null ? null : id;
+                    preparedInferenceRequestId = projection is null ? id : null;
+                    preparedInferenceOutputCount = Turn.Output.Length;
                 }
             }
             finally { gate.Release(); }
@@ -694,14 +700,18 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         }
 
         public async Task CompleteValidatedAsync(string id, CodexResponseOptions settings, string responseId,
-            JsonElement response, CancellationToken ct)
+            JsonElement response, IReadOnlyList<JsonElement> output, CancellationToken ct)
         {
             Remember(id, response);
-            // Capture before accounting: reconciliation can still settle the exact
-            // evidence if the financial observer throws after the provider terminal.
-            try { await CaptureMailSamplingAsync(id, settings, responseId, response, ct).ConfigureAwait(false); }
+            // Commit the validated terminal and any sampling proof before external
+            // accounting. A host can reconcile the same reservation after a crash;
+            // neither a failed observer nor a missing output append permits replay.
+            try
+            {
+                await CaptureInferenceCompletionAsync(id, settings, responseId, response, output, ct).ConfigureAwait(false);
+                await SettleAsync(id, false, ct).ConfigureAwait(false);
+            }
             finally { await budget.CompleteAsync(id, settings.Model, response, ct).ConfigureAwait(false); }
-            await SettleAsync(id, false, ct).ConfigureAwait(false);
         }
         public async Task IncompleteAsync(string id, string model, CancellationToken ct)
         {
@@ -739,9 +749,9 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 if (prior is null || prior.State is "succeeded" or "failed") return;
                 var result = observed.GetValueOrDefault(id);
                 var known = result.ValueKind != JsonValueKind.Undefined;
-                if (known && observedMailSampling.TryGetValue(id, out var sampling))
-                    await JournalAsync(doc => store.SettleNativeMailSamplingAsync(doc.Id, doc.Revision, turnId,
-                        owner, id, result, sampling, ct), ct).ConfigureAwait(false);
+                if (known && observedInferenceCompletions.TryGetValue(id, out var completion))
+                    await JournalAsync(doc => store.SettleValidatedInferenceAsync(doc.Id, doc.Revision, turnId,
+                        owner, id, result, completion, observedMailSampling.GetValueOrDefault(id), ct), ct).ConfigureAwait(false);
                 else
                     await JournalAsync(doc => store.SettleAsync(doc.Id, doc.Revision, turnId, owner, id,
                         known ? "succeeded" : notDispatched ? "failed" : "unknown",
@@ -855,7 +865,7 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             foreach (var id in Turn.Dispatches.Where(d => d.State is "dispatching" or "unknown").Select(d => d.CallId).ToArray())
                 await SettleAsync(id, false, timeout.Token).ConfigureAwait(false);
             await JournalAsync(doc => store.CompleteAsync(doc.Id, doc.Revision, turnId, owner,
-                interrupted ? "interrupted" : "failed", Turn.Output, timeout.Token), timeout.Token).ConfigureAwait(false);
+                interrupted ? "interrupted" : "failed", CodexInferenceRecovery.RecoverOutput(Turn), timeout.Token), timeout.Token).ConfigureAwait(false);
         }
         public void Dispose() => gate.Dispose();
     }

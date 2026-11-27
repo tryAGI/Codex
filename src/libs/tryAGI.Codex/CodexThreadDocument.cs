@@ -92,7 +92,11 @@ public sealed record CodexStoredTurn(
     public CodexStoredRetainedContextMetadata[]? RetainedContextMetadata { get; init; }
 
     // This invariant is local to the turn, including when it is deserialized outside the store.
-    void IJsonOnDeserialized.OnDeserialized() => CodexRetainedJournalMetadata.Validate(this);
+    void IJsonOnDeserialized.OnDeserialized()
+    {
+        CodexRetainedJournalMetadata.Validate(this);
+        CodexInferenceRecovery.Validate(this);
+    }
 }
 
 /// <summary>Request digest binds a call ID to its exact input bytes. Unknown outcomes remain
@@ -112,6 +116,9 @@ public sealed record CodexStoredDispatch(
     /// <summary>Exact agent-mail occurrences observed by a validated normal inference.
     /// This is sampling evidence, not mailbox delivery authority or provider billing.</summary>
     public CodexStoredMailSampling? MailSampling { get; init; }
+
+    /// <summary>Validated normal terminal output for crash recovery, not permission to replay or execute tools.</summary>
+    public CodexStoredInferenceCompletion? InferenceCompletion { get; init; }
 }
 
 /// <summary>Result of <see cref="CodexThreadStore.AdmitAsync"/>.</summary>

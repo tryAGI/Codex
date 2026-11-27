@@ -22,16 +22,17 @@ public sealed class NativeMailSamplingTests
             => ValueTask.FromResult(new CodexCredentials("test", "account"));
     }
 
-    private sealed class Budget(CancellationTokenSource? cancel = null, bool throwOnComplete = false) : ICodexUsageObserver
+    private sealed class Budget(CancellationTokenSource? cancel = null, bool throwOnComplete = false,
+        Func<Task>? onComplete = null) : ICodexUsageObserver
     {
         internal int Completed;
         public Task ReserveAsync(string id, string model, CancellationToken ct) => Task.CompletedTask;
-        public Task CompleteAsync(string id, string model, JsonElement response, CancellationToken ct)
+        public async Task CompleteAsync(string id, string model, JsonElement response, CancellationToken ct)
         {
             Completed++;
+            if (onComplete is not null) await onComplete();
             cancel?.Cancel();
             if (throwOnComplete) throw new IOException("Accounting acknowledgement lost.");
-            return Task.CompletedTask;
         }
         public Task IncompleteAsync(string id, string model, CancellationToken ct) => Task.CompletedTask;
     }
@@ -150,6 +151,83 @@ public sealed class NativeMailSamplingTests
         var loaded = await new CodexThreadStore(storage, "account").ReadAsync(thread.Id, Ct);
         Assert.Equal("interrupted", loaded.Turns[0].Status);
         Assert.Single(CodexNativeMailSampling.Sampled(loaded));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LostProcessRecoversExactValidatedOutputBeforeAccountingWithoutRedispatch(bool sparse)
+    {
+        var storage = new RecordingStorage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var turn = Guid.NewGuid();
+        var requests = new List<JsonElement>();
+        var answer = Json("""{"type":"message","role":"assistant","content":[{"type":"output_text","text":"done"}]}""");
+        var wire = sparse
+            ? """{"type":"response.output_item.done","output_index":0,"item":""" + answer.GetRawText() +
+                "}\n\ndata: " + """{"type":"response.completed","response":{"id":"reasoning-response","model":"model"}}"""
+            : Success;
+        JsonElement crashedSnapshot = default;
+        var budget = new Budget(onComplete: async () =>
+        {
+            var during = await store.ReadAsync(thread.Id, Ct);
+            var running = Assert.Single(during.Turns);
+            Assert.Equal("inProgress", running.Status);
+            Assert.Empty(running.Output);
+            var receipt = Assert.Single(running.Dispatches);
+            Assert.Equal("succeeded", receipt.State);
+            Assert.NotNull(receipt.InferenceCompletion);
+            Assert.Single(receipt.MailSampling!.Occurrences);
+            Assert.Equal(sparse, receipt.InferenceCompletion!.SparseOutput is not null);
+            crashedSnapshot = CodexThreadStore.Encode(during);
+        });
+        await Agent(store, requests, wire, budget).RunAsync(thread.Id, thread.Revision, turn, "runner",
+            Settings(thread.Id, turn), [Mail, User], (_, _) => throw new InvalidOperationException("No tools"), cancellationToken: Ct);
+        Assert.Single(requests);
+        Assert.Equal(1, budget.Completed);
+        // Restore exactly the last durable snapshot before the external ledger acknowledged
+        // the terminal and before any output item was appended to the turn.
+        var crashStorage = new RealtimeHistoryTests.Storage();
+        Assert.True(await crashStorage.CompareExchangeAsync(thread.Id, null, crashedSnapshot, Ct));
+        var recoveredStore = new CodexThreadStore(crashStorage, "account");
+        var observed = await recoveredStore.ReadAsync(thread.Id, Ct);
+        var interrupted = await recoveredStore.RecoverInterruptedAsync(thread.Id, observed.Revision, turn, "runner", Ct);
+        var restoredTurn = Assert.Single(interrupted.Turns);
+        Assert.Equal("interrupted", restoredTurn.Status);
+        Assert.True(JsonElement.DeepEquals(answer, Assert.Single(restoredTurn.Output)));
+        Assert.Single(CodexNativeMailSampling.Sampled(interrupted));
+        Assert.Single(restoredTurn.Dispatches);
+        Assert.Single(requests);
+        Assert.True(JsonElement.DeepEquals(answer, Assert.Single(CodexInferenceRecovery.RecoverOutput(restoredTurn))));
+        var corrupted = restoredTurn with
+        {
+            Output = [User],
+        };
+        Assert.Throws<InvalidDataException>(() => CodexInferenceRecovery.RecoverOutput(corrupted));
+    }
+
+    [Fact]
+    public async Task UnknownInferenceRemainsUnknownWithoutRecoveredOutput()
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [Mail, User], cancellationToken: Ct);
+        var request = Json("""{"input":[]}""");
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "request", "inference", request, Ct)).Thread;
+        var restarted = new CodexThreadStore(storage, "account");
+        var recovered = await restarted.RecoverInterruptedAsync(thread.Id, thread.Revision, turn, "runner", Ct);
+        var receipt = Assert.Single(recovered.Turns[0].Dispatches);
+        Assert.Equal("unknown", receipt.State);
+        Assert.Null(receipt.InferenceCompletion);
+        Assert.Empty(recovered.Turns[0].Output);
+        Assert.Empty(CodexNativeMailSampling.Sampled(recovered));
+        var laterTurn = Guid.NewGuid();
+        var later = await restarted.StartTurnAsync(thread.Id, recovered.Revision, laterTurn, "runner", [User], cancellationToken: Ct);
+        var retry = await restarted.AdmitAsync(thread.Id, later.Revision, laterTurn, "runner", "request", "inference", request, Ct);
+        Assert.False(retry.Admitted);
     }
 
     [Fact]
