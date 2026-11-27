@@ -26,7 +26,7 @@ public sealed record CodexCodeModeInvocation(CodexCodeModeScope Scope, string Tu
 /// This class is not a JavaScript runtime or gRPC client. The embedding host owns all
 /// remote cell operations and must explicitly authorize and deduplicate every tool effect.
 /// An ambiguous or cancelled execution is never automatically replayed.</summary>
-public sealed class CodexCodeModeSession : IDisposable
+public sealed partial class CodexCodeModeSession : IDisposable
 {
     private readonly object gate = new();
     private readonly TimeProvider clock;
@@ -78,7 +78,8 @@ public sealed class CodexCodeModeSession : IDisposable
     public CodexCodeModeAdmission Prepare(string executionId, string turnId, string toolCallId,
         CodexToolRegistry registry, DateTimeOffset expiresAt,
         Func<CodexCodeModeInvocation, CancellationToken, ValueTask<bool>> authorize,
-        Func<CodexCodeModeInvocation, CancellationToken, Task<CodexToolOutput>> execute)
+        Func<CodexCodeModeInvocation, CancellationToken, Task<CodexToolOutput>> execute,
+        Func<CodexCodeModeNotificationInvocation, CancellationToken, Task>? notify = null)
     {
         ValidateId(executionId);
         ValidateId(turnId);
@@ -119,7 +120,7 @@ public sealed class CodexCodeModeSession : IDisposable
             var admission = new CodexCodeModeAdmission(generation, executionId, turnId, toolCallId,
                 selectedRevision, reuses, Array.AsReadOnly(reuses ? [] : tools), expiresAt);
             usedExecutions.Add(executionId);
-            executions.Add(executionId, new Execution(admission, tools, eligible, authorize, execute));
+            executions.Add(executionId, new Execution(admission, tools, eligible, authorize, execute, notify));
             return admission;
         }
     }
@@ -165,6 +166,8 @@ public sealed class CodexCodeModeSession : IDisposable
         lock (gate)
         {
             execution = Find(request.Generation, request.ExecutionId);
+            if (execution.TerminalKind is not null)
+                throw new InvalidOperationException("Code Mode cell is closed.");
             if (execution.Admission.ToolCallId != request.ToolCallId)
                 throw new CodexProtocolException("Code Mode callback belongs to a different provider call.");
             if (clock.GetUtcNow() >= execution.Admission.ExpiresAt)
@@ -181,7 +184,7 @@ public sealed class CodexCodeModeSession : IDisposable
             seenInvocations.Add(request.InvocationId);
             if (cancelledBeforeArrival.Remove(request.InvocationId))
                 throw new OperationCanceledException("Code Mode callback was cancelled before arrival.");
-            if (callbacks.Count >= maxCallbacks)
+            if (callbacks.Count + notifications.Count >= maxCallbacks)
                 throw new InvalidOperationException("Code Mode pending callback limit exceeded.");
             var validated = ValidateTool(request.Tool, execution.Eligible);
             invocation = new(Scope, execution.Admission.TurnId, request with { Tool = validated });
@@ -235,7 +238,7 @@ public sealed class CodexCodeModeSession : IDisposable
         ActiveCallback? cancelled = null;
         lock (gate)
         {
-            _ = Find(hostGeneration, executionId);
+            if (Find(hostGeneration, executionId).TerminalKind is not null) return false;
             if (callbacks.TryGetValue(invocationId, out var active))
             {
                 if (active.ExecutionId != executionId) throw new CodexProtocolException("Callback belongs to another execution.");
@@ -275,12 +278,8 @@ public sealed class CodexCodeModeSession : IDisposable
                 ValidateId(cellId);
                 BindCell(execution, cellId);
             }
-            executions.Remove(executionId);
-            // Retain cell ownership and used execution IDs until reconnect.
-            if (catalogOwner == executionId) catalogOwner = null;
-            cancelled = callbacks.Values.Where(callback => callback.ExecutionId == executionId).ToArray();
-            foreach (var callbackId in callbacks.Where(pair => pair.Value.ExecutionId == executionId).Select(pair => pair.Key).ToArray())
-                callbacks.Remove(callbackId);
+            cancelled = [.. RemoveActive(callbacks, executionId), .. RevokeNotifications(execution)];
+            Settle(execution, CodexCodeModeSettlementKind.Abandoned);
         }
         foreach (var callback in cancelled) callback.Cancel();
         return true;
@@ -320,7 +319,9 @@ public sealed class CodexCodeModeSession : IDisposable
             if (!publicCellId.StartsWith(prefix, StringComparison.Ordinal))
                 throw new InvalidOperationException("Cell belongs to a stale Code Mode generation.");
             var cellId = publicCellId[prefix.Length..];
-            if (!cells.TryGetValue(cellId, out var executionId) || !executions.ContainsKey(executionId))
+            if (!cells.TryGetValue(cellId, out var executionId) ||
+                !executions.TryGetValue(executionId, out var execution) || execution.TerminalKind is not null ||
+                clock.GetUtcNow() >= execution.Admission.ExpiresAt)
                 throw new InvalidOperationException("Unknown or closed Code Mode cell.");
             return cellId;
         }
@@ -341,9 +342,16 @@ public sealed class CodexCodeModeSession : IDisposable
 
     private ActiveCallback[] Clear()
     {
-        var active = callbacks.Values.ToArray();
-        executions.Clear();
+        var active = callbacks.Values.Concat(notifications.Values).ToArray();
+        foreach (var execution in executions.Values.ToArray())
+        {
+            _ = RevokeNotifications(execution);
+            Settle(execution, CodexCodeModeSettlementKind.Disconnected);
+        }
+        settlements.Clear();
         callbacks.Clear();
+        notifications.Clear();
+        seenNotifications.Clear();
         cells.Clear();
         usedExecutions.Clear();
         seenInvocations.Clear();
@@ -414,7 +422,8 @@ public sealed class CodexCodeModeSession : IDisposable
     private sealed class Execution(CodexCodeModeAdmission admission, CodexRegisteredTool[] tools,
         Dictionary<(string Namespace, string Name), CodexToolCallKind> eligible,
         Func<CodexCodeModeInvocation, CancellationToken, ValueTask<bool>> authorize,
-        Func<CodexCodeModeInvocation, CancellationToken, Task<CodexToolOutput>> execute)
+        Func<CodexCodeModeInvocation, CancellationToken, Task<CodexToolOutput>> execute,
+        Func<CodexCodeModeNotificationInvocation, CancellationToken, Task>? notify)
     {
         internal CodexCodeModeAdmission Admission { get; } = admission;
         internal CodexRegisteredTool[] Tools { get; } = tools;
@@ -423,6 +432,15 @@ public sealed class CodexCodeModeSession : IDisposable
         internal Func<CodexCodeModeInvocation, CancellationToken, Task<CodexToolOutput>> Execute { get; } = execute;
         internal string? CellId { get; set; }
         internal bool Acknowledged { get; set; }
+        internal bool Claimed { get; set; }
+        internal CodexCodeModeSettlementKind? TerminalKind { get; set; }
+        internal int PendingNotifications { get; set; }
+        internal int NotificationsCompleted { get; set; }
+        internal int NotificationsFailed { get; set; }
+        internal int NotificationsRevoked { get; set; }
+        internal Func<CodexCodeModeNotificationInvocation, CancellationToken, Task>? Notify { get; } = notify;
+        internal TaskCompletionSource<CodexCodeModeSettlement> Settlement { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     private sealed class ActiveCallback(string executionId, CancellationTokenSource source) : IDisposable
