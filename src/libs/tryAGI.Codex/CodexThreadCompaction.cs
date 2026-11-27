@@ -71,6 +71,8 @@ public sealed record CodexStoredCompactionCheckpoint
     [JsonRequired] public required string ResponseId { get; init; }
     /// <summary>Retained model history with one opaque compaction item.</summary>
     [JsonRequired] public required JsonElement[] Projection { get; init; }
+    /// <summary>Optional aligned retained metadata, including truncation provenance. Never part of the wire prompt.</summary>
+    public JsonElement?[]? ProjectionMetadata { get; init; }
     /// <summary>Provider usage, if actually reported for the attempt.</summary>
     public JsonElement? Usage { get; init; }
     /// <summary>Local installation time.</summary>
@@ -101,10 +103,13 @@ public sealed class CodexThreadCompactionCandidate
     internal string? PriorCheckpointResponseId { get; }
     /// <summary>Exact model prompt to compact.</summary>
     public IReadOnlyList<JsonElement> History { get; }
+    /// <summary>Exact host metadata aligned with the captured history. Null entries have no annotation.</summary>
+    public IReadOnlyList<JsonElement?> HistoryMetadata { get; }
     /// <summary>All known durable tool call identities, including ambiguous dispatches.</summary>
     public IReadOnlyList<string> ExecutedCallIds { get; }
     internal CodexThreadCompactionCandidate(CodexThreadDocument document, string model, string scope,
-        IReadOnlyList<JsonElement> history, CodexActiveCompactionBoundary? activeBoundary = null)
+        IReadOnlyList<JsonElement> history, CodexActiveCompactionBoundary? activeBoundary = null,
+        IReadOnlyList<JsonElement?>? metadata = null)
     {
         ThreadId = document.Id;
         Revision = document.Revision;
@@ -118,6 +123,9 @@ public sealed class CodexThreadCompactionCandidate
         ScopeSha256 = scope;
         Model = model;
         History = Array.AsReadOnly(history.Select(item => item.Clone()).ToArray());
+        if (metadata is not null && metadata.Count != history.Count)
+            throw new ArgumentException("Retention metadata must align with captured history.", nameof(metadata));
+        HistoryMetadata = Array.AsReadOnly(metadata?.Select(item => item?.Clone()).ToArray() ?? new JsonElement?[history.Count]);
         ExecutedCallIds = Array.AsReadOnly(CodexThreadStore.DispatchedToolCallIds(document).Order(StringComparer.Ordinal).ToArray());
     }
 }
@@ -182,6 +190,7 @@ public static class CodexThreadCompaction
                 WriteItems(writer, turn.Input);
                 writer.WritePropertyName("output");
                 WriteItems(writer, turn.Output);
+                CodexRetainedJournalMetadata.WritePrefix(writer, turn, turn.Input.Length, turn.Output.Length);
                 writer.WriteStartArray("receipts");
                 foreach (var receipt in turn.Dispatches)
                 {
@@ -236,6 +245,7 @@ public static class CodexThreadCompaction
             WriteItems(writer, turn.Input.Take(boundary.InputCount).ToArray());
             writer.WritePropertyName("output");
             WriteItems(writer, turn.Output.Take(boundary.OutputCount).ToArray());
+            CodexRetainedJournalMetadata.WritePrefix(writer, turn, boundary.InputCount, boundary.OutputCount);
             writer.WriteStartArray("steering");
             foreach (var inputIndex in (turn.RealtimeSteeringInputIndices ?? []).Where(value => value < boundary.InputCount))
                 writer.WriteNumberValue(inputIndex);
@@ -280,9 +290,22 @@ public static class CodexThreadCompaction
 
     internal static List<JsonElement> Project(CodexThreadDocument document, CodexStoredCompactionCheckpoint? checkpoint,
         string model, string scope, int throughTurnCount, int firstTurnIndex = 0,
-        Guid? currentTurnId = null, IReadOnlyList<JsonElement>? currentInput = null, bool includeActiveOutput = false)
+        Guid? currentTurnId = null, IReadOnlyList<JsonElement>? currentInput = null, bool includeActiveOutput = false,
+        List<JsonElement?>? metadata = null)
     {
         var history = new List<JsonElement>();
+        void Add(JsonElement item, JsonElement? annotation = null)
+        {
+            history.Add(item.Clone());
+            metadata?.Add(annotation?.Clone());
+        }
+
+        void AddOutputs(CodexStoredTurn turn, int start)
+        {
+            var annotations = metadata is null ? null : CodexRetainedJournalMetadata.ForTurn(turn);
+            for (var index = start; index < turn.Output.Length; index++)
+                Add(turn.Output[index], CodexRetainedJournalMetadata.At(annotations, true, index));
+        }
         if (firstTurnIndex == 0 && checkpoint is not null && checkpoint.Model == model && checkpoint.ScopeSha256 == scope &&
             checkpoint.ThreadId == document.Id && checkpoint.ThroughTurnCount <= throughTurnCount)
         {
@@ -293,12 +316,13 @@ public static class CodexThreadCompaction
                     includeActiveOutput && document.Turns[checkpoint.ThroughTurnCount].Id == currentTurnId);
             if (canUse)
             {
-                history.AddRange(checkpoint.Projection.Select(item => item.Clone()));
+                for (var index = 0; index < checkpoint.Projection.Length; index++)
+                    Add(checkpoint.Projection[index], checkpoint.ProjectionMetadata?[index]);
                 firstTurnIndex = checkpoint.ThroughTurnCount;
                 if (boundary is not null)
                 {
                     // The initial input and preceding carryover are already compacted.
-                    history.AddRange(document.Turns[firstTurnIndex].Output.Skip(boundary.OutputCount).Select(item => item.Clone()));
+                    AddOutputs(document.Turns[firstTurnIndex], boundary.OutputCount);
                     firstTurnIndex++;
                 }
             }
@@ -306,11 +330,24 @@ public static class CodexThreadCompaction
         for (var index = firstTurnIndex; index < throughTurnCount; index++)
         {
             var turn = document.Turns[index];
-            history.AddRange(CodexThreadStore.RealtimeCarryoverBeforeTurn(document, index));
+            foreach (var item in CodexThreadStore.RealtimeCarryoverBeforeTurn(document, index)) Add(item);
+            var annotations = metadata is null ? null : CodexRetainedJournalMetadata.ForTurn(turn);
             if (turn.Status == "completed" || includeActiveOutput && turn.Id == currentTurnId)
-                history.AddRange(CodexThreadStore.RealtimeTimeline(turn, false).Select(item => item.Clone()));
+            {
+                // Use the same exact occurrence positions as RealtimeTimeline: a captured
+                // steering message belongs to Output, not to its duplicated input receipt.
+                var steering = (turn.RealtimeSteeringInputIndices ?? []).ToHashSet();
+                for (var inputIndex = 0; inputIndex < turn.Input.Length; inputIndex++)
+                    if (!steering.Contains(inputIndex))
+                        Add(turn.Input[inputIndex], CodexRetainedJournalMetadata.At(annotations, false, inputIndex));
+                for (var outputIndex = 0; outputIndex < turn.Output.Length; outputIndex++)
+                    Add(turn.Output[outputIndex], CodexRetainedJournalMetadata.At(annotations, true, outputIndex));
+            }
             else
-                history.AddRange((turn.Id == currentTurnId && currentInput is not null ? currentInput : turn.Input).Select(item => item.Clone()));
+            {
+                var inputs = turn.Id == currentTurnId && currentInput is not null ? currentInput : turn.Input;
+                foreach (var item in inputs) Add(item);
+            }
             if (turn.Status != "completed" && turn.Id != currentTurnId)
             {
                 // An incomplete turn's dispatch receipts are untrusted observations, never executable calls.
@@ -325,7 +362,7 @@ public static class CodexThreadCompaction
                     }).ToArray()),
                 };
                 using var parsed = JsonDocument.Parse(new JsonObject { ["role"] = "user", ["content"] = facts.ToJsonString() }.ToJsonString());
-                history.Add(parsed.RootElement.Clone());
+                Add(parsed.RootElement);
             }
         }
         return history;
@@ -340,9 +377,7 @@ public static class CodexThreadCompaction
             checkpoint.Projection is null || checkpoint.Projection.Length is < 1 or > 32768 ||
             checkpoint.Projection.Any(item => item.ValueKind != JsonValueKind.Object) ||
             checkpoint.Projection.Count(IsCheckpoint) != 1 ||
-            checkpoint.Projection.Any(item => !IsCheckpoint(item) &&
-                (CodexRealtimeProtocol.Text(item, "role") is not ("user" or "developer") ||
-                    CodexRealtimeProtocol.Text(item, "type") is not (null or "message"))) ||
+            !CodexRetainedJournalMetadata.ValidProjection(document, checkpoint) ||
             checkpoint.Usage is { ValueKind: not (JsonValueKind.Object or JsonValueKind.Null) })
             throw new InvalidDataException("Invalid native compaction checkpoint or changed original prefix.");
     }
@@ -355,20 +390,22 @@ public static class CodexThreadCompaction
             result.OriginalHistory.Where((item, index) => !JsonElement.DeepEquals(item, candidate.History[index])).Any() ||
             candidate.ExecutedCallIds.Except(result.ExecutedCallIds, StringComparer.Ordinal).Any())
             throw new CodexProtocolException("Compaction result does not match the captured native thread prefix.");
-        // Native journal records do not yet contain host metadata sidecars. Only ordinary retained messages
-        // can be selected here; raw tool receipts remain in the original journal independently of the prompt.
-        var retained = result.SelectRetainedContext(retention).WithCheckpoint(new(result.Item));
+        // Use only captured host annotations. Provider-returned metadata never acquires
+        // retention authority; original tool receipts stay in the durable journal.
+        var retained = result.SelectRetainedContext(retention, candidate.HistoryMetadata).WithCheckpoint(new(result.Item));
         return new()
         {
             ThreadId = candidate.ThreadId, SourceRevision = candidate.Revision, ThroughTurnCount = candidate.ThroughTurnCount,
             ActiveBoundary = candidate.ActiveBoundary,
             HistorySha256 = candidate.HistorySha256, ScopeSha256 = candidate.ScopeSha256, Model = candidate.Model,
             ResponseId = result.ResponseId, Projection = retained.Select(entry => entry.Item.Clone()).ToArray(),
+            ProjectionMetadata = retained.Any(entry => entry.Metadata is not null)
+                ? retained.Select(entry => entry.Metadata?.Clone()).ToArray() : null,
             Usage = result.Usage?.Clone(), InstalledAt = now,
         };
     }
 
-    private static bool IsCheckpoint(JsonElement item) =>
+    internal static bool IsCheckpoint(JsonElement item) =>
         CodexRealtimeProtocol.Text(item, "type") == "compaction" &&
         !string.IsNullOrWhiteSpace(CodexRealtimeProtocol.Text(item, "encrypted_content"));
     private static bool ValidId(string? id) => id is { Length: > 0 and <= 512 } && !string.IsNullOrWhiteSpace(id) && !id.Any(char.IsControl);

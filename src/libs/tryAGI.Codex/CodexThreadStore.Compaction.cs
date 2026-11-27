@@ -20,8 +20,10 @@ public sealed partial class CodexThreadStore
         if (before.Turns.Length == 0 || before.Turns.Any(turn => turn.Status == "inProgress"))
             throw new InvalidOperationException("Native compaction requires a closed nonempty turn prefix.");
         var scope = CodexThreadCompaction.ScopeHash(settings);
-        var history = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, settings.Model, scope, before.Turns.Length);
-        return new(before, settings.Model, scope, history);
+        var metadata = new List<JsonElement?>();
+        var history = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, settings.Model, scope, before.Turns.Length,
+            metadata: metadata);
+        return new(before, settings.Model, scope, history, metadata: metadata);
     }
 
     internal static CodexThreadCompactionCandidate? CaptureActiveCompaction(CodexThreadDocument before,
@@ -29,9 +31,10 @@ public sealed partial class CodexThreadStore
     {
         if (CodexThreadCompaction.CaptureActiveBoundary(before, turnId, owner) is not { } boundary) return null;
         var scope = CodexThreadCompaction.ScopeHash(settings);
+        var metadata = new List<JsonElement?>();
         var history = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, settings.Model, scope,
-            before.Turns.Length, currentTurnId: turnId, includeActiveOutput: true);
-        return new(before, settings.Model, scope, history, boundary);
+            before.Turns.Length, currentTurnId: turnId, includeActiveOutput: true, metadata: metadata);
+        return new(before, settings.Model, scope, history, boundary, metadata);
     }
 
     // Inline compaction reserves and settles one inference receipt through the same
@@ -51,9 +54,11 @@ public sealed partial class CodexThreadStore
             CodexRealtimeProtocol.Text(receipt, "id") != result.ResponseId ||
             !CodexThreadCompaction.MatchesPrefix(before, candidate.ThroughTurnCount, candidate.HistorySha256, boundary))
             throw new CodexThreadConflictException();
+        var metadata = new List<JsonElement?>();
         var actual = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, candidate.Model, candidate.ScopeSha256,
-            before.Turns.Length, currentTurnId: boundary.TurnId, includeActiveOutput: true);
-        if (!SameHistory(actual, candidate.History)) throw new CodexThreadConflictException();
+            before.Turns.Length, currentTurnId: boundary.TurnId, includeActiveOutput: true, metadata: metadata);
+        if (!SameHistory(actual, candidate.History) || !CodexRetainedJournalMetadata.Same(metadata, candidate.HistoryMetadata))
+            throw new CodexThreadConflictException();
         var now = time.GetUtcNow();
         var checkpoint = CodexThreadCompaction.BuildCheckpoint(candidate, result, retention, now);
         var next = before with { CompactionCheckpoint = checkpoint, Format = 2, Revision = checked(before.Revision + 1), UpdatedAt = now };
@@ -79,9 +84,10 @@ public sealed partial class CodexThreadStore
         if (before.Turns.Length != candidate.ThroughTurnCount ||
             CodexThreadCompaction.PrefixHash(before, candidate.ThroughTurnCount) != candidate.HistorySha256)
             throw new CodexThreadConflictException();
-        var actual = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, candidate.Model, candidate.ScopeSha256, before.Turns.Length);
-        if (actual.Count != candidate.History.Count ||
-            actual.Where((item, index) => !JsonElement.DeepEquals(item, candidate.History[index])).Any())
+        var metadata = new List<JsonElement?>();
+        var actual = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, candidate.Model, candidate.ScopeSha256, before.Turns.Length,
+            metadata: metadata);
+        if (!SameHistory(actual, candidate.History) || !CodexRetainedJournalMetadata.Same(metadata, candidate.HistoryMetadata))
             throw new CodexThreadConflictException();
         var now = time.GetUtcNow();
         var checkpoint = CodexThreadCompaction.BuildCheckpoint(candidate, result, retention, now);
@@ -146,9 +152,10 @@ public sealed partial class CodexThreadStore
 
         if (candidate.ActiveBoundary is not { } boundary)
         {
+            var metadata = new List<JsonElement?>();
             var closed = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, candidate.Model,
-                candidate.ScopeSha256, candidate.ThroughTurnCount);
-            return SameHistory(closed, candidate.History);
+                candidate.ScopeSha256, candidate.ThroughTurnCount, metadata: metadata);
+            return SameHistory(closed, candidate.History) && CodexRetainedJournalMetadata.Same(metadata, candidate.HistoryMetadata);
         }
 
         // Reconstruct the exact captured prefix, not the current (possibly longer) turn.
@@ -161,13 +168,17 @@ public sealed partial class CodexThreadStore
             Input = captured.Input.Take(boundary.InputCount).ToArray(),
             Output = captured.Output.Take(boundary.OutputCount).ToArray(),
             Dispatches = captured.Dispatches.Take(boundary.DispatchCount).ToArray(),
+            // An active capture cannot contain completed-turn host annotations. Any
+            // annotation added to the covered prefix has already invalidated its hash.
+            RetainedContextMetadata = null,
             RealtimeSteeringInputIndices = captured.RealtimeSteeringInputIndices?
                 .Where(index => index < boundary.InputCount).ToArray(),
         };
         var snapshot = before with { Turns = [.. before.Turns.Take(candidate.ThroughTurnCount), prefix] };
+        var activeMetadata = new List<JsonElement?>();
         var actual = CodexThreadCompaction.Project(snapshot, snapshot.CompactionCheckpoint, candidate.Model,
-            candidate.ScopeSha256, snapshot.Turns.Length, currentTurnId: boundary.TurnId, includeActiveOutput: true);
-        return SameHistory(actual, candidate.History);
+            candidate.ScopeSha256, snapshot.Turns.Length, currentTurnId: boundary.TurnId, includeActiveOutput: true, metadata: activeMetadata);
+        return SameHistory(actual, candidate.History) && CodexRetainedJournalMetadata.Same(activeMetadata, candidate.HistoryMetadata);
     }
 
     // A late durable receipt or history correction may change a covered prefix. Drop only

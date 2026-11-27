@@ -71,7 +71,7 @@ public sealed record CodexStoredTurn(
     [property: JsonRequired] JsonElement[] Input,
     [property: JsonRequired] JsonElement[] Output,
     [property: JsonRequired] CodexStoredDispatch[] Dispatches,
-    DateTimeOffset? CompletedAt = null, string?[]? ClientUserMessageIds = null, string? TurnTrigger = null)
+    DateTimeOffset? CompletedAt = null, string?[]? ClientUserMessageIds = null, string? TurnTrigger = null) : IJsonOnDeserialized
 {
     /// <summary>Durable steering inputs subsequently interleaved with model output in the turn timeline.</summary>
     public int[]? RealtimeSteeringInputIndices { get; init; }
@@ -84,6 +84,13 @@ public sealed record CodexStoredTurn(
 
     /// <summary>Host-observed canonical backing items that are not model continuation input.</summary>
     public CodexStoredNativeBackingArtifact[]? NativeBackingArtifacts { get; init; }
+
+    /// <summary>Trusted host retention sidecars bound to exact original history items.
+    /// These are journal metadata, never provider request content or tool authority.</summary>
+    public CodexStoredRetainedContextMetadata[]? RetainedContextMetadata { get; init; }
+
+    // This invariant is local to the turn, including when it is deserialized outside the store.
+    void IJsonOnDeserialized.OnDeserialized() => CodexRetainedJournalMetadata.Validate(this);
 }
 
 /// <summary>Request digest binds a call ID to its exact input bytes. Unknown outcomes remain
