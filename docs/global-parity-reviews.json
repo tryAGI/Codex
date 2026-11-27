@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+  "inventoryReviewed": false,
+  "rows": {
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/archive": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 89,
+        "scope": "typed-contract-only",
+        "rationale": "Request and empty result metadata; wire-name/parameter test. No Rust server round trip.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerMethods.ThreadArchive"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
+        ]
+      },
+      "native-sdk": {
+        "status": "missing",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 68,
+        "scope": "native-dispatch",
+        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
+        "basis": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
+        ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/unarchive": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 89,
+        "scope": "typed-contract-only",
+        "rationale": "Typed request and restored-thread result metadata; schema test covers declared response. No actual Rust round trip.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerMethods.ThreadUnarchive"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
+        ]
+      },
+      "native-sdk": {
+        "status": "missing",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 68,
+        "scope": "native-dispatch",
+        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
+        "basis": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
+        ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:clientRequests:thread/name/set": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 89,
+        "scope": "typed-contract-only",
+        "rationale": "Typed rename parameters and empty result; camel-case wire test, no Rust process.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerMethods.ThreadSetName"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleRequestsUseExactWireNamesAndRetainExtensionData",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
+        ]
+      },
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 68,
+        "scope": "native-behavior",
+        "rationale": "Native dispatcher calls CAS-backed SetNameAsync, emits name update, and test verifies persistence across cold host and fork. Revision-bound receipt still required.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Metadata.cs::SetNameAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Metadata.cs::SetNameAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks"
+        ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/archived": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 89,
+        "scope": "typed-contract-only",
+        "rationale": "Typed notification and unknown JSON preservation; synthetic only.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerNotifications.ThreadArchived"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
+        ]
+      },
+      "native-sdk": {
+        "status": "missing",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 68,
+        "scope": "native-dispatch",
+        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
+        "basis": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
+        ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/unarchived": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 89,
+        "scope": "typed-contract-only",
+        "rationale": "Typed notification and unknown JSON preservation; synthetic only.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerNotifications.ThreadUnarchived"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
+        ]
+      },
+      "native-sdk": {
+        "status": "missing",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 68,
+        "scope": "native-dispatch",
+        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
+        "basis": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
+        ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/closed": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 89,
+        "scope": "typed-contract-only",
+        "rationale": "Typed notification and unknown JSON preservation; synthetic only.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerNotifications.ThreadClosed"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
+        ]
+      },
+      "native-sdk": {
+        "status": "missing",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 68,
+        "scope": "native-dispatch",
+        "rationale": "No corresponding native dispatch or notification emission in the published native thread RPC at this revision; typed interop contract is separate. Re-evaluate when #68 lands.",
+        "basis": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.cs"
+        ]
+      }
+    },
+    "rpc:codex-rs/app-server-protocol/src/protocol/common.rs:serverNotifications:thread/name/updated": {
+      "rust-app-server-interop": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 89,
+        "scope": "typed-contract-only",
+        "rationale": "Typed notification with optional name and extension data; synthetic only.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexAppServerModels.cs::CodexAppServerNotifications.ThreadNameUpdated"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/AppServerThreadLifecycleContractTests.cs::AppServerThreadLifecycleContractTests.LifecycleNotificationsPreserveUnknownFieldsAndRejectOtherMethods",
+          "src/tests/tryAGI.Codex.Tests/AppServerModelSchemaTests.cs::AppServerModelSchemaTests.DeclaredMembersExistInTheNewestSchema"
+        ]
+      },
+      "native-sdk": {
+        "status": "source-reviewed",
+        "reviewedCommit": "c0d8c39ad3808fef5b82d85bdf9c87492685d4a5",
+        "ownerIssue": 68,
+        "scope": "native-behavior",
+        "rationale": "Native dispatcher calls CAS-backed SetNameAsync, emits name update, and test verifies persistence across cold host and fork. Revision-bound receipt still required.",
+        "implementation": [
+          "src/libs/tryAGI.Codex/CodexThreadRpc.Metadata.cs::SetNameAsync",
+          "src/libs/tryAGI.Codex/CodexThreadStore.Metadata.cs::SetNameAsync"
+        ],
+        "test": [
+          "src/tests/tryAGI.Codex.Tests/ThreadRpcTests.cs::ThreadRpcTests.ExplicitNamePersistsBeforeFirstTurnAcrossHostsAndForks"
+        ]
+      }
+    }
+  }
+}

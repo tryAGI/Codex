@@ -15,6 +15,7 @@ import tarfile
 import tomllib
 import urllib.request
 from pathlib import Path
+from global_parity_reviews import read_reviews, validate_reviews, summarize, self_test as review_self_test
 
 ROOT = Path(__file__).resolve().parent.parent
 PIN = "3d86e43b075adeba2193ec5c22ac92f55afd82e6"
@@ -338,17 +339,22 @@ def report(data):
                    "extra": sorted(set(catalog[key]) - set(names))}
              for key, names in data["rpcCatalog"].items()}
     rt_index = realtime_index()
+    review = read_reviews()
+    lanes, global_ready, reviewed_count, stale_count = summarize(data, review)
     return {"upstreamCommit": PIN, "sourceFiles": len(data["sourceInventory"]),
             "candidateKinds": dict(collections.Counter(r["kind"] for r in data["rows"])),
             "rustTestCandidates": sum(len(s.get("testCandidates", [])) for s in data["sourceInventory"].values()),
             "rustApiCandidates": sum(len(s.get("apiCandidates", [])) for s in data["sourceInventory"].values()),
-            "lanes": {lane: {"pending": len(data["rows"]), "reviewedDenominator": None, "passed": 0} for lane in LANES},
+            "lanes": lanes, "reviewedLaneDecisions": reviewed_count, "staleLaneDecisions": stale_count,
             "delegatedRealtime": len(data["delegatedRealtime"]),
             "unresolvedRealtimeReferences": [r["id"] for r in data["delegatedRealtime"] if not rt_index.get(r["symbol"])],
             "realtimeReleaseReady": realtime["releaseReady"], "catalogVersion": catalog["version"],
             "stableRpcCounts": {k: len(v) for k, v in data["stableRpcCatalog"].items()},
             "sourceRpcCounts": {k: len(v) for k, v in data["rpcCatalog"].items()},
-            "catalogDrift": drift, "inventoryReviewed": False, "releaseReady": False}
+            "catalogDrift": drift, "inventoryReviewed": review["inventoryReviewed"],
+            "releaseReady": global_ready and realtime["releaseReady"]
+                and all(rt_index.get(r["symbol"]) for r in data["delegatedRealtime"])
+                and not any(d["missing"] or d["extra"] for d in drift.values())}
 
 
 def self_test(data):
@@ -382,12 +388,14 @@ def main():
     validate(data)
     if action == "self-test":
         self_test(data)
+        review_self_test(data, read_reviews())
     elif action in ("report", "gate"):
         result = report(data)
         print(json.dumps(result, indent=2))
         if action == "gate" and not result["releaseReady"]:
             raise SystemExit(1)
     else:
+        validate_reviews(data, read_reviews())
         print(f"Validated {len(data['sourceInventory'])} pinned sources and {len(data['rows'])} global candidates.")
 
 

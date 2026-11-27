@@ -10,12 +10,24 @@ Four separate lanes: native SDK (no Rust process), host adapters (real effects/p
 
 Realtime delegates to #25 and its existing matrix/evidence runner. The global inventory records source files and links realtime candidates without copying their statuses or evidence. Unresolved or ambiguous references require review by the #25 owner. Do not close #25 on behalf of Agent 5.
 
+## Independent review overlay
+
+`docs/global-parity-reviews.json` records per-capability, per-lane decisions without rewriting the upstream inventory. Each decision binds a full published commit, exact source references, owner and rationale. Source review, missing behavior, divergence, justified N/A and receipt-backed passes are separate. Changed source references invalidate source review; changes to the source tree invalidate negative conclusions and accepted receipts. Typed-only App Server review never receives native credit. A lane without a verified platform, Rust-runtime or live-provider receipt verifier cannot pass.
+
+The CI workflow `global-parity.yml` runs the offline checker and a separate six-class cross-domain test suite, reusing the shared Realtime evidence parser and revision binding. Run locally only with admitted compilation on shared hosts:
+
+```sh
+python3 -B scripts/global_parity_evidence.py --host-admission --output /tmp/global-parity-receipt.json
+```
+
+Store reviewed sanitized global receipts under `docs/global-parity-evidence/`. Non-Realtime cases already present in the Realtime receipt may be referenced directly instead of copying receipts. No offline result proves actual Rust-process or live-provider behavior.
+
 ## Domain routing
 
 #63: threads, history, agents, #93 memory, #94 rollout. #64: tools/extensions/MCP and #95 remote control. #65: execution, approvals, sandbox/review and #98 platform adapters. #66: config, accounts, providers, #96 collaboration modes, #97 diagnostics. #67: independent protocol and differential acceptance.
 
 ## Release gate (#53 + #91)
 
-The global gate is deliberately red until independently reviewed scope, exact-revision offline evidence, applicable platform and host evidence, optional Rust interop, actual live provider acceptance and the Realtime gate all pass. Reuse `scripts/realtime_parity_evidence.py` for revision-bound offline receipts; extend evidence support to explicit credential-free non-realtime classes instead of running authenticated tests implicitly. Never publish on catalog parity or build success alone. No automatic publishing switch changes. Coordinate gate wiring with Agent 5 before editing the shared release workflow.
+The global gate is deliberately red until independently reviewed scope, exact-revision offline evidence, applicable platform and host evidence, optional Rust interop, actual live provider acceptance and the Realtime gate all pass. Reuse `scripts/realtime_parity_evidence.py` for revision-bound offline receipts; extend evidence support to explicit credential-free non-realtime classes instead of running authenticated tests implicitly. Never publish on catalog parity or build success alone. The publish workflow consumes the combined global report, which incorporates the existing Realtime gate and requires both lanes to be ready. This only tightens the existing publication condition; ordinary CI remains enabled and the owner-controlled publication switch is unchanged. Coordination with Agent 5 remains required before any release.
 
 For #89, compare the pinned RPC catalog to the packaged snapshot. Record typed request/result/notification/server-request support separately from native dispatch. Preserve extension data and raw payloads, register new types in the source-generated JSON context, and require schema, round-trip and NativeAOT tests. Catalog drift is reported independently and is not native coverage.

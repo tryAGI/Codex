@@ -1,0 +1,51 @@
+name: Global parity inventory
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      require_release_ready:
+        description: Require the combined global and Realtime release gate
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Validate pinned inventory, review and evidence logic
+        run: |
+          python3 -B scripts/global-parity.py self-test
+          python3 -B scripts/realtime_parity_evidence.py self-test
+      - name: Generate independent lane report
+        run: python3 -B scripts/global-parity.py report > global-parity-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: global-parity-report
+          path: global-parity-report.json
+      - name: Require full combined acceptance
+        if: github.event_name == 'workflow_dispatch' && inputs.require_release_ready
+        run: python3 -B scripts/global-parity.py gate
+
+  offline-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Run credential-free cross-domain acceptance tests
+        run: python3 -B scripts/global_parity_evidence.py --output global-parity-offline-receipt.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: global-parity-offline-receipt
+          path: global-parity-offline-receipt.json
+          if-no-files-found: warn

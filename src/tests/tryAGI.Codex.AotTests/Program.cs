@@ -50,6 +50,20 @@ Check("typed App Server models", () =>
         && CodexAppServerNotifications.TurnCompleted.TryRead(new("turn/completed", document.RootElement.Clone()), out var completed)
         && completed.Turn.AdditionalProperties?.ContainsKey("later") == true;
 });
+Check("typed thread lifecycle models", () =>
+{
+    var archive = CodexAppServerMethods.ThreadArchive;
+    var rename = CodexAppServerMethods.ThreadSetName;
+    var request = JsonSerializer.SerializeToElement(new CodexAppServerThreadIdParams("t1"), archive.ParamsType);
+    var name = JsonSerializer.SerializeToElement(new CodexAppServerThreadSetNameParams("t1", "name"), rename.ParamsType);
+    using var document = JsonDocument.Parse("""{"threadId":"t1","threadName":"name","future":42}""");
+    return request.GetProperty("threadId").GetString() == "t1"
+        && name.GetProperty("name").GetString() == "name"
+        && CodexAppServerNotifications.ThreadNameUpdated.TryRead(new("thread/name/updated", document.RootElement), out var update)
+        && update.ThreadName == "name"
+        && update.AdditionalProperties?.ContainsKey("future") == true
+        && CodexAppServerMethods.ThreadUnarchive.ResultType.Properties.Count > 0;
+});
 Check("TOML configuration", () =>
 {
     // Not the system temp folder: on macOS it sits behind a /var symlink, which the reader rejects by design.

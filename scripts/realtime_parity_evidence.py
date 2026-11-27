@@ -79,7 +79,7 @@ def require_clean_source():
     return source_revision()
 
 
-def parse_trx(raw):
+def parse_trx(raw, *, offline_classes=OFFLINE_CLASSES):
     root = ET.fromstring(raw)
     summary = root.find("t:ResultSummary/t:Counters", TRX_NS)
     if summary is None:
@@ -91,7 +91,7 @@ def parse_trx(raw):
             raise ValueError("Missing or duplicate TRX test definition")
         class_name = method.get("className", "")
         method_name = method.get("name", "")
-        if not class_name.startswith(NAMESPACE) or class_name[len(NAMESPACE):] not in OFFLINE_CLASSES or not method_name:
+        if not class_name.startswith(NAMESPACE) or class_name[len(NAMESPACE):] not in offline_classes or not method_name:
             raise ValueError(f"Unexpected test in offline receipt: {class_name}.{method_name}")
         definitions[test.get("id")] = class_name + "." + method_name
     # xUnit truncates long theory display names. Use the distinct TRX test identity
@@ -131,10 +131,12 @@ def parse_trx(raw):
     return dict(sorted(cases.items()))
 
 
-def run(output, host_admission):
+def run(output, host_admission, *, offline_classes=OFFLINE_CLASSES, scope=None):
+    if not offline_classes or len(set(offline_classes)) != len(offline_classes) or any(not re.fullmatch(r"[A-Za-z_]\w*", c) for c in offline_classes):
+        raise ValueError("Invalid explicit offline test class selection")
     before = require_clean_source()
     with tempfile.TemporaryDirectory(prefix="codex-parity-") as tmp:
-        selector = "|".join(f"FullyQualifiedName~{NAMESPACE}{c}." for c in OFFLINE_CLASSES)
+        selector = "|".join(f"FullyQualifiedName~{NAMESPACE}{c}." for c in offline_classes)
         command = ["dotnet", "test", PROJECT, "--filter", selector,
                    "--results-directory", tmp, "--logger", "trx;LogFileName=parity.trx"]
         if host_admission:
@@ -147,7 +149,7 @@ def run(output, host_admission):
         if not trx.is_file():
             raise ValueError(f"No completed test artifact (exit {completed.returncode})")
         raw = trx.read_bytes()
-        cases = parse_trx(raw)
+        cases = parse_trx(raw, offline_classes=offline_classes)
         receipt = {
             "schemaVersion": 1, "upstreamCommit": PIN, "lane": "offline",
             "csharpCommit": before[0], "sourceTree": before[1],
@@ -156,6 +158,8 @@ def run(output, host_admission):
             "artifactSha256": hashlib.sha256(raw).hexdigest(),
             "exitCode": completed.returncode, "cases": cases,
         }
+        if scope is not None:
+            receipt["scope"] = scope
         if output.exists():
             raise ValueError("Refusing to overwrite an existing evidence receipt")
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -173,14 +177,14 @@ def run(output, host_admission):
         return completed.returncode
 
 
-def validate_receipt(row, evidence, root=ROOT):
+def validate_receipt(row, evidence, root=ROOT, *, evidence_directory="docs/realtime-parity-evidence", expected_scope=None):
     """Validate that an offline row references real, exact passed test cases."""
     location = evidence.get("receipt")
     digest = evidence.get("receiptSha256", "")
     if not isinstance(location, str) or not HEX64.fullmatch(digest):
         raise ValueError("Missing receipt path or digest")
     path = (root / location).resolve()
-    allowed = (root / "docs/realtime-parity-evidence").resolve()
+    allowed = (root / evidence_directory).resolve()
     if not path.is_relative_to(allowed) or path.suffix != ".json" or not path.is_file():
         raise ValueError(f"Missing checked-in receipt: {location}")
     raw = path.read_bytes()
@@ -192,6 +196,9 @@ def validate_receipt(row, evidence, root=ROOT):
             or not HEX64.fullmatch(receipt.get("sourceTree", ""))
             or not HEX64.fullmatch(receipt.get("artifactSha256", ""))):
         raise ValueError(f"Invalid receipt provenance: {location}")
+    if (expected_scope is None and receipt.get("scope") not in (None, "realtime")
+            or expected_scope is not None and receipt.get("scope") != expected_scope):
+        raise ValueError("Receipt belongs to another acceptance scope")
     if row["lane"] == "live":
         raise ValueError("Offline TRX cannot certify live provider scenarios")
     if (receipt.get("acceptanceEligible") is not True or receipt.get("sourceCleanAtStart") is not True
@@ -270,6 +277,14 @@ def self_test():
           <ResultSummary><Counters total="{total}" passed="{int(outcome == 'Passed')}"/></ResultSummary></TestRun>""".encode()
     assert list(parse_trx(document("Passed")).values())[0]["outcome"] == "Passed"
     assert list(parse_trx(document("NotExecuted")).values())[0]["outcome"] == "NotExecuted"
+    global_document = document("Passed").replace(b"RustParityFixtureTests", b"AppServerThreadLifecycleContractTests")
+    assert len(parse_trx(global_document, offline_classes=("AppServerThreadLifecycleContractTests",))) == 1
+    try:
+        parse_trx(global_document)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Global test was accepted into Realtime-only receipt")
     collision = f"""<TestRun xmlns="{TRX_NS['t']}">
       <Results>
         <UnitTestResult testId="a" testName="{NAMESPACE}RustParityFixtureTests.Example(arg: truncated)" outcome="Passed"/>
@@ -324,6 +339,18 @@ def self_test():
             raise AssertionError("Invalid acceptance receipt was accepted")
         save()
         assert validate_receipt(row, evidence, root) == "b" * 64
+        receipt["scope"] = "global"
+        save()
+        rejects()
+        assert validate_receipt(row, evidence, root, expected_scope="global") == "b" * 64
+        del receipt["scope"]
+        save()
+        try:
+            validate_receipt(row, evidence, root, expected_scope="global")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Unscoped receipt certified global-only evidence")
         receipt["sourceCleanAtEnd"] = False
         save()
         rejects()
