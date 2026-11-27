@@ -31,6 +31,22 @@ public sealed partial class CodexThreadStore
         Func<CodexToolCall, CancellationToken, Task<CodexToolOutput>> execute, int maximumRequests = 8,
         CancellationToken cancellationToken = default)
     {
+        using var control = new CodexAgentControl();
+        return await RunControlledAgentMailboxWakeAsync(agent, rootThreadId, recipientThreadId, expectedMailboxRevision,
+            expectedThreadRevision, claimId, turnId, ownerId, options, execute, maximumRequests, control, null,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal ICodexNamedAgentLifecycleStorage RequireNamedAgentLifecycleStorage()
+        => storage as ICodexNamedAgentLifecycleStorage ??
+            throw new InvalidOperationException("Named-agent lifecycle storage is unavailable.");
+
+    internal async Task<CodexThreadAgentResult?> RunControlledAgentMailboxWakeAsync(CodexThreadAgent agent,
+        Guid rootThreadId, Guid recipientThreadId, long expectedMailboxRevision, long expectedThreadRevision,
+        Guid claimId, Guid turnId, string ownerId, CodexResponseOptions options,
+        Func<CodexToolCall, CancellationToken, Task<CodexToolOutput>> execute, int maximumRequests,
+        CodexAgentControl control, Action<CodexThreadDocument>? admittedObserver, CancellationToken cancellationToken)
+    {
         RequireMailboxExecution();
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(options);
@@ -79,7 +95,7 @@ public sealed partial class CodexThreadStore
         await WriteAgentMailboxAsync(before, before with { Claim = claim }, CodexAgentMailboxOperation.Claim,
             cancellationToken).ConfigureAwait(false);
 
-        using var control = new CodexAgentControl { CapturedDescendantGoal = descendantGoal };
+        control.CapturedDescendantGoal = descendantGoal;
         control.InitializeInput(input, turnTrigger: CodexAgentMailWakeAdmission.TurnTrigger(claimId));
         return await agent.RunAsync(recipientThreadId, thread.Revision, turnId, ownerId, options, input, execute,
             maximumRequests, turnStarted: async (admitted, ct) =>
@@ -88,6 +104,7 @@ public sealed partial class CodexThreadStore
                 if (current.Claim != claim)
                     throw new InvalidOperationException("Wake claim changed before admission acknowledgement.");
                 await AcknowledgeObservedWakeAsync(current, admitted, ct).ConfigureAwait(false);
+                admittedObserver?.Invoke(admitted);
             }, cancellationToken: cancellationToken, control: control).ConfigureAwait(false);
     }
 

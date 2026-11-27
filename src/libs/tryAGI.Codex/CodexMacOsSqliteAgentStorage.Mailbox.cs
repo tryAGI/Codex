@@ -233,11 +233,14 @@ public sealed partial class CodexMacOsSqliteAgentStorage
 
     private bool Settled(Sql sql, Guid id)
     {
-        if (Header(sql, id) is { Active: true }) return false;
+        var header = Header(sql, id);
+        if (header is { Active: true }) return false;
         if (sql.Query("SELECT 1 FROM agent_grants WHERE recipient=?1 AND state=0;", row => row.Number(0), 1, id).Count != 0)
             return false;
-        // Only mailbox bytes, never the thread body, are required for this fence.
+        if (header is null) return true;
         var root = Edge(sql, id)?.Root ?? id;
-        return Header(sql, id) is null || ReadMailbox(sql, root, id).Claim is null;
+        // Lifecycle mutations, unlike ordinary graph and mailbox reads, must also
+        // verify that no existing voice attachment retains execution ownership.
+        return ReadMailbox(sql, root, id).Claim is null && !CodexThreadStore.HasOpenRealtime(ReadDocument(sql, id));
     }
 }

@@ -12,7 +12,7 @@ namespace tryAGI.Codex;
 /// authorize ordinary journal/tool operations and explicitly grant wake admissions.
 /// Supports fresh named spawn and bound idle wake; active-turn mail admission and permanent
 /// deletion are not implemented. Do not restore older snapshots while the store is in use.</summary>
-public sealed partial class CodexMacOsSqliteAgentStorage : ICodexNamedAgentSpawnStorage, IAsyncDisposable
+public sealed partial class CodexMacOsSqliteAgentStorage : ICodexNamedAgentLifecycleStorage, IAsyncDisposable
 {
     private readonly CodexMacOsAgentSqlite database;
     private readonly string accountId;
