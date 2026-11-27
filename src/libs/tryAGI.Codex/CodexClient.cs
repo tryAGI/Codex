@@ -100,6 +100,28 @@ public sealed partial class CodexClient : IDisposable
         return content;
     }
 
+    /// <summary>Creates a realtime call using the Rust SDP-only endpoint, without session configuration.
+    /// The offer is sent as application/sdp to realtime/calls. Never retried after dispatch.</summary>
+    /// <param name="offerSdp">SDP offer from the caller's peer connection.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public async Task<CodexRealtimeCall> CreateRealtimeCallFromSdpAsync(string offerSdp, CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity("codex.realtime.call.create");
+        ArgumentException.ThrowIfNullOrWhiteSpace(offerSdp);
+        var api = realtimeApiKeyProvider is not null;
+        if (!api) ValidateChatGptCallDestination(options.BackendBaseUri);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(options.RequestTimeout);
+        using var request = new HttpRequestMessage(HttpMethod.Post,
+            new Uri((api ? RealtimeApiBaseUri : options.BackendBaseUri).AbsoluteUri.TrimEnd('/') + "/realtime/calls"))
+        {
+            Content = new ByteArrayContent(Encoding.UTF8.GetBytes(offerSdp)),
+            Version = HttpVersion.Version20, VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+        };
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/sdp");
+        return await SendRealtimeCallAsync(request, deadline.Token).ConfigureAwait(false);
+    }
+
     /// <summary>Creates a WebRTC realtime call from an SDP offer. Never retried: a lost response may still have created a call.</summary>
     /// <param name="offerSdp">SDP offer from the caller's peer connection.</param>
     /// <param name="session">Session settings.</param>
@@ -121,20 +143,26 @@ public sealed partial class CodexClient : IDisposable
                 new StringContent(new JsonObject { ["sdp"] = offerSdp, ["session"] = wireSession }.ToJsonString(), Encoding.UTF8, "application/json"),
             Version = HttpVersion.Version20, VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
         };
-        var auth = await GetRealtimeAuthorizationAsync(deadline.Token).ConfigureAwait(false);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
-        if (auth.AccountId is { } accountId) request.Headers.Add("ChatGPT-Account-Id", accountId);
-        request.Headers.Add("originator", options.Originator);
         if (session.SessionId is { } id) request.Headers.Add("x-session-id", id);
         if (session.VoiceSessionId is { } voiceId) request.Headers.Add("voice-session-id", voiceId);
         request.Headers.TryAddWithoutValidation("openai-alpha", session.Protocol == "v1" ? "quicksilver=v1" : "quicksilver=v2");
+        return await SendRealtimeCallAsync(request, deadline.Token).ConfigureAwait(false);
+    }
+
+    private async Task<CodexRealtimeCall> SendRealtimeCallAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        var auth = await GetRealtimeAuthorizationAsync(ct).ConfigureAwait(false);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+        if (auth.AccountId is { } accountId) request.Headers.Add("ChatGPT-Account-Id", accountId);
+        request.Headers.Add("originator", options.Originator);
         // Creation is deliberately not retried: a lost response may still have created a call.
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
-        await EnsureCallSuccessAsync(response, deadline.Token).ConfigureAwait(false);
-        var answer = await ReadBoundedAsync(response.Content, options.MaximumMessageBytes, deadline.Token).ConfigureAwait(false);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        await EnsureCallSuccessAsync(response, ct).ConfigureAwait(false);
+        var answer = await ReadBoundedAsync(response.Content, options.MaximumMessageBytes, ct).ConfigureAwait(false);
         if (!answer.StartsWith("v=0", StringComparison.Ordinal)) throw new CodexProtocolException("Call response is not SDP.");
-        if (!response.Headers.TryGetValues("Location", out var values)) throw new CodexProtocolException("Call response omitted Location.");
-        return new(CodexRealtimeProtocol.CallId(values.First()), answer);
+        if (!response.Headers.TryGetValues("Location", out var values) || values.FirstOrDefault() is not { } location)
+            throw new CodexProtocolException("Call response omitted Location.");
+        return new(CodexRealtimeProtocol.CallId(location), answer);
     }
 
     /// <summary>Connects the V3 sideband WebSocket of a call.</summary>
