@@ -14,6 +14,7 @@ public sealed partial class CodexClient : IDisposable
     public static readonly ActivitySource ActivitySource = new("tryAGI.Codex");
     private readonly HttpClient http;
     private readonly ICodexCredentialProvider credentials;
+    private readonly ICodexRealtimeApiKeyProvider? realtimeApiKeyProvider;
     private readonly CodexEndpointOptions options;
     private readonly ICodexUsageObserver? usageObserver;
     internal bool IsBoundTo(ICodexCredentialProvider expectedCredentials, ICodexUsageObserver expectedObserver) =>
@@ -26,8 +27,13 @@ public sealed partial class CodexClient : IDisposable
     /// <param name="usageObserver">Optional admission and accounting hooks for every model request.</param>
     public CodexClient(ICodexCredentialProvider credentials, CodexEndpointOptions? options = null, HttpMessageHandler? handler = null,
         ICodexUsageObserver? usageObserver = null)
+        : this(credentials, options, handler, usageObserver, null) { }
+
+    private CodexClient(ICodexCredentialProvider credentials, CodexEndpointOptions? options, HttpMessageHandler? handler,
+        ICodexUsageObserver? usageObserver, ICodexRealtimeApiKeyProvider? realtimeApiKeyProvider)
     {
         this.credentials = credentials;
+        this.realtimeApiKeyProvider = realtimeApiKeyProvider;
         this.options = options ?? new();
         this.usageObserver = usageObserver;
         if (this.options.BackendBaseUri.Scheme != "https" || this.options.SidebandBaseUri.Scheme != "wss" ||
@@ -38,6 +44,62 @@ public sealed partial class CodexClient : IDisposable
         { Timeout = Timeout.InfiniteTimeSpan };
     }
 
+    /// <summary>Creates an API-only realtime client. API keys are sent only to the official API origin;
+    /// ChatGPT-only operations on this client require a separate explicitly authorized client.</summary>
+    /// <param name="apiKeyProvider">Caller-owned OpenAI API key provider.</param>
+    /// <param name="options">Timeout and message size configuration.</param>
+    /// <param name="handler">Optional HTTP handler for tests or a trusted transport.</param>
+    /// <param name="usageObserver">Optional model request accounting hooks.</param>
+    public static CodexClient ForRealtimeApi(ICodexRealtimeApiKeyProvider apiKeyProvider, CodexEndpointOptions? options = null,
+        HttpMessageHandler? handler = null, ICodexUsageObserver? usageObserver = null)
+    {
+        ArgumentNullException.ThrowIfNull(apiKeyProvider);
+        return new(new UnavailableChatGptCredentials(), options, handler, usageObserver, apiKeyProvider);
+    }
+
+    private sealed class UnavailableChatGptCredentials : ICodexCredentialProvider
+    {
+        public ValueTask<CodexCredentials> GetCredentialsAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.FromException<CodexCredentials>(new CodexAuthorizationUnavailableException());
+    }
+
+    private static readonly Uri RealtimeApiBaseUri = new("https://api.openai.com/v1/");
+    private const string RealtimeMultipartBoundary = "codex-realtime-call-boundary";
+
+    private async ValueTask<(string Token, string? AccountId)> GetRealtimeAuthorizationAsync(CancellationToken ct)
+    {
+        if (realtimeApiKeyProvider is not null)
+        {
+            var key = await realtimeApiKeyProvider.GetApiKeyAsync(ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(key) || key.Any(char.IsControl))
+                throw new CodexProtocolException("OpenAI realtime API credentials are unavailable or invalid.");
+            return (key, null);
+        }
+        var auth = await credentials.GetCredentialsAsync(ct).ConfigureAwait(false);
+        return (auth.AccessToken, auth.AccountId);
+    }
+
+    private static void ValidateChatGptCallDestination(Uri uri)
+    {
+        if (uri.Scheme != "https" || !uri.IdnHost.Equals("chatgpt.com", StringComparison.OrdinalIgnoreCase) ||
+            !uri.IsDefaultPort || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0 ||
+            uri.AbsolutePath.TrimEnd('/') != "/backend-api/codex")
+            throw new ArgumentException("ChatGPT realtime call creation requires the trusted ChatGPT Codex backend. Use ForRealtimeApi for API-key requests.");
+    }
+
+    private static HttpContent RealtimeMultipart(string offerSdp, JsonObject session)
+    {
+        // Rust uses a fixed multipart boundary and raw CRLF-delimited SDP/JSON parts.
+        if (offerSdp.Contains("--" + RealtimeMultipartBoundary, StringComparison.Ordinal))
+            throw new ArgumentException("SDP contains the reserved multipart boundary.", nameof(offerSdp));
+        var body = $"--{RealtimeMultipartBoundary}\r\nContent-Disposition: form-data; name=\"sdp\"\r\nContent-Type: application/sdp\r\n\r\n{offerSdp}\r\n" +
+            $"--{RealtimeMultipartBoundary}\r\nContent-Disposition: form-data; name=\"session\"\r\nContent-Type: application/json\r\n\r\n{session.ToJsonString()}\r\n" +
+            $"--{RealtimeMultipartBoundary}--\r\n";
+        var content = new ByteArrayContent(Encoding.UTF8.GetBytes(body));
+        content.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data; boundary=" + RealtimeMultipartBoundary);
+        return content;
+    }
+
     /// <summary>Creates a WebRTC realtime call from an SDP offer. Never retried: a lost response may still have created a call.</summary>
     /// <param name="offerSdp">SDP offer from the caller's peer connection.</param>
     /// <param name="session">Session settings.</param>
@@ -46,10 +108,23 @@ public sealed partial class CodexClient : IDisposable
     {
         using var activity = ActivitySource.StartActivity("codex.realtime.call.create");
         ArgumentException.ThrowIfNullOrWhiteSpace(offerSdp);
-        var body = new JsonObject { ["sdp"] = offerSdp, ["session"] = CodexRealtimeProtocol.Session(session) };
+        var api = realtimeApiKeyProvider is not null;
+        if (!api) ValidateChatGptCallDestination(options.BackendBaseUri);
+        var wireSession = CodexRealtimeProtocol.Session(session, chatGptCall: !api);
+        wireSession.Remove("id");
+        var path = api && session.Protocol == "v3" ? "live" : "realtime/calls?intent=quicksilver&architecture=avas";
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(options.RequestTimeout);
-        using var request = await RequestAsync("realtime/calls?intent=quicksilver&architecture=avas", body, deadline.Token).ConfigureAwait(false);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri((api ? RealtimeApiBaseUri : options.BackendBaseUri).AbsoluteUri.TrimEnd('/') + "/" + path))
+        {
+            Content = api ? RealtimeMultipart(offerSdp, wireSession) :
+                new StringContent(new JsonObject { ["sdp"] = offerSdp, ["session"] = wireSession }.ToJsonString(), Encoding.UTF8, "application/json"),
+            Version = HttpVersion.Version20, VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+        };
+        var auth = await GetRealtimeAuthorizationAsync(deadline.Token).ConfigureAwait(false);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+        if (auth.AccountId is { } accountId) request.Headers.Add("ChatGPT-Account-Id", accountId);
+        request.Headers.Add("originator", options.Originator);
         request.Headers.TryAddWithoutValidation("openai-alpha", session.Protocol == "v1" ? "quicksilver=v1" : "quicksilver=v2");
         // Creation is deliberately not retried: a lost response may still have created a call.
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);

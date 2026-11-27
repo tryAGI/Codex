@@ -26,6 +26,13 @@ public interface ICodexCredentialProvider
     ValueTask<CodexCredentials> GetCredentialsAsync(CancellationToken cancellationToken = default);
 }
 
+/// <summary>Explicit OpenAI API credentials for native realtime; never substituted for ChatGPT OAuth.</summary>
+public interface ICodexRealtimeApiKeyProvider
+{
+    /// <summary>Returns the current OpenAI API key without logging or persisting it in the SDK.</summary>
+    ValueTask<string> GetApiKeyAsync(CancellationToken cancellationToken = default);
+}
+
 /// <summary>The host no longer has an active login; carries no account or token data.</summary>
 public sealed class CodexAuthorizationUnavailableException() : InvalidOperationException("Native Codex requires explicit ChatGPT authorization.");
 
