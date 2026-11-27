@@ -292,6 +292,229 @@ public sealed class SegmentedThreadStorageTests
         Assert.Equal((writes[0] ? first : second).GetRawText(), actual!.Value.GetRawText());
     }
 
+    private static CodexStoredTurn[] Turns(int count)
+    {
+        var now = DateTimeOffset.UnixEpoch.AddDays(1);
+        return Enumerable.Range(0, count).Select(i =>
+        {
+            var id = Guid.NewGuid();
+            return new CodexStoredTurn(id, id, "runner", "completed", now,
+                [Settings("turn-" + i)], [], [], now);
+        }).ToArray();
+    }
+
+    [Fact]
+    public async Task IndexedTurnPagesMatchFullSnapshotAndOnlyReadIntersectingPhysicalPages()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("large", Payload()), Ct);
+        var original = CodexThreadStore.Encode(thread with { Revision = thread.Revision + 1, Turns = Turns(130) });
+        Assert.True(await storage.CompareExchangeAsync(thread.Id, thread.Revision, original, Ct));
+        var manifest = roots.Snapshot(thread.Id);
+        Assert.Equal(2, manifest.GetProperty("version").GetInt32());
+        var fullPageCount = Hashes(manifest).Length;
+        Assert.True(fullPageCount > 2);
+
+        var reads = pages.Reads;
+        var first = await storage.ReadHistoryPageAsync(thread.Id, CodexThreadHistoryCollection.Turns,
+            pageSize: 17, cancellationToken: Ct);
+        Assert.True(first.UsedIndex);
+        Assert.Equal(130, first.TotalCount);
+        Assert.Equal(0, first.StartOrdinal);
+        Assert.Equal(17, first.Items.Length);
+        Assert.InRange(pages.Reads - reads, 1, fullPageCount - 1);
+        var actual = new List<JsonElement>(first.Items);
+        var page = first;
+        while (page.Next is { } cursor)
+        {
+            page = await storage.ReadHistoryPageAsync(thread.Id, CodexThreadHistoryCollection.Turns,
+                pageSize: 17, cursor: cursor, cancellationToken: Ct);
+            Assert.Equal(actual.Count, page.StartOrdinal);
+            Assert.True(page.UsedIndex);
+            Assert.InRange(page.Items.Length, 1, 17);
+            actual.AddRange(page.Items);
+        }
+        Assert.Equal(original.GetProperty("turns").EnumerateArray().Select(t => t.GetRawText()),
+            actual.Select(t => t.GetRawText()));
+        Assert.Equal(original.GetRawText(), (await storage.ReadAsync(thread.Id, Ct))!.Value.GetRawText());
+        reads = pages.Reads;
+        var empty = await storage.ReadHistoryPageAsync(thread.Id, CodexThreadHistoryCollection.RealtimeFrames,
+            "missing", cancellationToken: Ct);
+        Assert.True(empty.UsedIndex);
+        Assert.Empty(empty.Items);
+        Assert.Equal(reads, pages.Reads);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LegacyInlineOrV1HistoryReadsRemainCompatibleAndV2EnrollmentIsSticky(bool inline)
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var legacy = new CodexSegmentedThreadStorage(roots, pages, "account");
+        var store = new CodexThreadStore(inline ? roots : legacy, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("old"), Ct);
+        var candidate = CodexThreadStore.Encode(thread with { Revision = thread.Revision + 1, Turns = Turns(3) });
+        var writer = inline ? (ICodexThreadStorage)roots : legacy;
+        Assert.True(await writer.CompareExchangeAsync(thread.Id, thread.Revision, candidate, Ct));
+
+        var upgraded = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var first = await upgraded.ReadHistoryPageAsync(thread.Id, CodexThreadHistoryCollection.Turns,
+            pageSize: 1, cancellationToken: Ct);
+        Assert.False(first.UsedIndex);
+        Assert.NotNull(first.Next);
+        var next = await upgraded.ReadHistoryPageAsync(thread.Id, CodexThreadHistoryCollection.Turns,
+            pageSize: 1, cursor: first.Next, cancellationToken: Ct);
+        Assert.Equal(candidate.GetProperty("turns")[1].GetRawText(), Assert.Single(next.Items).GetRawText());
+
+        var revision = first.Revision;
+        var enrolled = JsonNode.Parse(candidate.GetRawText())!.AsObject();
+        enrolled["revision"] = revision + 1;
+        Assert.True(await upgraded.CompareExchangeAsync(thread.Id, revision, Json(enrolled.ToJsonString()), Ct));
+        var reads = pages.Reads;
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => upgraded.ReadHistoryPageAsync(thread.Id,
+            CodexThreadHistoryCollection.Turns, cursor: first.Next, cancellationToken: Ct));
+        Assert.Equal(reads, pages.Reads);
+        var current = await legacy.ReadHistoryPageAsync(thread.Id, CodexThreadHistoryCollection.Turns, cancellationToken: Ct);
+        Assert.True(current.UsedIndex);
+        enrolled["revision"] = current.Revision + 1;
+        Assert.True(await legacy.CompareExchangeAsync(thread.Id, current.Revision, Json(enrolled.ToJsonString()), Ct));
+        Assert.Equal(2, roots.Snapshot(thread.Id).GetProperty("version").GetInt32());
+    }
+
+    [Fact]
+    public async Task RealtimeSemanticCollectionsAreScopedAndMatchTheDurableHistory()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("rt"), Ct);
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "session", "rtc_semantic", "v3", "owner", Ct);
+        var attachment = Guid.NewGuid();
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "speech",
+            """{"type":"input_transcript.added","item":{"text":"original words"}}""");
+        thread = await RealtimeHistoryTests.Observe(store, thread, attachment, "handoff",
+            """{"type":"delegation.created","item":{"id":"delegate","type":"delegation","target":"client","content":[]}}""");
+        var input = CodexThreadStore.PrepareRealtimeHandoffInput(RealtimeHistoryTests.Session(thread), "delegate")?.Text ?? "";
+        thread = (await store.RejectRealtimeHandoffAsync(thread.Id, thread.Revision, "session", "owner",
+            attachment, "delegate", Guid.NewGuid(), input, cancellationToken: Ct)).Thread;
+        var operation = Guid.NewGuid();
+        var ended = await store.BeginRealtimeEndAsync(thread.Id, thread.Revision, "session", "owner", attachment, operation, Ct);
+        thread = await store.CompleteRealtimeEndAsync(thread.Id, ended.Thread.Revision, "session", "owner", operation, Ct);
+        var original = CodexThreadStore.Encode(thread).GetProperty("realtimeSessions")[0];
+        var history = original.GetProperty("history");
+        foreach (var (kind, values) in new[]
+        {
+            (CodexThreadHistoryCollection.RealtimeObservations, history.GetProperty("events")),
+            (CodexThreadHistoryCollection.RealtimeFrames, history.GetProperty("frames")),
+            (CodexThreadHistoryCollection.RealtimeHandoffs, history.GetProperty("handoffs")),
+            (CodexThreadHistoryCollection.RealtimeCarryover, history.GetProperty("carryover")),
+            (CodexThreadHistoryCollection.RealtimeAdmissions, original.GetProperty("handoffAdmissions")),
+        })
+        {
+            var page = await storage.ReadHistoryPageAsync(thread.Id, kind, "session", cancellationToken: Ct);
+            Assert.True(page.UsedIndex);
+            Assert.Null(page.Next);
+            Assert.Equal(values.EnumerateArray().Select(v => v.GetRawText()), page.Items.Select(v => v.GetRawText()));
+        }
+
+        var first = await storage.ReadHistoryPageAsync(thread.Id, CodexThreadHistoryCollection.RealtimeObservations,
+            "session", pageSize: 1, cancellationToken: Ct);
+        Assert.NotNull(first.Next);
+        var reads = pages.Reads;
+        await Assert.ThrowsAsync<ArgumentException>(() => storage.ReadHistoryPageAsync(thread.Id,
+            CodexThreadHistoryCollection.RealtimeFrames, "session", cursor: first.Next, cancellationToken: Ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => storage.ReadHistoryPageAsync(thread.Id,
+            CodexThreadHistoryCollection.RealtimeObservations, "other", cursor: first.Next, cancellationToken: Ct));
+        var anotherAccount = new CodexSegmentedThreadStorage(roots, pages, "other-account", indexHistory: true);
+        await Assert.ThrowsAsync<InvalidDataException>(() => anotherAccount.ReadHistoryPageAsync(thread.Id,
+            CodexThreadHistoryCollection.RealtimeObservations, "session", cancellationToken: Ct));
+        Assert.Equal(reads, pages.Reads);
+
+        var fork = await store.ForkAsync(thread.Id, thread.Revision, Guid.NewGuid(), cancellationToken: Ct);
+        var inherited = await storage.ReadHistoryPageAsync(fork.Id, CodexThreadHistoryCollection.InheritedRealtimeCarryover,
+            cancellationToken: Ct);
+        Assert.True(inherited.UsedIndex);
+        Assert.Single(inherited.Items);
+        Assert.Equal(CodexThreadStore.Encode(fork).GetProperty("inheritedRealtimeCarryover")[0].GetRawText(),
+            inherited.Items[0].GetRawText());
+    }
+
+    [Theory]
+    [InlineData("digest")]
+    [InlineData("ordinal")]
+    [InlineData("range")]
+    public async Task CorruptSemanticIndexFailsClosed(string fault)
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        var snapshot = CodexThreadStore.Encode(thread with { Revision = thread.Revision + 1, Turns = Turns(2) });
+        Assert.True(await storage.CompareExchangeAsync(thread.Id, thread.Revision, snapshot, Ct));
+        var root = JsonNode.Parse(roots.Snapshot(thread.Id).GetRawText())!.AsObject();
+        var block = root["historyIndex"]![0]!["blocks"]![0]!.AsObject();
+        switch (fault)
+        {
+            case "digest": block["sha256"] = new string('0', 64); break;
+            case "ordinal": block["firstOrdinal"] = 1; break;
+            case "range": block["offset"] = int.MaxValue; break;
+        }
+        roots.ReplaceForFaultInjection(thread.Id, Json(root.ToJsonString()));
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadHistoryPageAsync(thread.Id,
+            CodexThreadHistoryCollection.Turns, cancellationToken: Ct));
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadAsync(thread.Id, Ct));
+    }
+
+    [Fact]
+    public async Task V2WithoutIndexUsesFullReadAndDoesNotClaimSelectiveAccess()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("large", Payload()), Ct);
+        var candidate = CodexThreadStore.Encode(thread with { Revision = thread.Revision + 1, Turns = Turns(2) });
+        Assert.True(await storage.CompareExchangeAsync(thread.Id, thread.Revision, candidate, Ct));
+        var root = JsonNode.Parse(roots.Snapshot(thread.Id).GetRawText())!.AsObject();
+        // Simulate enrollment whose index exceeds the manifest budget, without changing the document.
+        root.Remove("historyIndex");
+        root.Remove("historyIndexSha256");
+        roots.ReplaceForFaultInjection(thread.Id, Json(root.ToJsonString()));
+        var reads = pages.Reads;
+        var page = await storage.ReadHistoryPageAsync(thread.Id, CodexThreadHistoryCollection.Turns,
+            pageSize: 1, cancellationToken: Ct);
+        Assert.False(page.UsedIndex);
+        Assert.Equal(Hashes(roots.Snapshot(thread.Id)).Length, pages.Reads - reads);
+        Assert.Equal(candidate.GetProperty("turns")[0].GetRawText(), Assert.Single(page.Items).GetRawText());
+        Assert.NotNull(page.Next);
+    }
+
+    [Fact]
+    public async Task OversizedIndexedRecordRequiresFullReadWithoutAllocatingItsPages()
+    {
+        var roots = new Roots();
+        var pages = new Pages();
+        var storage = new CodexSegmentedThreadStorage(roots, pages, "account", indexHistory: true);
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Settings("test"), Ct);
+        var turn = Assert.Single(Turns(1)) with { Input = [Settings("large", new string('x', 5 * 1024 * 1024))] };
+        var candidate = CodexThreadStore.Encode(thread with { Revision = thread.Revision + 1, Turns = [turn] });
+        Assert.True(await storage.CompareExchangeAsync(thread.Id, thread.Revision, candidate, Ct));
+        var reads = pages.Reads;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.ReadHistoryPageAsync(thread.Id,
+            CodexThreadHistoryCollection.Turns, cancellationToken: Ct));
+        Assert.Equal(reads, pages.Reads);
+        Assert.Equal(candidate.GetRawText(), (await storage.ReadAsync(thread.Id, Ct))!.Value.GetRawText());
+    }
+
     [Fact]
     public async Task ReaderOfAnOlderManifestRemainsConsistentDuringConcurrentPublication()
     {

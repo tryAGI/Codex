@@ -28,8 +28,32 @@ The version-1 manifest uses `kind: "codexThreadSegments"`, `version`, `id`, `acc
 - Fence all inline-only writers before enrolling a thread. An older client must not write to a manifest root; there is no implicit downgrade.
 - If staging or root CAS throws, do not dispatch any external action based on an uncertain receipt. Re-read the same thread identity and reconcile its existing durable admission. Pages staged by a failed writer may remain unreferenced.
 - Do not delete a page merely because the newest manifest no longer refers to it: an older reader or an in-flight candidate may still require it. Reference-aware garbage collection and subtree deletion need explicit host coordination and separate proof. This adapter does not advertise the deletion capability.
-- Existing materialized-document, event-count and closure-reservation bounds remain. This stage reduces possible physical write amplification, but still reconstructs a full document on read and stages candidate pages on write. No throughput or latency improvement is claimed without a host measurement.
+- Existing materialized-document, event-count and closure-reservation bounds remain. Ordinary reads still reconstruct a full document and writes stage candidate pages. No throughput or latency improvement is claimed without a host measurement.
+
+## Stage 2a: revision-bound semantic history reads
+
+Upgrade all manifest consumers before enrolling in version 2. The original constructor still writes version 1 for new threads; once a v2 root is published, newer writers preserve v2 even without explicit enrollment.
+
+```csharp
+var storage = new CodexSegmentedThreadStorage(rootStore, segmentStore, accountId, indexHistory: true);
+var page = await storage.ReadHistoryPageAsync(threadId, CodexThreadHistoryCollection.Turns,
+    pageSize: 32, cancellationToken: ct);
+while (page.Next is { } cursor)
+{
+    // Consume page.Items before continuing; the cursor cannot cross a revision.
+    page = await storage.ReadHistoryPageAsync(threadId, CodexThreadHistoryCollection.Turns,
+        pageSize: 32, cursor: cursor, cancellationToken: ct);
+}
+```
+
+Version 2 can add `historyIndex` and its canonical SHA-256 digest in the same root CAS. Each entry names a collection, an optional realtime session ID and an ordered sequence of byte ranges in the original document. A range contains complete original JSON records, their first ordinal/count, offset/length and SHA-256. No source records are duplicated. The collections include turns, realtime observations/boundaries, frames, handoff captures, carryover, admission receipts, and inherited carryover. Realtime collections require an exact session ID.
+
+- Index blocks target 256 KiB and at most 64 records; a larger individual record occupies its own block. Selective reads load only intersecting physical pages, verify each page and the indexed range, and return at most the requested item count (1–256) from one block. The decoded record-byte budget is 4 MiB; boundary physical pages can add up to two partial pages of I/O. An oversized individual record requires the existing full-document API.
+- Continuations bind thread, document revision/hash, collection, session and next ordinal. An intervening CAS rejects the cursor rather than silently mixing revisions. One request uses one captured root. Cursors are not authority tokens.
+- The root and its index are trusted host-published metadata; selective reads do not attest unread pages or the whole document's semantic validity. Full reads verify the document digest and rebuild the index to verify exact correspondence. Corrupt selected pages/ranges fail closed.
+- V1 and inline roots remain readable through the full-document path. If the index exceeds its bounded directory budget (8,192 entries/ranges or a 1 MiB v2 manifest), omit it rather than preventing closure of an otherwise valid journal. The page result exposes `UsedIndex = false` for those fallback reads; missing collections are empty.
+- No inference, handoff dispatch or persistence mutation occurs during history reads.
 
 ## Next stages
 
-Use stable semantic pages for observations, sealed transcript frames, handoff receipts and turns. Publish page indexes and reducer checkpoints in the same revision manifest, keeping immutable source events authoritative. Validate incremental replay against full replay, including old journal upgrades, handoff deduplication, late finals, compaction, forks and deletion. Move bounded item/history queries to those indexes. Only then retire the full-document ceiling for a page-aware store, keeping bounded pages, context windows, manifests and explicit recovery. The Advantage consumer migration is outside this initial SDK change.
+Move the existing host history/item query surface to the bounded index API. Add persistent incremental reducer checkpoints validated against the immutable source event prefix, coordinate with the native realtime reduction and Rust rollout work, and support page-aware compaction, forks and deletion. Only then retire the full-document ceiling for a page-aware store, keeping bounded pages, context windows, manifests and explicit recovery. The Advantage consumer migration remains outside this SDK change.

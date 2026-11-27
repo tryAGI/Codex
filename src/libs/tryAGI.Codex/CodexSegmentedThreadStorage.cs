@@ -25,7 +25,7 @@ public interface ICodexThreadSegmentStorage
 /// objects with the same revision CAS. Pages are staged first; only the root CAS publishes
 /// a new revision. Reads reconstruct and verify a single immutable manifest snapshot.
 /// The existing materialized-document bound remains in force until page-aware readers exist.</summary>
-public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
+public sealed partial class CodexSegmentedThreadStorage : ICodexThreadStorage
 {
     private const string ManifestKind = "codexThreadSegments";
     private const int MinimumPageBytes = 32 * 1024;
@@ -37,10 +37,17 @@ public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
     private readonly ICodexThreadStorage roots;
     private readonly ICodexThreadSegmentStorage pages;
     private readonly string accountId;
+    private readonly bool indexHistory;
 
     /// <summary>Bind one account's manifest CAS and immutable page store.
     /// The caller must prevent older inline-only writers from accessing these roots after migration.</summary>
     public CodexSegmentedThreadStorage(ICodexThreadStorage roots, ICodexThreadSegmentStorage pages, string accountId)
+        : this(roots, pages, accountId, indexHistory: false) { }
+
+    /// <summary>Optionally enroll in version-2 semantic history indexes. Upgrade every
+    /// manifest reader and writer before enabling this option; version-1 roots remain readable.</summary>
+    public CodexSegmentedThreadStorage(ICodexThreadStorage roots, ICodexThreadSegmentStorage pages, string accountId,
+        bool indexHistory)
     {
         ArgumentNullException.ThrowIfNull(roots);
         ArgumentNullException.ThrowIfNull(pages);
@@ -49,6 +56,7 @@ public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
         this.roots = roots;
         this.pages = pages;
         this.accountId = accountId;
+        this.indexHistory = indexHistory;
     }
 
     /// <inheritdoc />
@@ -59,8 +67,13 @@ public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
         var root = await roots.ReadAsync(threadId, cancellationToken).ConfigureAwait(false);
         if (root is null) return null;
         var header = ReadRoot(threadId, root.Value);
-        if (header.Manifest is not { } manifest) return root.Value.Clone();
+        return await ReadCapturedDocumentAsync(threadId, root.Value, header.Manifest, cancellationToken).ConfigureAwait(false);
+    }
 
+    private async Task<JsonElement> ReadCapturedDocumentAsync(Guid threadId, JsonElement root,
+        CodexThreadSegmentManifest? manifest, CancellationToken cancellationToken)
+    {
+        if (manifest is null) return root.Clone();
         var bytes = new byte[manifest.Length];
         var offset = 0;
         foreach (var page in manifest.Pages)
@@ -84,6 +97,8 @@ public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
             var value = document.RootElement;
             if (ReadDocumentRevision(threadId, value) != manifest.Revision)
                 throw new InvalidDataException("Native thread journal manifest revision does not match its document.");
+            if (manifest.HistoryIndex is { } index && !SameHistoryIndex(index, BuildHistoryIndex(bytes)))
+                throw new InvalidDataException("Native thread journal history index does not match its document.");
             return value.Clone();
         }
         catch (JsonException error)
@@ -109,24 +124,39 @@ public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
         // A known conflict must not stage pages. This check is only an optimization;
         // the final root CAS is the sole publication authority.
         var root = await roots.ReadAsync(threadId, cancellationToken).ConfigureAwait(false);
-        var currentRevision = root is { } current ? ReadRoot(threadId, current).Revision : (long?)null;
-        if (currentRevision != expectedRevision) return false;
+        var header = root is { } current ? ReadRoot(threadId, current) : ((long Revision, CodexThreadSegmentManifest? Manifest)?)null;
+        if (header?.Revision != expectedRevision) return false;
 
         var references = new List<CodexThreadSegmentReference>();
-        var staged = new HashSet<string>(StringComparer.Ordinal);
+        var staged = new Dictionary<string, (int Offset, int Length)>(StringComparer.Ordinal);
         foreach (var (offset, length) in Split(bytes))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var page = bytes.AsMemory(offset, length);
-            var sha = Digest(page.Span);
-            if (staged.Add(sha))
-                await pages.PutSegmentAsync(threadId, sha, page, cancellationToken).ConfigureAwait(false);
+            var sha = Digest(bytes.AsSpan(offset, length));
+            staged.TryAdd(sha, (offset, length));
             references.Add(new(sha, length));
         }
-        var manifest = new CodexThreadSegmentManifest(ManifestKind, 1, threadId, accountId, revision,
-            bytes.Length, Digest(bytes), references.ToArray());
+        var indexed = indexHistory || header?.Manifest?.Version == 2;
+        var index = indexed ? BuildHistoryIndex(bytes) : null;
+        var manifest = new CodexThreadSegmentManifest(ManifestKind, indexed ? 2 : 1, threadId, accountId, revision,
+            bytes.Length, Digest(bytes), references.ToArray())
+        {
+            HistoryIndex = index, HistoryIndexSha256 = index is null ? null : HistoryIndexDigest(index),
+        };
         var candidate = JsonSerializer.SerializeToElement(manifest, CodexThreadSegmentJson.Default.CodexThreadSegmentManifest);
+        if (indexed && Encoding.UTF8.GetByteCount(candidate.GetRawText()) > MaximumIndexedManifestBytes)
+        {
+            // Indexing must never make an otherwise valid journal impossible to close.
+            // Keep v2 enrollment and fall back to an ordinary verified full read.
+            manifest = manifest with { HistoryIndex = null, HistoryIndexSha256 = null };
+            candidate = JsonSerializer.SerializeToElement(manifest, CodexThreadSegmentJson.Default.CodexThreadSegmentManifest);
+        }
         ValidateManifest(threadId, candidate, manifest);
+        foreach (var (sha, range) in staged)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await pages.PutSegmentAsync(threadId, sha, bytes.AsMemory(range.Offset, range.Length), cancellationToken).ConfigureAwait(false);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         // Do not retry uncertain commits. A throw may mean the manifest is already visible.
         return await roots.CompareExchangeAsync(threadId, expectedRevision, candidate, cancellationToken).ConfigureAwait(false);
@@ -137,7 +167,7 @@ public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
         if (root.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException("Invalid native thread journal root.");
         if (!root.TryGetProperty("kind", out _)) return (ReadDocumentRevision(threadId, root), null);
-        if (Encoding.UTF8.GetByteCount(root.GetRawText()) > MaximumManifestBytes)
+        if (Encoding.UTF8.GetByteCount(root.GetRawText()) > MaximumIndexedManifestBytes)
             throw new InvalidDataException("Native thread journal manifest exceeds its bound.");
         try
         {
@@ -154,11 +184,13 @@ public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
 
     private void ValidateManifest(Guid threadId, JsonElement raw, CodexThreadSegmentManifest manifest)
     {
-        if (manifest.Kind != ManifestKind || manifest.Version != 1 || manifest.Id != threadId ||
+        if (manifest.Kind != ManifestKind || manifest.Version is not (1 or 2) ||
+            manifest.Version == 1 && manifest.HistoryIndex is not null ||
+            (manifest.HistoryIndex is null) != (manifest.HistoryIndexSha256 is null) || manifest.Id != threadId ||
             manifest.AccountId != accountId || manifest.Revision < 1 ||
             manifest.Length is <= 0 or > CodexThreadStore.MaximumDocumentBytes ||
             !ValidDigest(manifest.DocumentSha256) || manifest.Pages is not { Length: > 0 and <= MaximumPages } ||
-            Encoding.UTF8.GetByteCount(raw.GetRawText()) > MaximumManifestBytes)
+            Encoding.UTF8.GetByteCount(raw.GetRawText()) > (manifest.Version == 1 ? MaximumManifestBytes : MaximumIndexedManifestBytes))
             throw new InvalidDataException("Native thread journal manifest identity or bounds are invalid.");
         RequireUniqueProperties(raw);
         foreach (var entry in raw.GetProperty("pages").EnumerateArray()) RequireUniqueProperties(entry);
@@ -173,6 +205,12 @@ public sealed class CodexSegmentedThreadStorage : ICodexThreadStorage
         }
         if (length != manifest.Length)
             throw new InvalidDataException("Native thread journal page lengths do not match the manifest.");
+        if (manifest.HistoryIndex is { } index)
+        {
+            ValidateHistoryIndex(raw.GetProperty("historyIndex"), index, manifest.Length);
+            if (!ValidDigest(manifest.HistoryIndexSha256) || HistoryIndexDigest(index) != manifest.HistoryIndexSha256)
+                throw new InvalidDataException("Native history index digest mismatch.");
+        }
     }
 
     private long ReadDocumentRevision(Guid threadId, JsonElement value)
@@ -255,9 +293,17 @@ internal sealed record CodexThreadSegmentManifest(
     [property: JsonRequired] long Revision,
     [property: JsonRequired] int Length,
     [property: JsonRequired] string DocumentSha256,
-    [property: JsonRequired] CodexThreadSegmentReference[] Pages);
+    [property: JsonRequired] CodexThreadSegmentReference[] Pages)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CodexThreadHistoryIndexEntry[]? HistoryIndex { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? HistoryIndexSha256 { get; init; }
+}
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(CodexThreadSegmentManifest))]
+[JsonSerializable(typeof(CodexThreadHistoryIndexEntry[]))]
 internal partial class CodexThreadSegmentJson : JsonSerializerContext;
