@@ -102,3 +102,32 @@ compilation, symbolic roots, turn/session grants and platform enforcement remain
 Local validation on macOS arm64 / .NET 10: 20 tests passed, 0 failed, 0 skipped across
 CodexPermissionProfileCatalogTests and CodexConfigurationResolutionTests.
 Admitted build receipt: native-20261127-aaab1c807928486c9f0f015eb58f6738.
+
+## Approval RPC correlation (#112)
+
+`CodexApprovalRpcBridge` connects the v2 command, file-change and permission request families
+to `CodexApprovalStore`, reusing the exact numeric/string request identity type from the
+tool request ledger. The account and connection partition the durable request ID; a CAS binds
+the original method, parameter digest, offered one-action choices, resolved action and expiry.
+Only a newly created record authorizes initial request publication. Reattachment, duplicate
+responses, stale revisions, mismatched connections/actions, expiry and cancellation cannot
+rebind the request or admit a second execution. A reviewer decision is not a dispatch receipt;
+the trusted dispatcher must separately consume the approval for the exact resolved action.
+Command/file one-action accept, decline and cancel are supported. An empty turn permission
+grant is denial; nonempty permission grants, acceptForSession and policy amendments retain raw
+response JSON and return Unsupported without approving anything. Legacy approval routing,
+turn/session grants and actual durable storage/dispatcher integration remain #112, #111 and #113.
+
+Local validation on macOS arm64 / .NET 10: 32 tests passed, 0 failed, 0 skipped across
+CodexApprovalRpcBridgeTests, CodexApprovalStoreTests and CodexToolRequestLedgerTests.
+Admitted build receipt: native-20261127-e404d0fab6394321b3620247067b182c. Storage remains a test double.
+
+## macOS sandbox admission (#104)
+
+A deny-default Seatbelt probe for /usr/bin/true with minimal library reads returned exit 134
+without output, as did a second probe allowing sysctl reads and self process information.
+Runs: run-01a21be07ca771c2b72c721aba3b4672 and run-01a21be0b3d07dca9af883053a304324.
+These failed probes do not prove that Seatbelt is unavailable or that the policy can enforce
+the desired restrictions. Keep the real-adapter row unaccepted; no fallback or looser
+production policy was installed. Review the pinned Rust base/defaults policies and lifecycle
+before admitting any real platform adapter.

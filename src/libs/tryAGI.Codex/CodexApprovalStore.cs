@@ -68,7 +68,11 @@ public enum CodexApprovalState
 /// <param name="ActorId">Last authenticated reviewer/cancellation actor, if present.</param>
 public sealed record CodexApprovalRecord(Guid Id, string AccountId, CodexApprovalAction Action, long Revision,
     CodexApprovalState State, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, DateTimeOffset UpdatedAt,
-    string? ActorId = null);
+    string? ActorId = null)
+{
+    /// <summary>Optional immutable correlation for a native approval server request.</summary>
+    public CodexApprovalRpcBinding? RpcBinding { get; init; }
+}
 
 /// <summary>Host-owned durable atomic storage, partitioned by account and request ID.
 /// CompareExchange must return true only after a durable commit. A thrown write may have
@@ -101,6 +105,7 @@ public sealed class CodexApprovalStore
     private readonly Func<CodexApprovalAuthorization, CancellationToken, ValueTask> authorize;
     private readonly TimeProvider clock;
     private readonly TimeSpan maximumLifetime;
+    internal string AccountId => accountId;
 
     /// <summary>Creates an approval journal with an explicit storage and reviewer authorization boundary.</summary>
     public CodexApprovalStore(ICodexApprovalStorage storage, string accountId,
@@ -120,22 +125,26 @@ public sealed class CodexApprovalStore
     /// <summary>Creates a pending request. Exact repeated identities are idempotent, but an
     /// existing identity with a different action or deadline is never replaced or resurrected.</summary>
     public async Task<CodexApprovalRecord> RequestAsync(Guid id, CodexApprovalAction action,
-        DateTimeOffset expiresAt, CancellationToken cancellationToken = default)
+        DateTimeOffset expiresAt, CancellationToken cancellationToken = default) =>
+        (await AdmitAsync(id, action, expiresAt, null, cancellationToken).ConfigureAwait(false)).Record;
+
+    internal async Task<CodexApprovalRpcAdmission> AdmitAsync(Guid id, CodexApprovalAction action,
+        DateTimeOffset expiresAt, CodexApprovalRpcBinding? rpcBinding, CancellationToken cancellationToken)
     {
         ValidateId(id);
         ValidateAction(action);
         var existing = await ReadAsync(id, cancellationToken).ConfigureAwait(false);
-        if (existing is not null) return MatchRequest(existing, action, expiresAt);
+        if (existing is not null) return new(MatchRequest(existing, action, expiresAt, rpcBinding), false);
         var now = clock.GetUtcNow();
         if (expiresAt <= now || expiresAt - now > maximumLifetime)
             throw new ArgumentOutOfRangeException(nameof(expiresAt));
         var pending = new CodexApprovalRecord(id, accountId, action, 1, CodexApprovalState.Pending,
-            now, expiresAt, now);
+            now, expiresAt, now) { RpcBinding = rpcBinding };
         cancellationToken.ThrowIfCancellationRequested();
         if (await storage.CompareExchangeAsync(accountId, id, null, pending, cancellationToken).ConfigureAwait(false))
-            return pending;
+            return new(pending, true);
         existing = await ReadAsync(id, cancellationToken).ConfigureAwait(false);
-        return existing is not null ? MatchRequest(existing, action, expiresAt) : throw Conflict();
+        return existing is not null ? new(MatchRequest(existing, action, expiresAt, rpcBinding), false) : throw Conflict();
     }
 
     /// <summary>Reads a request, atomically materializing expiration before returning it.</summary>
@@ -246,8 +255,9 @@ public sealed class CodexApprovalStore
         CodexApprovalState.Revoked => current == CodexApprovalState.Approved,
         _ => false,
     };
-    private static CodexApprovalRecord MatchRequest(CodexApprovalRecord current, CodexApprovalAction action, DateTimeOffset expiresAt) =>
-        current.Action == action && current.ExpiresAt == expiresAt ? current : throw Conflict();
+    private static CodexApprovalRecord MatchRequest(CodexApprovalRecord current, CodexApprovalAction action,
+        DateTimeOffset expiresAt, CodexApprovalRpcBinding? rpcBinding) =>
+        current.Action == action && current.ExpiresAt == expiresAt && current.RpcBinding == rpcBinding ? current : throw Conflict();
 
     private static InvalidOperationException Conflict() => new("Approval is unknown, stale, mismatched or no longer actionable.");
     private static void ValidateId(Guid id)
