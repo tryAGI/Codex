@@ -56,6 +56,8 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             maximumRequests, observe, observeDiagnostics, canExecuteConcurrently, turnStarted,
             cancellationToken, control, validatedItem, observeAsync, journalProjection, historyTurnLimit, null).ConfigureAwait(false);
 
+    internal bool IsBoundTo(CodexThreadStore journal) => ReferenceEquals(store, journal);
+
     internal Task<CodexThreadAgentResult> RunRealtimeHandoffAsync(Guid threadId, long expectedRevision, string turnOwnerId,
         CodexRealtimeHandoffRequest handoff, CodexResponseOptions options, CodexAgentControl control,
         Func<CodexToolCall, CancellationToken, Task<CodexToolOutput>> execute, int maximumRequests,

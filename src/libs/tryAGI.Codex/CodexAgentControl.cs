@@ -74,7 +74,7 @@ public sealed class CodexAgentControl : IDisposable
     }
 
     internal async Task<CodexRealtimeHandoffAdmission> SteerRealtimeAsync(CodexRealtimeHandoffRequest request,
-        CancellationToken ct)
+        CancellationToken ct, Action? onAdmitted = null)
     {
         await realtimeGate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -102,6 +102,8 @@ public sealed class CodexAgentControl : IDisposable
                     queuedBytes += bytes;
                 }
             }
+            // Publish the new feedback generation before capture can acquire realtimeGate.
+            if (receipt.Admitted) onAdmitted?.Invoke();
             return receipt;
         }
         finally

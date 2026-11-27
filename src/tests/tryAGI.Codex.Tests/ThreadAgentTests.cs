@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading.Channels;
 
 namespace tryAGI.Codex.Tests;
 
@@ -274,6 +275,98 @@ public sealed class ThreadAgentTests
         release.TrySetResult();
         await run;
         Assert.Equal("hello", server.Requests.Single().GetProperty("input")[0].GetProperty("content").GetString());
+    }
+
+    [Fact]
+    public async Task NativeCoordinatorKeepsAudioAndControlLiveDuringToolAndContinuesSameThread()
+    {
+        var (_, store, thread, auth, budget, server) = await Setup();
+        var agent = Agent(store, auth, budget, server);
+        var priorId = Guid.NewGuid();
+        server.Replies.Enqueue(Text("prior answer"));
+        thread = (await agent.RunAsync(thread.Id, thread.Revision, priorId, "prior",
+            Options(thread.Id, priorId), [Input("prior question")], NoTools, cancellationToken: Ct)).Thread;
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice", "rtc_call", "v3", "voice-owner", Ct);
+        using var client = new CodexClient(auth);
+        var incoming = Channel.CreateUnbounded<string>();
+        var outgoing = Channel.CreateUnbounded<string>();
+        var controller = new CodexRealtimeSessionController(store, thread.Id, "voice", "voice-owner",
+            (request, ct) => client.AttachExistingRealtimeCallAsync(request.CallId,
+                new CodexRealtimeAttachmentStream(incoming.Reader, outgoing.Writer), request.Protocol, request.StartBefore, ct));
+        var toolStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseTool = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rpc = new CodexThreadRpc(store, _ => Task.FromResult<IReadOnlyList<CodexThreadDocument>>([]),
+            Json("{}"), (_, _, _) => throw new InvalidOperationException("Use the native owned executor."), (_, _) => Task.CompletedTask);
+        await using var coordinator = new CodexRealtimeCoordinator(store, agent, rpc, controller, thread.Id, "voice", "voice-owner", "account",
+            _ => Options(thread.Id, Guid.NewGuid()), async (_, ct) =>
+            {
+                toolStarted.TrySetResult();
+                await releaseTool.Task.WaitAsync(ct);
+                return new CodexToolOutput("tool result");
+            }, new() { DirectAudio = true, ChannelMode = CodexRealtimeReasoningChannelMode.Commentary, BackendReasoningStatus = true });
+        server.Replies.Enqueue(Call("voice_read", "key"));
+        server.Replies.Enqueue(Text("steered answer"));
+        server.Replies.Enqueue(Text("third answer"));
+        Assert.Equal(CodexRealtimeLifecycleStatus.Attached, await coordinator.AttachAsync(Ct));
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        var token = deadline.Token;
+        var pump = coordinator.RunAsync(ct: token);
+        async Task Send(string id) => await incoming.Writer.WriteAsync(
+            $$$"""{"type":"delegation.created","item":{"type":"delegation","target":"client","id":"{{{id}}}","content":[{"type":"input_text","text":"task {{{id}}}"}]}}""", token);
+        async Task<CodexThreadDocument> Until(Func<CodexThreadDocument, bool> condition)
+        {
+            while (true)
+            {
+                if (coordinator.ReasoningFailure is { } error) throw new InvalidOperationException("Reasoning failed.", error);
+                if (pump.IsCompleted) throw new InvalidOperationException("Voice pump ended.", pump.Exception);
+                var snapshot = await store.ReadAsync(thread.Id, token);
+                if (condition(snapshot)) return snapshot;
+                await Task.Delay(10, token);
+            }
+        }
+        async Task<string> ReadWire(Func<string, bool> predicate)
+        {
+            while (true)
+            {
+                var wire = await outgoing.Reader.ReadAsync(token);
+                if (predicate(wire)) return wire;
+            }
+        }
+        try
+        {
+            await Send("first");
+            await toolStarted.Task.WaitAsync(token);
+            await Send("second");
+            var steered = await Until(d => d.Turns.Length == 2 && d.Turns.Last().Input.Length == 2);
+            Assert.Equal("inProgress", steered.Turns.Last().Status);
+            Assert.Equal(2, server.Requests.Count);
+            Assert.True(coordinator.TryAppendAudio(new byte[] { 0, 0, 1, 0 }));
+            Assert.True(coordinator.TryAppendText("keep talking"));
+            Assert.True(coordinator.TryAppendReasoningStatus("working"));
+            // Separate lanes are independent, so their relative wire order is unspecified.
+            var heardAudio = false; var heardText = false;
+            while (!heardAudio || !heardText)
+            {
+                var wire = await outgoing.Reader.ReadAsync(token);
+                heardAudio |= wire.Contains("input_audio.append", StringComparison.Ordinal);
+                heardText |= wire.Contains("keep talking", StringComparison.Ordinal);
+            }
+            Assert.False(releaseTool.Task.IsCompleted);
+            releaseTool.TrySetResult();
+            await Until(d => d.Turns.Length == 2 && d.Turns.Last().Status == "completed");
+            await ReadWire(x => x.Contains("steered answer", StringComparison.Ordinal));
+            await Send("third");
+            var completed = await Until(d => d.Turns.Length == 3 && d.Turns.Last().Status == "completed");
+            Assert.Equal(priorId, completed.Turns.First().Id);
+            Assert.Equal(4, server.Requests.Count);
+            Assert.Equal(3, completed.RealtimeSessions!.Single().HandoffAdmissions!.Length);
+            Assert.Contains("prior answer", server.Requests.Last().GetRawText());
+            await ReadWire(x => x.Contains("third answer", StringComparison.Ordinal));
+            Assert.Equal(CodexRealtimeLifecycleStatus.Detached, await coordinator.DetachAsync(token));
+            await pump;
+        }
+        finally { releaseTool.TrySetResult(); await deadline.CancelAsync(); }
     }
 
     [Fact]

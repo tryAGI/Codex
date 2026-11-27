@@ -119,6 +119,11 @@ public sealed class CodexRealtimeSessionController : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(options));
     }
 
+    internal bool IsBoundTo(CodexThreadStore journal, Guid thread, string session, string owner) =>
+        ReferenceEquals(store, journal) && threadId == thread && sessionId == session && ownerId == owner;
+
+    internal Guid? AttachmentId { get { lock (sync) return current?.Id; } }
+
     /// <summary>Current connection for outbound commands. Use <see cref="PumpAsync"/> as the
     /// sole inbound reader so that observations are persisted before delivery.</summary>
     public CodexRealtimeConnection? Connection

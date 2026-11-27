@@ -19,6 +19,25 @@ public sealed partial class CodexThreadRpc
         internal JsonElement? ConfigurationRequirements { get; init; }
     }
 
+    internal bool IsBoundTo(CodexThreadStore journal) => ReferenceEquals(store, journal);
+
+    internal async Task<CodexRealtimeHandoffAdmission?> SteerRealtimeAsync(Guid threadId,
+        CodexRealtimeHandoffRequest handoff, CancellationToken ct, Action? onAdmitted = null)
+    {
+        Running? running;
+        await admission.WaitAsync(ct).ConfigureAwait(false);
+        try { active.TryGetValue(threadId, out running); }
+        finally { admission.Release(); }
+        if (running is null) return null;
+        await running.Started.Task.WaitAsync(ct).ConfigureAwait(false);
+        return await running.Control.SteerRealtimeAsync(handoff, ct, onAdmitted).ConfigureAwait(false);
+    }
+
+    internal void InterruptRealtimeReasoning(Guid threadId)
+    {
+        if (active.TryGetValue(threadId, out var running)) running.Control.Interrupt();
+    }
+
     private long notificationFailures;
     /// <summary>Notifications that could not be delivered.</summary>
     public long NotificationFailures => Interlocked.Read(ref notificationFailures);
