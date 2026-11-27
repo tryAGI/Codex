@@ -24,6 +24,7 @@ jobs:
         run: |
           python3 -B scripts/realtime-parity.py self-test
           python3 -B scripts/realtime_parity_evidence.py self-test
+          python3 -B scripts/realtime_parity_live_probe.py self-test
       - name: Generate deterministic report
         run: python3 -B scripts/realtime-parity.py report > realtime-parity-report.json
       - name: Store machine-readable report

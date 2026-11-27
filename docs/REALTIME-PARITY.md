@@ -62,16 +62,25 @@ Prepare two short, synthetic spoken prompts with an approved local media source:
 
 Convert each recording locally to raw little-endian signed PCM16, 24 kHz, mono, at most eight seconds. For example, use `ffmpeg -i first.wav -f s16le -ac 1 -ar 24000 first.pcm`. Do not use customer recordings or a WAV container as the PCM input.
 
-Only after offline acceptance and separate authorization of the exact route and its cost limits, supply the existing short-lived ChatGPT credentials privately as CODEX_ACCESS_TOKEN and CODEX_ACCOUNT_ID; do not print them, use shell literals containing them, or commit them. Set an explicit supported CODEX_MODEL. Set CODEX_NATIVE_REALTIME_PCM_FIRST and CODEX_NATIVE_REALTIME_PCM_FOLLOWUP to the prepared input files and CODEX_NATIVE_REALTIME_TRACE to a fresh, private output path. The test will not overwrite a trace.
+Only after offline acceptance and separate authorization of the exact route and its cost limits, supply the existing short-lived ChatGPT credentials privately as CODEX_ACCESS_TOKEN and CODEX_ACCOUNT_ID; do not print them, use shell literals containing them, or commit them. Set an explicit supported CODEX_MODEL. Set CODEX_NATIVE_REALTIME_PCM_FIRST and CODEX_NATIVE_REALTIME_PCM_FOLLOWUP to the prepared input files and CODEX_NATIVE_REALTIME_TRACE to a fresh, private output path. Set CODEX_NATIVE_REALTIME_RESULTS to a fresh private results directory. The test will not overwrite a trace.
 
 The manual runner command (on the shared development host) is:
 
 ```sh
 export CODEX_NATIVE_REALTIME_REVISION="$(git rev-parse HEAD)"
 # Set the separate opt-in only after the offline gate and provider budget authorization.
-CODEX_NATIVE_REALTIME_LIVE=1 host-build-admission -- dotnet test src/tests/tryAGI.Codex.Tests/tryAGI.Codex.Tests.csproj --filter 'Category=LiveRealtimeParity'
+CODEX_NATIVE_REALTIME_LIVE=1 host-build-admission -- dotnet test src/tests/tryAGI.Codex.Tests/tryAGI.Codex.Tests.csproj --filter 'Category=LiveRealtimeParity' --results-directory "$CODEX_NATIVE_REALTIME_RESULTS" --logger 'trx;LogFileName=probe.trx'
 ```
 
 The probe limits execution to one direct session, two paced input clips, five admitted reasoning requests, one tool invocation, 90 seconds of active test time and bounded cleanup. These are dispatch/time bounds, **not** a provider-enforced monetary or token/credit cap. Do not run if a strict provider-side usage ceiling is required and not separately enforced. There is no automatic credential fallback or new-session retry. The backing reasoning transport in this probe is SSE; Responses WebSocket acceptance is a separate test. The two delegated turns must share one stored thread; the tool returns a randomized phrase, the backing reasoning output and assistant transcript must contain that phrase, and provider PCM must actually be received. A third, host-triggered ordinary reasoning turn must produce standalone speech without any new voice input or delegation. This is not evidence of autonomous event delivery by another application.
 
-The sanitized trace contains hashed provider session/delegation/request/response IDs, local thread and turn IDs, input digests, actual observed PCM counts, explicit reported usage (or null), and cleanup state. It excludes raw credentials, audio, arbitrary transcripts and model text. The process-local CAS test journal is not production crash-recovery storage. The trace deliberately marks interruption and reconnect as not-run and does not claim audio playback. A declared revision in a trace is not sufficient certification: retain the exact successful test artifact, verify the immutable source and review the actual coverage. The live gate remains fail-closed until the live evidence verifier is implemented and all required routes/scenarios are verified.
+The sanitized trace contains hashed provider session/delegation/request/response IDs, local thread and turn IDs, input digests, actual observed PCM counts, explicit reported usage (or null), and cleanup state. It excludes raw credentials, audio, arbitrary transcripts and model text. The process-local CAS test journal is not production crash-recovery storage. The trace deliberately marks interruption and reconnect as not-run and does not claim audio playback. A declared revision in a trace is not sufficient certification: retain the exact successful test artifact, verify the immutable source and review the actual coverage. Inspect a completed trace and its exact single-case TRX without contacting any provider:
+
+```sh
+python3 -B scripts/realtime_parity_live_probe.py inspect \
+  --trace "$CODEX_NATIVE_REALTIME_TRACE" \
+  --trx "$CODEX_NATIVE_REALTIME_RESULTS/probe.trx" \
+  --commit "$CODEX_NATIVE_REALTIME_REVISION"
+```
+
+The diagnostic inspector rejects unknown or duplicate fields, incomplete stages, reused turn/delegation/request identities, inconsistent request accounting, invalid PCM sizes, missing terminal phrase evidence, and failed/skipped/mixed TRX cases. It preserves absent token counters as unknown and reports missing provider response correlation separately. Its declared source fingerprint verifies only that the named Git commit exists; it is not proof of which binary was executed. The inspector never issues an acceptance receipt, never upgrades PCM receipt to playback, and never claims that authorization or a provider cost ceiling was verified. The live gate remains fail-closed until an independently reviewed execution envelope and all required route/scenario evidence are available.
