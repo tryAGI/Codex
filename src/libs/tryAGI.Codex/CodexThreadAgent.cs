@@ -147,7 +147,13 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
                 control?.ObserveRealtimeValidated(item);
                 if (validatedItem is not null) await validatedItem(item, ct).ConfigureAwait(false);
             }
-            var result = await new CodexAgent(client).RunWithToolsAsync(options, execution.Seed,
+            var runner = new CodexAgent(client)
+            {
+                PrepareNativeHistory = historyTurnLimit is null && journalProjection is null && options.AutomaticCompaction is not null
+                    ? (settings, history, ct) => execution.PrepareWireHistoryAsync(client, settings, history, observeDiagnostics, ct)
+                    : null,
+            };
+            var result = await runner.RunWithToolsAsync(options, execution.Seed,
                 (call, ct) => execution.ExecuteAsync(call, execute, ct, control), Validated,
                 maximumRequests, item =>
                 {
@@ -189,6 +195,10 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         private readonly Func<JsonElement, JsonElement>? projection;
         private readonly CodexAgentControl? control;
         private CodexRealtimeModeCapture? pendingMode;
+        private IReadOnlyList<JsonElement>? preparedWireHistory;
+        private CodexThreadCompactionCandidate? inlineCandidate;
+        private string? inlineCallId;
+        private int inlineAttempts;
         private readonly SemaphoreSlim gate = new(1, 1);
         private readonly ConcurrentDictionary<string, JsonElement> observed = new(StringComparer.Ordinal);
         internal CodexThreadDocument Current { get; private set; }
@@ -275,6 +285,88 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
             finally { gate.Release(); }
         }
 
+        internal async Task<IReadOnlyList<JsonElement>> PrepareWireHistoryAsync(CodexClient client,
+            CodexResponseOptions settings, IReadOnlyList<JsonElement> originalHistory,
+            Action<CodexResponseDiagnostic>? observeDiagnostics, CancellationToken ct)
+        {
+            CodexThreadCompactionCandidate? candidate = null;
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (originalHistory.Count < Seed.Count ||
+                    Seed.Where((item, index) => !JsonElement.DeepEquals(item, originalHistory[index])).Any())
+                    throw new CodexProtocolException("Native runner rewrote its original history.");
+                // Persist tool outputs and any captured steering before compaction can remove
+                // them from the model-visible context. The agent's original history is never changed.
+                await SynchronizeAsync(originalHistory.Skip(Seed.Count).ToArray(), ct).ConfigureAwait(false);
+                await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
+                var scope = CodexThreadCompaction.ScopeHash(settings);
+                var checkpoint = Current.CompactionCheckpoint;
+                var wireHistory = checkpoint?.ActiveBoundary?.TurnId == turnId &&
+                    checkpoint.Model == settings.Model && checkpoint.ScopeSha256 == scope
+                    ? CodexThreadCompaction.Project(Current, checkpoint, settings.Model, scope, Current.Turns.Length,
+                        currentTurnId: turnId, includeActiveOutput: true)
+                    : originalHistory;
+                preparedWireHistory = Array.AsReadOnly(wireHistory.Select(item => item.Clone()).ToArray());
+                if (settings.AutomaticCompaction is { } policy)
+                {
+                    if (policy.MaximumInlineCompactions is < 0 or > 32)
+                        throw new ArgumentOutOfRangeException(nameof(policy.MaximumInlineCompactions));
+                    if (inlineAttempts < policy.MaximumInlineCompactions &&
+                        Turn.Output.Length > 0 &&
+                        (checkpoint?.ActiveBoundary?.TurnId != turnId ||
+                            Turn.Output.Length > checkpoint.ActiveBoundary.OutputCount) &&
+                        CodexThreadCompaction.ShouldCompact(settings, preparedWireHistory, [], policy))
+                    {
+                        candidate = CodexThreadStore.CaptureActiveCompaction(Current, turnId, owner, settings);
+                        if (candidate is not null && !CodexThreadStore.SameHistory(candidate.History, preparedWireHistory))
+                            candidate = null; // Raw prompt and durable history must agree before an attempt.
+                        if (candidate is not null)
+                        {
+                            inlineAttempts++;
+                            inlineCandidate = candidate;
+                            inlineCallId = null;
+                        }
+                    }
+                }
+            }
+            finally { gate.Release(); }
+
+            if (candidate is null) return preparedWireHistory!;
+            try
+            {
+                var result = await client.CompactAsync(settings with
+                {
+                    RequiredFirstFunction = null,
+                    WebSocketDrain = default,
+                }, candidate.History, ct, observeDiagnostics, candidate.ExecutedCallIds).ConfigureAwait(false);
+                await gate.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    try
+                    {
+                        Current = await store.InstallActiveCompactionAsync(candidate, result,
+                            inlineCallId ?? throw new CodexProtocolException("Missing compaction inference receipt."),
+                            owner, settings.AutomaticCompaction!.Retention, ct).ConfigureAwait(false);
+                        preparedWireHistory = Array.AsReadOnly(Current.CompactionCheckpoint!.Projection
+                            .Select(item => item.Clone()).ToArray());
+                    }
+                    catch (CodexThreadConflictException)
+                    {
+                        // The provider result has already been settled. A newer journal revision
+                        // invalidates the candidate; never install it or repeat the paid request.
+                    }
+                }
+                finally { gate.Release(); }
+            }
+            finally
+            {
+                inlineCandidate = null;
+                inlineCallId = null;
+            }
+            return preparedWireHistory!;
+        }
+
         public Task ReserveAsync(string requestId, string model, CancellationToken ct) => budget.ReserveAsync(requestId, model, ct);
         public Task<CodexResponsesIdentity?> ReserveWithIdentityAsync(string requestId, string model, CancellationToken ct) =>
             budget.ReserveWithIdentityAsync(requestId, model, ct);
@@ -282,16 +374,40 @@ public sealed class CodexThreadAgent(CodexThreadStore store, ICodexCredentialPro
         public async Task PreparedAsync(string id, string model, JsonElement request, CancellationToken ct)
         {
             var input = request.GetProperty("input").EnumerateArray().Select(x => x.Clone()).ToArray();
-            if (input.Length < Seed.Count || Seed.Where((item, index) => !JsonElement.DeepEquals(item, input[index])).Any())
-                throw new CodexProtocolException("Native request rewrote the captured thread history.");
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                await SynchronizeAsync(input.Skip(Seed.Count).ToArray(), ct).ConfigureAwait(false);
-                await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
-                var admission = await JournalAsync(doc => store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, id,
-                    "inference", request, ct), result => result.Thread, ct).ConfigureAwait(false);
-                if (!admission.Admitted) throw new CodexProtocolException("Inference identity already dispatched; replay refused.");
+                if (inlineCandidate is { } candidate)
+                {
+                    if (Current.Revision != candidate.Revision || input.Length != candidate.History.Count + 1 ||
+                        !CodexThreadStore.SameHistory(input.Take(input.Length - 1).ToArray(), candidate.History) ||
+                        CodexRealtimeProtocol.Text(input[^1], "type") != "compaction_trigger")
+                        throw new CodexThreadConflictException();
+                    // No CAS retry: compaction must be admitted against its exact captured prefix.
+                    var compactAdmission = await store.AdmitAsync(Current.Id, candidate.Revision, turnId, owner, id,
+                        "inference", request, ct).ConfigureAwait(false);
+                    if (!compactAdmission.Admitted) throw new CodexProtocolException("Compaction identity already dispatched; replay refused.");
+                    Current = compactAdmission.Thread;
+                    inlineCallId = id;
+                }
+                else
+                {
+                    if (preparedWireHistory is { } wire)
+                    {
+                        if (!CodexThreadStore.SameHistory(input, wire))
+                            throw new CodexProtocolException("Native request rewrote the prepared wire history.");
+                    }
+                    else
+                    {
+                        if (input.Length < Seed.Count || Seed.Where((item, index) => !JsonElement.DeepEquals(item, input[index])).Any())
+                            throw new CodexProtocolException("Native request rewrote the captured thread history.");
+                        await SynchronizeAsync(input.Skip(Seed.Count).ToArray(), ct).ConfigureAwait(false);
+                        await RecordCapturedClientsAsync(ct).ConfigureAwait(false);
+                    }
+                    var admission = await JournalAsync(doc => store.AdmitAsync(doc.Id, doc.Revision, turnId, owner, id,
+                        "inference", request, ct), result => result.Thread, ct).ConfigureAwait(false);
+                    if (!admission.Admitted) throw new CodexProtocolException("Inference identity already dispatched; replay refused.");
+                }
             }
             finally { gate.Release(); }
             await budget.PreparedAsync(id, model, request, ct).ConfigureAwait(false);

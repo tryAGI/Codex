@@ -147,9 +147,12 @@ public sealed class ThreadCompactionCheckpointTests
         public Task IncompleteAsync(string id, string model, CancellationToken ct) { Incomplete++; return Task.CompletedTask; }
     }
 
-    private sealed class Server(bool incomplete = false)
+    private sealed class Server(bool incomplete = false, bool midTurn = false, int toolRounds = 1)
     {
         internal List<JsonElement> Requests { get; } = [];
+        private int reasoningCalls;
+        private int compactionCalls;
+        private int ToolRounds => toolRounds;
         internal HttpMessageHandler Handler() => new Transport(this);
         private sealed class Transport(Server owner) : HttpMessageHandler
         {
@@ -163,13 +166,183 @@ public sealed class ThreadCompactionCheckpointTests
                 if (compacting && owner.Incomplete)
                     response = """{"type":"response.incomplete","response":{"id":"incomplete","usage":{"output_tokens":2}}}""";
                 else if (compacting)
-                    response = "{\"type\":\"response.completed\",\"response\":{\"id\":\"compact-response\",\"output\":[" + Checkpoint.GetRawText() + "]}}";
+                {
+                    var count = ++owner.compactionCalls;
+                    var id = count == 1 ? "compact-response" : $"compact-response-{count}";
+                    var checkpoint = count == 1 ? Checkpoint.GetRawText() :
+                        Checkpoint.GetRawText().Replace("compacted-opaque", $"compacted-opaque-{count}", StringComparison.Ordinal);
+                    response = "{\"type\":\"response.completed\",\"response\":{\"id\":\"" + id + "\",\"output\":[" + checkpoint + "]}}";
+                }
+                else if (owner.MidTurn && ++owner.reasoningCalls <= owner.ToolRounds)
+                {
+                    var count = owner.reasoningCalls;
+                    var call = count == 1 ? ToolCall.GetRawText() :
+                        ToolCall.GetRawText().Replace("executed", $"executed-{count}", StringComparison.Ordinal);
+                    response = "{\"type\":\"response.completed\",\"response\":{\"id\":\"reasoning-tool-response-" + count + "\",\"output\":[" +
+                        Encrypted.GetRawText() + "," + call + "]}}";
+                }
                 else
                     response = """{"type":"response.completed","response":{"id":"reasoning-response","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"done"}]}]}}""";
                 return new(HttpStatusCode.OK) { Content = new StringContent("data: " + response + "\n\n", Encoding.UTF8, "text/event-stream") };
             }
         }
         private bool Incomplete => incomplete;
+        private bool MidTurn => midTurn;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InlineCompactionPreservesOriginalToolJournalAndSettlesEveryRequest(bool incomplete)
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var budget = new Budget();
+        var server = new Server(incomplete, midTurn: true);
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage));
+        var turn = Guid.NewGuid();
+        var options = Settings(thread.Id, turn) with
+        {
+            Tools = [Json("""{"type":"function","name":"read","description":"Read test data","parameters":{"type":"object","properties":{}}}""")],
+            AutomaticCompaction = new() { TokenThreshold = 1 },
+        };
+        var calls = 0;
+        Task<CodexThreadAgentResult> Run() => agent.RunAsync(thread.Id, thread.Revision, turn, "owner", options,
+            [User("first input")], (_, _) =>
+            {
+                calls++;
+                return Task.FromResult(new CodexToolOutput("receipt"));
+            }, cancellationToken: Ct);
+        if (incomplete)
+        {
+            await Assert.ThrowsAsync<CodexProtocolException>(Run);
+            var failed = await store.ReadAsync(thread.Id, Ct);
+            Assert.Null(failed.CompactionCheckpoint);
+            Assert.Equal("failed", failed.Turns[^1].Status);
+            Assert.Equal(2, budget.Reserved);
+            Assert.Equal(1, budget.Completed);
+            Assert.Equal(1, budget.Incomplete);
+            Assert.Equal(3, failed.Turns[^1].Output.Length);
+            Assert.Equal("receipt", failed.Turns[^1].Output[^1].GetProperty("output").GetString());
+        }
+        else
+        {
+            var result = await Run();
+            Assert.Equal("done", result.Result.Text);
+            Assert.Equal(3, budget.Completed);
+            Assert.Equal(3, budget.Reserved);
+            Assert.Equal(3, server.Requests.Count);
+            var compacting = server.Requests[1].GetProperty("input").EnumerateArray().ToArray();
+            Assert.Equal("compaction_trigger", compacting[^1].GetProperty("type").GetString());
+            Assert.Contains(compacting, item => JsonElement.DeepEquals(item, ToolOutput));
+            var continuation = server.Requests[2].GetProperty("input").EnumerateArray().ToArray();
+            Assert.Equal("compacted-opaque", continuation[^1].GetProperty("encrypted_content").GetString());
+            Assert.DoesNotContain(continuation, item => CodexRealtimeProtocol.Text(item, "call_id") == "executed");
+            var stored = Assert.Single(result.Thread.Turns);
+            Assert.Equal(4, stored.Output.Length);
+            Assert.Equal("original-opaque", stored.Output[0].GetProperty("encrypted_content").GetString());
+            Assert.Equal(3, stored.Dispatches.Count(receipt => receipt.Kind == "inference"));
+            Assert.All(stored.Dispatches, receipt => Assert.Equal("succeeded", receipt.State));
+            var restored = new CodexThreadStore(storage, "account");
+            var observed = await restored.ReadAsync(thread.Id, Ct);
+            Assert.Equal(turn, observed.CompactionCheckpoint!.ActiveBoundary!.TurnId);
+            Assert.Equal(3, observed.CompactionCheckpoint.ActiveBoundary.OutputCount);
+            Assert.Equal("compact-response", observed.CompactionCheckpoint.ResponseId);
+            var next = Guid.NewGuid();
+            observed = await restored.StartTurnAsync(thread.Id, observed.Revision, next, "owner", [User("next")], cancellationToken: Ct);
+            var seed = CodexThreadCompaction.Project(observed, observed.CompactionCheckpoint, options.Model,
+                CodexThreadCompaction.ScopeHash(options), observed.Turns.Length, currentTurnId: next);
+            Assert.Equal("next", seed[^1].GetProperty("content").GetString());
+            Assert.True(JsonElement.DeepEquals(stored.Output[^1], seed[^2]));
+            Assert.Single(seed, item => CodexRealtimeProtocol.Text(item, "type") == "compaction");
+            Assert.Equal("executed", Assert.Single(CodexThreadStore.DispatchedToolCallIds(observed)));
+        }
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task InlineCandidateCannotInstallAfterConcurrentInput()
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "owner", [User("first")], cancellationToken: Ct);
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "owner", [Encrypted], Ct);
+        var candidate = CodexThreadStore.CaptureActiveCompaction(thread, turn, "owner", Settings(thread.Id, turn))!;
+        var result = Result(candidate);
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "owner", "compact", "inference", Json("{}"), Ct)).Thread;
+        thread = await store.SettleAsync(thread.Id, thread.Revision, turn, "owner", "compact", "succeeded",
+            Json("""{"id":"response-id"}"""), Ct);
+        thread = await store.AppendInputAsync(thread.Id, thread.Revision, turn, "owner", [User("new input")], Ct);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() => store.InstallActiveCompactionAsync(candidate, result, "compact", "owner", null, Ct));
+        var observed = await store.ReadAsync(thread.Id, Ct);
+        Assert.Null(observed.CompactionCheckpoint);
+        Assert.Equal("succeeded", Assert.Single(observed.Turns[^1].Dispatches).State);
+        Assert.Equal(2, observed.Turns[^1].Input.Length);
+        Assert.True(JsonElement.DeepEquals(Encrypted, Assert.Single(observed.Turns[^1].Output)));
+    }
+
+    [Fact]
+    public async Task MultipleInlineCheckpointsKeepAllOriginalOutputAndExecutedIds()
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var budget = new Budget();
+        var server = new Server(midTurn: true, toolRounds: 2);
+        var agent = new CodexThreadAgent(store, new Credentials(), budget,
+            clientFactory: (credentials, usage) => new CodexClient(credentials, handler: server.Handler(), usageObserver: usage));
+        var turn = Guid.NewGuid();
+        var settings = Settings(thread.Id, turn) with
+        {
+            Tools = [Json("""{"type":"function","name":"read","parameters":{"type":"object","properties":{}}}""")],
+            AutomaticCompaction = new() { TokenThreshold = 1, MaximumInlineCompactions = 2 },
+        };
+        var calls = 0;
+        var result = await agent.RunAsync(thread.Id, thread.Revision, turn, "owner", settings, [User("first")],
+            (_, _) => { calls++; return Task.FromResult(new CodexToolOutput("receipt")); }, cancellationToken: Ct);
+        Assert.Equal(2, calls);
+        Assert.Equal(5, budget.Completed);
+        Assert.Equal(5, server.Requests.Count);
+        var secondCompaction = server.Requests[3].GetProperty("input").EnumerateArray().ToArray();
+        Assert.Single(secondCompaction, item => CodexRealtimeProtocol.Text(item, "type") == "compaction");
+        Assert.DoesNotContain(secondCompaction, item => CodexRealtimeProtocol.Text(item, "call_id") == "executed");
+        Assert.Equal(2, secondCompaction.Count(item => CodexRealtimeProtocol.Text(item, "call_id") == "executed-2"));
+        var stored = Assert.Single(result.Thread.Turns);
+        Assert.Equal(7, stored.Output.Length);
+        Assert.Equal(new[] { "executed", "executed-2" }, CodexThreadStore.DispatchedToolCallIds(result.Thread));
+        Assert.Equal("compact-response-2", result.Thread.CompactionCheckpoint!.ResponseId);
+        Assert.Equal(6, result.Thread.CompactionCheckpoint.ActiveBoundary!.OutputCount);
+    }
+
+    [Fact]
+    public async Task ActiveCheckpointAmbiguousCommitRemainsObservableButCannotBeReinstalled()
+    {
+        var storage = new RealtimeHistoryTests.Storage();
+        var store = new CodexThreadStore(storage, "account");
+        var thread = await store.CreateAsync(Guid.NewGuid(), Json("{}"), Ct);
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "owner", [User("first")], cancellationToken: Ct);
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "owner", [Encrypted], Ct);
+        var candidate = CodexThreadStore.CaptureActiveCompaction(thread, turn, "owner", Settings(thread.Id, turn))!;
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "owner", "compact", "inference", Json("{}"), Ct)).Thread;
+        thread = await store.SettleAsync(thread.Id, thread.Revision, turn, "owner", "compact", "succeeded", Json("""{"id":"response-id"}"""), Ct);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            store.InstallActiveCompactionAsync(candidate, Result(candidate), "compact", "owner", null, cancelled.Token));
+        Assert.Null((await store.ReadAsync(thread.Id, Ct)).CompactionCheckpoint);
+        storage.ThrowAfterCommit = true;
+        await Assert.ThrowsAsync<IOException>(() =>
+            store.InstallActiveCompactionAsync(candidate, Result(candidate), "compact", "owner", null, Ct));
+        var observed = await new CodexThreadStore(storage, "account").ReadAsync(thread.Id, Ct);
+        Assert.Equal("response-id", observed.CompactionCheckpoint!.ResponseId);
+        Assert.Equal("succeeded", Assert.Single(observed.Turns[^1].Dispatches).State);
+        await Assert.ThrowsAsync<CodexThreadConflictException>(() =>
+            store.InstallActiveCompactionAsync(candidate, Result(candidate), "compact", "owner", null, Ct));
     }
 
     [Theory]

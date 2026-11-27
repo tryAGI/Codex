@@ -24,6 +24,47 @@ public sealed partial class CodexThreadStore
         return new(before, settings.Model, scope, history);
     }
 
+    internal static CodexThreadCompactionCandidate? CaptureActiveCompaction(CodexThreadDocument before,
+        Guid turnId, string owner, CodexResponseOptions settings)
+    {
+        if (CodexThreadCompaction.CaptureActiveBoundary(before, turnId, owner) is not { } boundary) return null;
+        var scope = CodexThreadCompaction.ScopeHash(settings);
+        var history = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, settings.Model, scope,
+            before.Turns.Length, currentTurnId: turnId, includeActiveOutput: true);
+        return new(before, settings.Model, scope, history, boundary);
+    }
+
+    // Inline compaction reserves and settles one inference receipt through the same
+    // execution journal. Only these two writes may advance the captured revision.
+    internal async Task<CodexThreadDocument> InstallActiveCompactionAsync(CodexThreadCompactionCandidate candidate,
+        CodexCompactionResult result, string compactionCallId, string owner,
+        CodexRetainedContextOptions? retention, CancellationToken ct)
+    {
+        var boundary = candidate.ActiveBoundary ?? throw new ArgumentException("Expected active compaction candidate.");
+        var before = await CurrentAsync(candidate.ThreadId, checked(candidate.Revision + 2), ct).ConfigureAwait(false);
+        var turn = Active(before, boundary.TurnId, owner);
+        if (before.Turns.Length != candidate.ThroughTurnCount + 1 ||
+            turn.Input.Length != boundary.InputCount || turn.Output.Length != boundary.OutputCount ||
+            turn.Dispatches.Length != boundary.DispatchCount + 1 ||
+            turn.Dispatches[^1] is not { Kind: "inference", State: "succeeded", Result: { } receipt } dispatch ||
+            dispatch.CallId != compactionCallId ||
+            CodexRealtimeProtocol.Text(receipt, "id") != result.ResponseId ||
+            !CodexThreadCompaction.MatchesPrefix(before, candidate.ThroughTurnCount, candidate.HistorySha256, boundary))
+            throw new CodexThreadConflictException();
+        var actual = CodexThreadCompaction.Project(before, before.CompactionCheckpoint, candidate.Model, candidate.ScopeSha256,
+            before.Turns.Length, currentTurnId: boundary.TurnId, includeActiveOutput: true);
+        if (!SameHistory(actual, candidate.History)) throw new CodexThreadConflictException();
+        var now = time.GetUtcNow();
+        var checkpoint = CodexThreadCompaction.BuildCheckpoint(candidate, result, retention, now);
+        var next = before with { CompactionCheckpoint = checkpoint, Format = 2, Revision = checked(before.Revision + 1), UpdatedAt = now };
+        CodexThreadCompaction.Validate(next, checkpoint);
+        ct.ThrowIfCancellationRequested();
+        return await PublishAsync(before.Revision, next, ct).ConfigureAwait(false);
+    }
+
+    internal static bool SameHistory(IReadOnlyList<JsonElement> left, IReadOnlyList<JsonElement> right)
+        => left.Count == right.Count && !left.Where((item, index) => !JsonElement.DeepEquals(item, right[index])).Any();
+
     /// <summary>Atomically install a validated compaction response if the exact captured thread revision and history still match.
     /// A revision conflict or cancellation does not authorize replaying the provider request. Inspect the stored response ID
     /// after an uncertain storage write. The original journal and dispatch receipts remain unchanged.</summary>
@@ -32,6 +73,7 @@ public sealed partial class CodexThreadStore
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(result);
+        if (candidate.ActiveBoundary is not null) throw new ArgumentException("Active checkpoints require the settled inference receipt.", nameof(candidate));
         var before = await CurrentAsync(candidate.ThreadId, candidate.Revision, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (before.Turns.Length != candidate.ThroughTurnCount ||
@@ -54,9 +96,8 @@ public sealed partial class CodexThreadStore
     private static CodexThreadDocument InvalidateChangedCompactionPrefix(CodexThreadDocument document)
     {
         if (document.CompactionCheckpoint is not { } checkpoint) return document;
-        if (checkpoint.ThreadId != document.Id || checkpoint.ThroughTurnCount > document.Turns.Length ||
-            document.Turns.Take(checkpoint.ThroughTurnCount).Any(turn => turn.Status == "inProgress") ||
-            CodexThreadCompaction.PrefixHash(document, checkpoint.ThroughTurnCount) != checkpoint.HistorySha256)
+        if (checkpoint.ThreadId != document.Id ||
+            !CodexThreadCompaction.MatchesPrefix(document, checkpoint.ThroughTurnCount, checkpoint.HistorySha256, checkpoint.ActiveBoundary))
             return document with { CompactionCheckpoint = null };
         return document;
     }

@@ -29,6 +29,10 @@ public sealed record CodexAgentResult(string Text, IReadOnlyList<JsonElement> Hi
 /// <summary>Bounded native reasoning/tool loop. The host retains responsibility for tool authorization and durable action deduplication.</summary>
 public sealed class CodexAgent(CodexClient client)
 {
+    // The native journal can prepare a compacted wire projection without modifying
+    // the original history accumulated by this runner or its executed-call fence.
+    internal Func<CodexResponseOptions, IReadOnlyList<JsonElement>, CancellationToken, Task<IReadOnlyList<JsonElement>>>? PrepareNativeHistory { get; init; }
+
     /// <summary>Runs one turn with flat function tools until the model answers without calling one.</summary>
     /// <param name="options">Model, instructions and advertised tools.</param>
     /// <param name="history">Conversation items so far, including the new user message.</param>
@@ -123,7 +127,9 @@ public sealed class CodexAgent(CodexClient client)
             var requestOptions = request == 1 ? options : options with { RequiredFirstFunction = null };
             IReadOnlyList<JsonElement>? completedOutput = null;
             CodexResponseDiagnostic? requestDiagnostic = null;
-            await foreach (var item in client.StreamResponseAsync(requestOptions, input, cancellationToken,
+            var wireHistory = PrepareNativeHistory is null ? input :
+                await PrepareNativeHistory(requestOptions, input, cancellationToken).ConfigureAwait(false);
+            await foreach (var item in client.StreamResponseAsync(requestOptions, wireHistory, cancellationToken,
                 observeDiagnostics is null ? null : point =>
                 {
                     requestDiagnostic = point with { RequestNumber = request };

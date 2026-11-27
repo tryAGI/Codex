@@ -13,9 +13,26 @@ public sealed record CodexThreadCompactionOptions
     public required long TokenThreshold { get; init; }
     /// <summary>Retained message and media selection policy.</summary>
     public CodexRetainedContextOptions? Retention { get; init; }
+    /// <summary>Maximum additional compaction attempts during an active turn, zero disables inline compaction.</summary>
+    public int MaximumInlineCompactions { get; init; } = 4;
 }
 
-/// <summary>Durable compacted projection of a closed journal prefix, never a replacement for turns or tool receipts.</summary>
+/// <summary>Exact durable prefix of a turn that was active when compaction started.</summary>
+public sealed record CodexActiveCompactionBoundary
+{
+    /// <summary>Turn owning the captured prefix.</summary>
+    [JsonRequired] public required Guid TurnId { get; init; }
+    /// <summary>Number of durable inputs captured.</summary>
+    [JsonRequired] public required int InputCount { get; init; }
+    /// <summary>Number of original output items captured.</summary>
+    [JsonRequired] public required int OutputCount { get; init; }
+    /// <summary>Number of settled dispatch receipts captured before the compaction attempt.</summary>
+    [JsonRequired] public required int DispatchCount { get; init; }
+    /// <summary>Digest of the captured turn, carryover, input, output and receipts.</summary>
+    [JsonRequired] public required string PrefixSha256 { get; init; }
+}
+
+/// <summary>Durable compacted projection of a journal prefix, never a replacement for turns or tool receipts.</summary>
 public sealed record CodexStoredCompactionCheckpoint
 {
     /// <summary>Thread owning this projection.</summary>
@@ -24,6 +41,8 @@ public sealed record CodexStoredCompactionCheckpoint
     [JsonRequired] public required long SourceRevision { get; init; }
     /// <summary>Number of closed turns covered, excluding carryover at this boundary.</summary>
     [JsonRequired] public required int ThroughTurnCount { get; init; }
+    /// <summary>Optional captured prefix of the immediately following turn, including its initial input and carryover.</summary>
+    public CodexActiveCompactionBoundary? ActiveBoundary { get; init; }
     /// <summary>Digest of the original durable turn/carryover prefix.</summary>
     [JsonRequired] public required string HistorySha256 { get; init; }
     /// <summary>Digest of the captured model/instructions/tools.</summary>
@@ -50,6 +69,8 @@ public sealed class CodexThreadCompactionCandidate
     public long Revision { get; }
     /// <summary>Number of complete or terminal turns captured.</summary>
     public int ThroughTurnCount { get; }
+    /// <summary>Optional active-turn boundary.</summary>
+    public CodexActiveCompactionBoundary? ActiveBoundary { get; }
     /// <summary>Captured original prefix digest.</summary>
     public string HistorySha256 { get; }
     /// <summary>Captured model configuration digest.</summary>
@@ -61,11 +82,12 @@ public sealed class CodexThreadCompactionCandidate
     /// <summary>All known durable tool call identities, including ambiguous dispatches.</summary>
     public IReadOnlyList<string> ExecutedCallIds { get; }
     internal CodexThreadCompactionCandidate(CodexThreadDocument document, string model, string scope,
-        IReadOnlyList<JsonElement> history)
+        IReadOnlyList<JsonElement> history, CodexActiveCompactionBoundary? activeBoundary = null)
     {
         ThreadId = document.Id;
         Revision = document.Revision;
-        ThroughTurnCount = document.Turns.Length;
+        ActiveBoundary = activeBoundary;
+        ThroughTurnCount = document.Turns.Length - (activeBoundary is null ? 0 : 1);
         HistorySha256 = CodexThreadCompaction.PrefixHash(document, ThroughTurnCount);
         ScopeSha256 = scope;
         Model = model;
@@ -111,7 +133,7 @@ public static class CodexThreadCompaction
 
     internal static string PrefixHash(CodexThreadDocument document, int count)
     {
-        if (count < 1 || count > document.Turns.Length || document.Turns.Take(count).Any(turn => turn.Status == "inProgress"))
+        if (count < 0 || count > document.Turns.Length || document.Turns.Take(count).Any(turn => turn.Status == "inProgress"))
             throw new InvalidOperationException("A compaction prefix must contain only closed native turns.");
         return Hash(writer =>
         {
@@ -148,23 +170,113 @@ public static class CodexThreadCompaction
         });
     }
 
+    internal static CodexActiveCompactionBoundary? CaptureActiveBoundary(CodexThreadDocument document, Guid turnId, string owner)
+    {
+        var turn = document.Turns.LastOrDefault();
+        if (turn is null || turn.Id != turnId || turn.OwnerId != owner || turn.Status != "inProgress" ||
+            turn.Output.Length == 0 || turn.Dispatches.Any(receipt => receipt.State is "dispatching" or "unknown"))
+            return null;
+        // Do not compact an admitted but not yet captured steering message.
+        var steering = turn.RealtimeSteeringInputIndices ?? [];
+        var captured = 0;
+        foreach (var item in turn.Output)
+            if (captured < steering.Length && JsonElement.DeepEquals(item, turn.Input[steering[captured]])) captured++;
+        if (captured != steering.Length) return null;
+        var boundary = new CodexActiveCompactionBoundary
+        {
+            TurnId = turn.Id, InputCount = turn.Input.Length, OutputCount = turn.Output.Length,
+            DispatchCount = turn.Dispatches.Length, PrefixSha256 = "",
+        };
+        return boundary with { PrefixSha256 = ActivePrefixHash(document, document.Turns.Length - 1, boundary) };
+    }
+
+    private static string ActivePrefixHash(CodexThreadDocument document, int index, CodexActiveCompactionBoundary boundary)
+    {
+        var turn = document.Turns[index];
+        return Hash(writer =>
+        {
+            writer.WriteStartObject();
+            writer.WriteString("id", turn.Id);
+            writer.WriteString("root", turn.RootTurnId);
+            writer.WriteString("owner", turn.OwnerId);
+            writer.WritePropertyName("carryover");
+            WriteItems(writer, CodexThreadStore.RealtimeCarryoverBeforeTurn(document, index));
+            writer.WritePropertyName("input");
+            WriteItems(writer, turn.Input.Take(boundary.InputCount).ToArray());
+            writer.WritePropertyName("output");
+            WriteItems(writer, turn.Output.Take(boundary.OutputCount).ToArray());
+            writer.WriteStartArray("steering");
+            foreach (var inputIndex in (turn.RealtimeSteeringInputIndices ?? []).Where(value => value < boundary.InputCount))
+                writer.WriteNumberValue(inputIndex);
+            writer.WriteEndArray();
+            writer.WriteStartArray("receipts");
+            foreach (var receipt in turn.Dispatches.Take(boundary.DispatchCount))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("id", receipt.CallId);
+                writer.WriteString("kind", receipt.Kind);
+                writer.WriteString("request_hash", receipt.RequestSha256);
+                writer.WriteString("state", receipt.State);
+                writer.WritePropertyName("result");
+                if (receipt.Result is { } result) result.WriteTo(writer); else writer.WriteNullValue();
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        });
+    }
+
+    internal static bool MatchesPrefix(CodexThreadDocument document, int throughTurnCount, string historySha256,
+        CodexActiveCompactionBoundary? activeBoundary)
+    {
+        if (throughTurnCount < (activeBoundary is null ? 1 : 0) || throughTurnCount > document.Turns.Length ||
+            document.Turns.Take(throughTurnCount).Any(turn => turn.Status == "inProgress") ||
+            historySha256 != PrefixHash(document, throughTurnCount)) return false;
+        if (activeBoundary is not { } boundary) return true;
+        if (throughTurnCount >= document.Turns.Length || !ValidHash(boundary.PrefixSha256)) return false;
+        var turn = document.Turns[throughTurnCount];
+        if (turn.Id != boundary.TurnId || boundary.InputCount < 0 || boundary.InputCount > turn.Input.Length ||
+            boundary.OutputCount <= 0 || boundary.OutputCount > turn.Output.Length ||
+            boundary.DispatchCount < 0 || boundary.DispatchCount > turn.Dispatches.Length ||
+            turn.Dispatches.Take(boundary.DispatchCount).Any(receipt => receipt.State is "dispatching" or "unknown")) return false;
+        var steering = (turn.RealtimeSteeringInputIndices ?? []).ToHashSet();
+        // Subsequent durable steering is interleaved in Output; arbitrary appended initial
+        // input would change the compacted prefix and therefore invalidates the projection.
+        if (Enumerable.Range(boundary.InputCount, turn.Input.Length - boundary.InputCount).Any(index => !steering.Contains(index)))
+            return false;
+        return boundary.PrefixSha256 == ActivePrefixHash(document, throughTurnCount, boundary);
+    }
+
     internal static List<JsonElement> Project(CodexThreadDocument document, CodexStoredCompactionCheckpoint? checkpoint,
         string model, string scope, int throughTurnCount, int firstTurnIndex = 0,
-        Guid? currentTurnId = null, IReadOnlyList<JsonElement>? currentInput = null)
+        Guid? currentTurnId = null, IReadOnlyList<JsonElement>? currentInput = null, bool includeActiveOutput = false)
     {
         var history = new List<JsonElement>();
         if (firstTurnIndex == 0 && checkpoint is not null && checkpoint.Model == model && checkpoint.ScopeSha256 == scope &&
             checkpoint.ThreadId == document.Id && checkpoint.ThroughTurnCount <= throughTurnCount)
         {
             Validate(document, checkpoint);
-            history.AddRange(checkpoint.Projection.Select(item => item.Clone()));
-            firstTurnIndex = checkpoint.ThroughTurnCount;
+            var boundary = checkpoint.ActiveBoundary;
+            var canUse = boundary is null || checkpoint.ThroughTurnCount < throughTurnCount &&
+                (document.Turns[checkpoint.ThroughTurnCount].Status == "completed" ||
+                    includeActiveOutput && document.Turns[checkpoint.ThroughTurnCount].Id == currentTurnId);
+            if (canUse)
+            {
+                history.AddRange(checkpoint.Projection.Select(item => item.Clone()));
+                firstTurnIndex = checkpoint.ThroughTurnCount;
+                if (boundary is not null)
+                {
+                    // The initial input and preceding carryover are already compacted.
+                    history.AddRange(document.Turns[firstTurnIndex].Output.Skip(boundary.OutputCount).Select(item => item.Clone()));
+                    firstTurnIndex++;
+                }
+            }
         }
         for (var index = firstTurnIndex; index < throughTurnCount; index++)
         {
             var turn = document.Turns[index];
             history.AddRange(CodexThreadStore.RealtimeCarryoverBeforeTurn(document, index));
-            if (turn.Status == "completed")
+            if (turn.Status == "completed" || includeActiveOutput && turn.Id == currentTurnId)
                 history.AddRange(CodexThreadStore.RealtimeTimeline(turn, false).Select(item => item.Clone()));
             else
                 history.AddRange((turn.Id == currentTurnId && currentInput is not null ? currentInput : turn.Input).Select(item => item.Clone()));
@@ -191,8 +303,7 @@ public static class CodexThreadCompaction
     internal static void Validate(CodexThreadDocument document, CodexStoredCompactionCheckpoint checkpoint)
     {
         if (checkpoint.ThreadId != document.Id || checkpoint.SourceRevision < 1 || checkpoint.SourceRevision >= document.Revision ||
-            checkpoint.ThroughTurnCount < 1 || checkpoint.ThroughTurnCount > document.Turns.Length ||
-            document.Turns.Take(checkpoint.ThroughTurnCount).Any(turn => turn.Status == "inProgress") ||
+            !MatchesPrefix(document, checkpoint.ThroughTurnCount, checkpoint.HistorySha256, checkpoint.ActiveBoundary) ||
             !ValidId(checkpoint.Model) || !ValidId(checkpoint.ResponseId) || checkpoint.InstalledAt == default ||
             !ValidHash(checkpoint.HistorySha256) || !ValidHash(checkpoint.ScopeSha256) ||
             checkpoint.Projection is null || checkpoint.Projection.Length is < 1 or > 32768 ||
@@ -201,8 +312,7 @@ public static class CodexThreadCompaction
             checkpoint.Projection.Any(item => !IsCheckpoint(item) &&
                 (CodexRealtimeProtocol.Text(item, "role") is not ("user" or "developer") ||
                     CodexRealtimeProtocol.Text(item, "type") is not (null or "message"))) ||
-            checkpoint.Usage is { ValueKind: not (JsonValueKind.Object or JsonValueKind.Null) } ||
-            checkpoint.HistorySha256 != PrefixHash(document, checkpoint.ThroughTurnCount))
+            checkpoint.Usage is { ValueKind: not (JsonValueKind.Object or JsonValueKind.Null) })
             throw new InvalidDataException("Invalid native compaction checkpoint or changed original prefix.");
     }
 
@@ -220,6 +330,7 @@ public static class CodexThreadCompaction
         return new()
         {
             ThreadId = candidate.ThreadId, SourceRevision = candidate.Revision, ThroughTurnCount = candidate.ThroughTurnCount,
+            ActiveBoundary = candidate.ActiveBoundary,
             HistorySha256 = candidate.HistorySha256, ScopeSha256 = candidate.ScopeSha256, Model = candidate.Model,
             ResponseId = result.ResponseId, Projection = retained.Select(entry => entry.Item.Clone()).ToArray(),
             Usage = result.Usage?.Clone(), InstalledAt = now,
