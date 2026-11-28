@@ -63,6 +63,12 @@ host-build-admission -- dotnet test src/tests/tryAGI.Codex.Tests/tryAGI.Codex.Te
 
 Two local peers exchange SDP and synthetic PCM tones. The test requires actual inbound RTP packets, decoded sample-count growth excluding concealed samples, non-silent PCM measured by WebAudio callbacks after each synthetic tone, and negotiated Opus in both directions. Muted receiver energy is diagnostic only; these measurements are not physical playback evidence. The output sink is silent; physical playback and live provider behavior are not claimed. This is a prerequisite for the WebRTC sideband probe, not a live receipt or a replacement for native SDK signaling. Do not pass credentials to the browser or perform automatic paid fallback.
 
+### WebRTC sideband probe (#52)
+
+The separate opt-in `Category=LiveRealtimeWebRtcParity` uses the same bounded native reasoning/tool/host-speech probe as the direct route. A test-only isolated Chromium peer provides real media; the C# SDK owns the single ChatGPT OAuth call creation and sideband attachment. It sends two synthetic PCM clips only through WebRTC, detaches/reattaches the same call between turns, verifies the new attachment fence and continued media, then admits one durable end with session.close and closes the peer. It records actual RTP and non-silent decoded PCM counts by stage, not audible playback. It does not claim an unclean-loss reconnect or interruption scenario. The existing direct inspector does not yet certify this WebRTC trace; retain it as diagnostic evidence until the route-specific verifier is accepted.
+
+After the local media preflight and required offline acceptance, use the same explicit revision, two clips, reasoning model, separate fresh private trace/results and short-lived ChatGPT OAuth prerequisites described below, additionally supplying the approved Chromium path. Select only this test with `CODEX_NATIVE_WEBRTC_LIVE=1` and `--filter 'Category=LiveRealtimeWebRtcParity'`. Never enable both routes accidentally, retry a failed signaling POST, use API fallback, or send credentials to Chromium.
+
 ### Direct WebSocket probe (#51)
 
 The compiled opt-in test **NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech** uses the public direct WebSocket factory, an account-bound native thread/coordinator, one local effect-free tool and the native thread RPC. It has its own xUnit category, LiveRealtimeParity; the existing Category=Live workflow and the credential-free parity runner do not select it.
