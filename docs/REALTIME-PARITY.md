@@ -36,6 +36,8 @@ python3 -B scripts/realtime_parity_evidence.py run --host-admission --output /tm
 
 Omit `--host-admission` only on a standalone CI runner not sharing the owner's build queue. The runner selects only explicitly reviewed credential-free test classes. It refuses dirty build inputs before testing, parses the completed TRX, and records exact xUnit case display names/outcomes, the TRX digest, the Git commit and the source-tree fingerprint. A compile failure creates no receipt. A failed test run or a change in build inputs during testing can create a diagnostic receipt, but cannot certify rows; the latter is explicitly marked `acceptanceEligible: false`. The independent lifecycle suite uses the native session controller and in-memory transport/storage, including a two-session no-observer case; it is not provider E2E evidence.
 
+The offline suite also includes `SegmentedThreadStorageTests` (#143), using in-memory root CAS and immutable-page fixtures for manifest integrity, concurrent writes, lost receipts, selective replay and persistent projection recovery. This evidence does not establish production storage activation, bounded authoritative writes or removal of the full-document limit.
+
 Review the generated receipt before checking it in under `docs/realtime-parity-evidence/`. After independently reviewing an applicable row and its exact C# assertions, record its evidence explicitly:
 
 ```sh
