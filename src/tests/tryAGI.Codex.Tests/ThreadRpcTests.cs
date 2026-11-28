@@ -179,7 +179,10 @@ public sealed class ThreadRpcTests
     private static async Task VerifyFileConfigurationLayersAsync()
     {
         var ct = TestContext.Current.CancellationToken;
-        var directory = Path.Combine(AppContext.BaseDirectory, "codex-config-fixture-" + Guid.NewGuid().ToString("N"));
+        // On Windows, build artifacts can live on a mounted volume junction. Use the operation's
+        // private temporary directory for this fixture without weakening the configuration link guard.
+        var fixtureRoot = OperatingSystem.IsWindows() ? Path.GetTempPath() : AppContext.BaseDirectory;
+        var directory = Path.Combine(fixtureRoot, "codex-config-fixture-" + Guid.NewGuid().ToString("N"));
         var home = Path.Combine(directory, "home"); var repo = Path.Combine(directory, "repo"); var cwd = Path.Combine(repo, "sub");
         Directory.CreateDirectory(home); Directory.CreateDirectory(Path.Combine(repo, ".git"));
         Directory.CreateDirectory(Path.Combine(repo, ".codex")); Directory.CreateDirectory(Path.Combine(cwd, ".codex"));
