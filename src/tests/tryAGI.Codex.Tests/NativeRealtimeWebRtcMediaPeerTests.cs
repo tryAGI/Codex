@@ -1,70 +1,74 @@
 using System.Buffers.Binary;
+using System.Net;
 
 namespace tryAGI.Codex.Tests;
 
-// This opt-in test has no provider credentials, network signaling or physical audio output.
+// No browser, provider credentials, external network signaling or physical audio output.
 [Trait("Category", "OfflineWebRtcMedia")]
 public sealed class NativeRealtimeWebRtcMediaPeerTests
 {
     [Fact]
     public async Task LocalPeersNegotiateAndDecodeBidirectionalSyntheticAudio()
     {
-        var executable = Environment.GetEnvironmentVariable("CODEX_NATIVE_WEBRTC_BROWSER");
-        Assert.SkipUnless(!string.IsNullOrWhiteSpace(executable), "Explicit isolated Chromium executable required.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(45));
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
         var ct = deadline.Token;
-        await using var peer = await NativeRealtimeWebRtcMediaPeer.StartAsync(executable!, ct);
-        await peer.CreateAsync("left", true, ct);
-        await peer.CreateAsync("right", false, ct);
-        var offer = await peer.OfferAsync("left", ct);
+        await using var left = NativeRealtimeWebRtcMediaPeer.CreateLocal();
+        await using var right = NativeRealtimeWebRtcMediaPeer.CreateLocal();
+        var offer = left.CreateOffer();
         Assert.Contains("m=audio ", offer);
         Assert.Contains("a=fingerprint:", offer);
-        var answer = await peer.AnswerAsync("right", offer, ct);
+        var answer = right.CreateAnswer(offer);
         Assert.Contains("m=audio ", answer);
-        await peer.ApplyAnswerAsync("left", answer, ct);
+        left.SetRemoteAnswer(answer);
+        await Task.WhenAll(left.ConnectAsync(true, ct), right.ConnectAsync(false, ct));
 
-        async Task<NativeRealtimeWebRtcMediaPeer.Snapshot> WaitAsync(string name,
-            Func<NativeRealtimeWebRtcMediaPeer.Snapshot, bool> satisfied)
+        async Task<NativeRealtimeWebRtcMediaPeer.Snapshot> ReceiveAsync(NativeRealtimeWebRtcMediaPeer receiver,
+            NativeRealtimeWebRtcMediaPeer.Snapshot baseline)
         {
-            var watch = System.Diagnostics.Stopwatch.StartNew();
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                var snapshot = await peer.SnapshotAsync(name, ct);
-                Assert.DoesNotContain(snapshot.State, new[] { "closed", "failed" });
-                if (satisfied(snapshot)) return snapshot;
-                Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"{name}: {snapshot}");
-                await Task.Delay(50, ct);
+                var snapshot = receiver.ReadSnapshot();
+                Assert.Equal("connected", snapshot.State);
+                if (snapshot.PacketsReceived > baseline.PacketsReceived &&
+                    snapshot.BytesReceived > baseline.BytesReceived &&
+                    snapshot.DecodedSamples - baseline.DecodedSamples >= 1024 &&
+                    snapshot.NonSilentSamples - baseline.NonSilentSamples >= 1024)
+                    return snapshot;
+                await Task.Delay(10, ct);
             }
         }
 
-        await WaitAsync("left", x => x.State == "connected");
-        await WaitAsync("right", x => x.State == "connected");
-
-        static bool ReceivedDecodedAudio(NativeRealtimeWebRtcMediaPeer.Snapshot before,
-            NativeRealtimeWebRtcMediaPeer.Snapshot after)
-            => after.PacketsReceived > before.PacketsReceived && after.BytesReceived > before.BytesReceived &&
-                after.TotalSamplesReceived - before.TotalSamplesReceived - (after.ConcealedSamples - before.ConcealedSamples) >= 1024 &&
-                after.NonSilentSamples - before.NonSilentSamples >= 1024;
-
-        var rightBefore = await peer.SnapshotAsync("right", ct);
-        await peer.PlayAsync("left", Tone(440), ct);
-        var right = await WaitAsync("right", x => ReceivedDecodedAudio(rightBefore, x));
-        var leftBefore = await peer.SnapshotAsync("left", ct);
-        await peer.PlayAsync("right", Tone(660), ct);
-        var left = await WaitAsync("left", x => ReceivedDecodedAudio(leftBefore, x));
-        // The right peer has sent its tone only after the first receive assertion.
-        Assert.True((await peer.SnapshotAsync("right", ct)).PacketsSent > right.PacketsSent);
-        Assert.True(left.PacketsSent > 0);
-        foreach (var media in new[] { left, right })
+        var rightBefore = right.ReadSnapshot();
+        await left.PlayAsync(Tone(440), ct);
+        var fromLeft = await ReceiveAsync(right, rightBefore);
+        var leftBefore = left.ReadSnapshot();
+        await right.PlayAsync(Tone(660), ct);
+        var fromRight = await ReceiveAsync(left, leftBefore);
+        foreach (var media in new[] { fromLeft, fromRight })
         {
+            Assert.Equal("audio/opus", media.Codec);
+            Assert.Equal(0, media.ConcealedSamples);
             Assert.True(media.DecodedSamples >= media.NonSilentSamples);
-            Assert.Contains("opus", media.Codec ?? "", StringComparison.OrdinalIgnoreCase);
         }
-        await peer.CloseAsync("left", ct);
-        await peer.CloseAsync("right", ct);
+        Assert.Equal(50, left.ReadSnapshot().PacketsSent);
+        Assert.Equal(50, right.ReadSnapshot().PacketsSent);
+        await Task.WhenAll(left.CloseAsync(ct), right.CloseAsync(ct));
     }
+
+    [Theory]
+    [InlineData("127.0.0.1", false)]
+    [InlineData("10.0.0.1", false)]
+    [InlineData("169.254.169.254", false)]
+    [InlineData("100.64.0.1", false)]
+    [InlineData("172.16.0.1", false)]
+    [InlineData("192.168.0.1", false)]
+    [InlineData("203.0.113.1", false)]
+    [InlineData("::1", false)]
+    [InlineData("8.8.8.8", true)]
+    public void ProviderCandidatePolicyRejectsPrivateDestinations(string address, bool expected)
+        => Assert.Equal(expected, NativeRealtimeWebRtcMediaPeer.IsPublicIpv4(IPAddress.Parse(address)));
 
     private static byte[] Tone(int frequency)
     {

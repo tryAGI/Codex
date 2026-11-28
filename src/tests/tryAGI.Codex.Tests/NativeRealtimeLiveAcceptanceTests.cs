@@ -202,7 +202,7 @@ public sealed class NativeRealtimeLiveAcceptanceTests
         Require(LiveRealtimeLimits.SafeModel(model), "explicit reasoning model");
         var revision = Required("CODEX_NATIVE_REALTIME_REVISION");
         Require(revision.Length == 40 && revision.All(Uri.IsHexDigit), "explicit tested revision");
-        var browserExecutable = webRtc ? Required("CODEX_NATIVE_WEBRTC_BROWSER") : null;
+        var mediaAddress = webRtc ? Required("CODEX_NATIVE_WEBRTC_LOCAL_IP") : null;
         var token = Required("CODEX_ACCESS_TOKEN");
         var account = Required("CODEX_ACCOUNT_ID");
         await using var receipt = new FileStream(Required("CODEX_NATIVE_REALTIME_TRACE"), FileMode.CreateNew, FileAccess.Write, FileShare.Read);
@@ -210,14 +210,8 @@ public sealed class NativeRealtimeLiveAcceptanceTests
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(90));
         var ct = deadline.Token;
-        await using var media = browserExecutable is null ? null :
-            await NativeRealtimeWebRtcMediaPeer.StartAsync(browserExecutable, ct);
-        string? offer = null;
-        if (media is not null)
-        {
-            await media.CreateAsync("voice", true, ct);
-            offer = await media.OfferAsync("voice", ct);
-        }
+        await using var media = mediaAddress is null ? null : NativeRealtimeWebRtcMediaPeer.CreateProvider(mediaAddress);
+        var offer = media?.CreateOffer();
         var phrase = Phrase();
         var announcement = Phrase();
         var store = new CodexThreadStore(new Storage(), account);
@@ -264,7 +258,7 @@ public sealed class NativeRealtimeLiveAcceptanceTests
         {
             try
             {
-                // The SDK owns the one authenticated signaling POST; the browser sees only SDP/media.
+                // The SDK owns the one authenticated signaling POST; the native peer sees only SDP/media.
                 var call = await voice.CreateRealtimeCallAsync(offer!, settings, ct);
                 providerCallDigest = LiveRealtimeLimits.Digest(call.CallId);
                 answer = call.AnswerSdp;
@@ -303,9 +297,9 @@ public sealed class NativeRealtimeLiveAcceptanceTests
         var mediaClosed = false;
         NativeRealtimeWebRtcMediaPeer.Snapshot? mediaBaseline = null;
 
-        async Task BeginStageAsync(string name, string expected, bool delegated)
+        void BeginStage(string name, string expected, bool delegated)
         {
-            mediaBaseline = media is null ? null : await media.SnapshotAsync("voice", ct);
+            mediaBaseline = media?.ReadSnapshot();
             observation.Begin(name, expected, delegated);
         }
 
@@ -321,7 +315,7 @@ public sealed class NativeRealtimeLiveAcceptanceTests
                 WebRtcMediaStage? mediaStage = null;
                 if (media is not null && mediaBaseline is { } baseline)
                 {
-                    var received = await media.SnapshotAsync("voice", ct);
+                    var received = media.ReadSnapshot();
                     Require(received.State == "connected", "live WebRTC media connected");
                     var samples = received.TotalSamplesReceived - baseline.TotalSamplesReceived;
                     var concealed = received.ConcealedSamples - baseline.ConcealedSamples;
@@ -354,8 +348,8 @@ public sealed class NativeRealtimeLiveAcceptanceTests
             if (media is not null)
             {
                 // WebRTC audio must never also be enqueued on the sideband control connection.
-                await media.PlayAsync("voice", pcm, ct);
-                await media.PlayAsync("voice", new byte[48_000], ct);
+                await media.PlayAsync(pcm, ct);
+                await media.PlayAsync(new byte[48_000], ct);
                 return;
             }
             // Pace 20 ms of 24 kHz mono PCM16 per frame, then append bounded silence for server VAD.
@@ -375,7 +369,7 @@ public sealed class NativeRealtimeLiveAcceptanceTests
         {
             Require(connection is not null, "owned sideband before end");
             await connection!.CloseSessionAsync(cancel);
-            await media.CloseAsync("voice", cancel);
+            await media.CloseAsync(cancel);
             mediaClosed = true;
         };
 
@@ -384,7 +378,8 @@ public sealed class NativeRealtimeLiveAcceptanceTests
             if (media is not null)
             {
                 step = "apply provider SDP";
-                await media.ApplyAnswerAsync("voice", answer!, ct);
+                media.SetRemoteAnswer(answer!);
+                await media.ConnectAsync(openEvents: true, ct);
             }
             Require(await coordinator.AttachAsync(ct) == CodexRealtimeLifecycleStatus.Attached, "provider attach");
             pump = coordinator.RunAsync(observer: observation.Observe, ct: ct);
@@ -396,14 +391,14 @@ public sealed class NativeRealtimeLiveAcceptanceTests
             }
             if (media is not null)
             {
-                while ((await media.SnapshotAsync("voice", ct)).State != "connected")
+                while (media.ReadSnapshot().State != "connected")
                 {
                     Require(!pump.IsCompleted, "media readiness");
                     await Task.Delay(50, ct);
                 }
             }
             step = "first audio and tool";
-            await BeginStageAsync("audio-delegation-tool-feedback", phrase, true);
+            BeginStage("audio-delegation-tool-feedback", phrase, true);
             await SendClipAsync(first);
             var one = await WaitStageAsync(1, phrase, true);
             Require(toolCalls == 1, "actual tool receipt");
@@ -417,7 +412,7 @@ public sealed class NativeRealtimeLiveAcceptanceTests
                 Require(before.AttachmentId is not null, "first attachment identity");
                 Require(await coordinator.DetachAsync(ct) == CodexRealtimeLifecycleStatus.Detached, "sideband-only detach");
                 await pump.WaitAsync(ct);
-                Require((await media.SnapshotAsync("voice", ct)).State == "connected", "original media call remains open");
+                Require(media.ReadSnapshot().State == "connected", "original media call remains open");
                 Require(await coordinator.AttachAsync(ct) == CodexRealtimeLifecycleStatus.Attached, "reattach same call");
                 var after = (await store.ReadAsync(thread.Id, ct)).RealtimeSessions!.Single();
                 Require(after.CallId == before.CallId && after.AttachmentId is not null &&
@@ -426,14 +421,14 @@ public sealed class NativeRealtimeLiveAcceptanceTests
                 reattached = true;
             }
             step = "follow-up audio";
-            await BeginStageAsync("follow-up", phrase, true);
+            BeginStage("follow-up", phrase, true);
             await SendClipAsync(followup);
             var two = await WaitStageAsync(2, phrase, true);
             Require(two.Turns[0].Id == one.Turns[0].Id && toolCalls == 1, "same thread continuation");
             Require(two.RealtimeSessions!.Single().HandoffAdmissions?.Length == 2, "two durable handoffs");
 
             step = "host-triggered reasoning speech";
-            await BeginStageAsync("host-triggered-reasoning-speech", announcement, false);
+            BeginStage("host-triggered-reasoning-speech", announcement, false);
             await rpc.InvokeAsync("thread/resume", JsonSerializer.SerializeToElement(new { threadId = thread.Id.ToString() }), ct);
             await rpc.InvokeAsync("turn/start", JsonSerializer.SerializeToElement(new
             {
