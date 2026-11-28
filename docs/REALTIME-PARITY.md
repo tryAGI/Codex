@@ -69,6 +69,22 @@ The separate opt-in `Category=LiveRealtimeWebRtcParity` uses the same bounded na
 
 After the local media preflight and required offline acceptance, use the same explicit revision, two clips, reasoning model, separate fresh private trace/results and short-lived ChatGPT OAuth prerequisites described below. Supply `CODEX_NATIVE_WEBRTC_LOCAL_IP` with the chosen active non-loopback IPv4 interface. Only explicit authenticated signaling and its admitted public ICE destinations are used; no automatic STUN/TURN or credential fallback. Select only this test with `CODEX_NATIVE_WEBRTC_LIVE=1` and `--filter 'Category=LiveRealtimeWebRtcParity'`. Never retry a failed signaling POST automatically.
 
+### Private single-login native runner (#51/#52)
+
+On the selected macOS development host, prepare one owner-only output directory outside the checkout. The runner checks clean immutable source, creates synthetic PCM locally (Samantha through `say` and `afconvert`, or two explicit raw PCM files), builds both the native test and the existing credential-only sample through host admission, executes the local native media and guard tests and hashes the actual release assemblies/dependencies. No credentials or provider requests are used during preparation.
+
+```sh
+python3 -B scripts/run-native-realtime-probe.py prepare --route both --model <supported-model> --local-ip <selected-local-ipv4> --output <new-private-directory>
+```
+
+After offline acceptance is complete and the owner has authorized the exact route(s) and bounded reasoning-request budget, run interactively on the same host:
+
+```sh
+python3 -B scripts/run-native-realtime-probe.py run --output <prepared-private-directory> --confirm-live
+```
+
+The runner checks current offline parity, source, artifact hashes and exact preflight TRX **before** OAuth. The existing sample displays its one-time device login locally and stores only short-lived credentials in a temporary owner-only directory; those files are removed before the test launch. Each requested route is attempted at most once with an exact test-case filter and the same prepared assembly; no new build or paid fallback is allowed after login. Failure stops subsequent routes. The exclusive attempt marker prevents a replay from that preparation. Raw test logs/TRX remain private; diagnostic JSON reports sanitized provider evidence and binary hash, not independent attestation or complete live acceptance. Do not upload credentials, raw logs or private traces to CI. A new attempt requires a new preparation and explicit authorization.
+
 ### Direct WebSocket probe (#51)
 
 The compiled opt-in test **NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech** uses the public direct WebSocket factory, an account-bound native thread/coordinator, one local effect-free tool and the native thread RPC. It has its own xUnit category, LiveRealtimeParity; the existing Category=Live workflow and the credential-free parity runner do not select it.
