@@ -54,6 +54,8 @@ public sealed class CodexResponsesInterruptionTests
         private readonly Channel<string> incoming = Channel.CreateUnbounded<string>();
         private readonly Channel<JsonObject> outgoing = Channel.CreateUnbounded<JsonObject>();
         private WebSocketState state = WebSocketState.Open;
+        private int receives;
+        internal Action? OnSecondReceive { get; init; }
         internal void Receive(string frame) => Assert.True(incoming.Writer.TryWrite(frame));
         internal void End() => incoming.Writer.TryComplete();
         internal ValueTask<JsonObject> Sent(CancellationToken ct) => outgoing.Reader.ReadAsync(ct);
@@ -75,6 +77,7 @@ public sealed class CodexResponsesInterruptionTests
         }
         public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken ct)
         {
+            if (Interlocked.Increment(ref receives) == 2) OnSecondReceive?.Invoke();
             if (!await incoming.Reader.WaitToReadAsync(ct))
                 return new(0, WebSocketMessageType.Close, true);
             var bytes = Encoding.UTF8.GetBytes(await incoming.Reader.ReadAsync(ct));
@@ -254,6 +257,57 @@ public sealed class CodexResponsesInterruptionTests
         Assert.Equal("r2", events[^1].ResponseId);
         Assert.Equal(2, observer.Completed);
         Assert.Equal(1, connections);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InterruptWakesPendingReceiveWhenSignalArrivesDuringReceiveAdmission(bool drain)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var wake = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
+        // Signal synchronously after the loop's initial cancellation check, before receive waits.
+        using var socket = new Socket { OnSecondReceive = wake.Cancel };
+        var connections = 0;
+        await using var session = new CodexResponsesWebSocketSession((_, _) =>
+        {
+            connections++;
+            return Task.FromResult<CodexResponsesWebSocketSession.Connection?>(new(socket));
+        });
+        var observer = new Observer();
+        var http = new Http();
+        using var client = new CodexClient(new Credentials(), handler: http, usageObserver: observer);
+        var read = Read(client, Settings(session) with { WebSocketDrain = drain ? wake.Token : default },
+            drain ? timeout.Token : wake.Token);
+        Assert.Equal("response.create", (await socket.Sent(timeout.Token))["type"]!.GetValue<string>());
+        socket.Receive(Created);
+
+        // The provider will not send anything until the interrupt frame arrives.
+        AssertInterrupt(await socket.Sent(timeout.Token));
+        socket.Receive(Accepted);
+        socket.Receive(Terminal);
+        if (drain)
+        {
+            var terminal = (await read)[^1];
+            Assert.True(terminal.Interrupted);
+            Assert.Equal("response.incomplete", terminal.Type);
+        }
+        else
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await read);
+        }
+
+        Assert.Equal(1, observer.Completed);
+        Assert.Equal(7, observer.Receipt.GetProperty("usage").GetProperty("output_tokens").GetInt32());
+        Assert.Equal(0, observer.Incomplete);
+        Assert.Equal(WebSocketState.Open, socket.State);
+        var next = Read(client, Settings(session), timeout.Token);
+        Assert.Equal("response.create", (await socket.Sent(timeout.Token))["type"]!.GetValue<string>());
+        socket.Receive("""{"type":"response.completed","response":{"id":"r2"}}""");
+        Assert.Single(await next);
+        Assert.Equal(1, connections);
+        Assert.Equal(2, observer.Completed);
+        Assert.Equal(0, http.Calls);
     }
 
     [Fact]

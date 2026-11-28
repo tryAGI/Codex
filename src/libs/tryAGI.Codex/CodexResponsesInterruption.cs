@@ -64,7 +64,8 @@ internal sealed class CodexResponsesInterruption(CodexResponsesCorrelation corre
                     }
 
                     pending ??= reader.MoveNextAsync().AsTask();
-                    if (!InterruptSent && createdId is not null && !wake.IsCancellationRequested)
+                    // The signal may already be completed when receive admission returns.
+                    if (!InterruptSent && createdId is not null)
                     {
                         await Task.WhenAny(pending, signal.Task).ConfigureAwait(false);
                         if (!pending.IsCompleted) continue;
