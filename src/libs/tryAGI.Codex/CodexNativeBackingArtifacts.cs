@@ -34,7 +34,8 @@ public sealed partial class CodexThreadStore
     /// in canonical App Server item form. The trusted host must supply the exact turn owner
     /// and previously admitted source dispatch. This method never generates images, spawns an
     /// agent, invokes an MCP server, or grants execution authority. Repeated observations are
-    /// idempotent; a terminal item cannot be rewritten.</summary>
+    /// idempotent; an exact observation may only add a previously suppressed realtime presentation.
+    /// A terminal item cannot be rewritten.</summary>
     public async Task<CodexThreadAdmission> ObserveNativeBackingArtifactAsync(Guid threadId, long expectedRevision,
         Guid turnId, string ownerId, string sourceDispatchId, CodexNativeArtifactStage stage,
         JsonElement item, CancellationToken cancellationToken = default)
@@ -56,7 +57,15 @@ public sealed partial class CodexThreadStore
         {
             if (previous.SourceDispatchId != sourceDispatchId || !SameNativeArtifactIdentity(previous.Item, item))
                 throw new InvalidOperationException("Native backing artifact identity changed.");
-            if (previous.Stage == stage && JsonElement.DeepEquals(previous.Item, item)) return new(false, before);
+            if (previous.Stage == stage && JsonElement.DeepEquals(previous.Item, item))
+            {
+                var presented = PromoteRealtimeArtifacts(before, turn, turn, reobservedNativeItemId: previous.ItemId);
+                if (ReferenceEquals(presented, before)) return new(false, before);
+                return new(true, await PublishAsync(before.Revision, presented with
+                {
+                    Revision = checked(before.Revision + 1), UpdatedAt = time.GetUtcNow(),
+                }, cancellationToken).ConfigureAwait(false));
+            }
             if (previous.Stage == CodexNativeArtifactStage.Completed || stage != CodexNativeArtifactStage.Completed)
                 throw new InvalidOperationException("Native backing artifact lifecycle cannot be rewritten.");
         }

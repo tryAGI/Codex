@@ -118,7 +118,8 @@ public sealed partial class CodexThreadStore
         return ReplaceRealtimeSession(document, session with { PresentationTurnIds = [.. session.PresentationTurnIds ?? [], turnId] });
     }
 
-    private CodexThreadDocument PromoteRealtimeArtifacts(CodexThreadDocument document, CodexStoredTurn before, CodexStoredTurn after)
+    private CodexThreadDocument PromoteRealtimeArtifacts(CodexThreadDocument document, CodexStoredTurn before, CodexStoredTurn after,
+        bool reobserveOutput = false, string? reobservedNativeItemId = null)
     {
         if (!ReferenceEquals(before.Output, after.Output))
             document = DropRedundantArtifactPreviewUpdates(document, after);
@@ -130,9 +131,14 @@ public sealed partial class CodexThreadStore
             .Where(e => e.Promotion is not null).Select(e => Key(e.Promotion!)).ToHashSet();
         foreach (var promotion in CodexRealtimePresentation.Eligible(after, bound.SessionId))
         {
-            if (prior.Contains(promotion) || !observed.Add(Key(promotion))) continue;
-            var active = PresentationSession(document);
+            if (!observed.Add(Key(promotion))) continue;
             var native = after.NativeBackingArtifacts?.SingleOrDefault(a => a.ItemId == promotion.ItemId);
+            // An exact host reobservation can present a previously suppressed completed tool.
+            // Neither a new session alone nor an unrelated receipt replays old artifacts.
+            var reobserved = native is null ? reobserveOutput && promotion.Presentation == "wholeItem" :
+                reobservedNativeItemId == promotion.ItemId;
+            if (!reobserved && prior.Contains(promotion)) continue;
+            var active = PresentationSession(document);
             // Image generation (including the canonical projection of its extension item)
             // and sub-agent start activity may be presented after voice closure.
             if (promotion.Presentation == "wholeItem" && active is null &&

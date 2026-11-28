@@ -155,7 +155,8 @@ public sealed partial class CodexThreadStore
                 turn = turn with { GoalSteeringTransitions = [.. turn.GoalSteeringTransitions ?? [], goalContext.Transition] };
             }
             var updated = turn with { Output = next };
-            return PromoteRealtimeArtifacts(Replace(document, updated) with { Format = 2 }, turn, updated);
+            return PromoteRealtimeArtifacts(Replace(document, updated) with { Format = 2 }, turn, updated,
+                reobserveOutput: next.Length == turn.Output.Length);
         }, cancellationToken);
 
     /// <summary>Only a true durable admission permits dispatch. A repeated call ID never grants

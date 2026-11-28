@@ -34,6 +34,67 @@ public sealed class RustParityPresentationTests
         ["tool"] = "lookup", ["status"] = status, ["arguments"] = new JsonObject(),
     }.ToJsonString());
 
+    // Rust core/src/realtime_history_tests.rs:591-624: a tool completed while voice
+    // is closed is not shown until that exact artifact is observed in a successor session.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClosedVoiceToolCompletionCanBeReobservedWithoutRedispatch(bool nativeMcp)
+    {
+        var (store, thread, attachment) = await StartLegacyAsync();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        var call = Call("late");
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [call], Ct);
+        thread = (await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "late", "tool", call, Ct)).Thread;
+        if (nativeMcp)
+            thread = (await store.ObserveNativeBackingArtifactAsync(thread.Id, thread.Revision, turn, "runner", "late",
+                CodexNativeArtifactStage.Started, McpItem("late", "codex_app", "inProgress"), Ct)).Thread;
+
+        var end = Guid.NewGuid();
+        thread = (await store.BeginRealtimeEndAsync(thread.Id, thread.Revision, "voice-1", "owner", attachment, end, Ct)).Thread;
+        thread = await store.CompleteRealtimeEndAsync(thread.Id, thread.Revision, "voice-1", "owner", end, Ct);
+        var receipt = Json("""{"type":"function_call_output","call_id":"late","output":"fixture","success":true}""");
+        thread = await store.SettleAsync(thread.Id, thread.Revision, turn, "runner", "late", "succeeded", receipt, Ct);
+        var terminal = McpItem("late", "codex_app", "completed");
+        if (nativeMcp)
+            thread = (await store.ObserveNativeBackingArtifactAsync(thread.Id, thread.Revision, turn, "runner", "late",
+                CodexNativeArtifactStage.Completed, terminal, Ct)).Thread;
+        Assert.DoesNotContain(Timeline(thread), item => Type(item) == "bemItemPromoted");
+
+        thread = await store.CreateRealtimeSessionAsync(thread.Id, thread.Revision, "voice-2", "rtc_voice_2", "v2", "owner", Ct);
+        thread = await store.ConfigureRealtimeHistoryAsync(thread.Id, thread.Revision, "voice-2", "owner", CodexRealtimeHistoryMode.LegacyFlush, Ct);
+        thread = await store.AttachRealtimeSessionAsync(thread.Id, thread.Revision, "voice-2", "owner", Guid.NewGuid(), Ct);
+        var before = Timeline(thread);
+        Assert.DoesNotContain(before, item => Type(item) == "bemItemPromoted");
+        var duplicate = await store.AdmitAsync(thread.Id, thread.Revision, turn, "runner", "late", "tool", call, Ct);
+        Assert.False(duplicate.Admitted);
+        Assert.Equal(thread.Revision, duplicate.Thread.Revision);
+
+        async Task Reobserve()
+        {
+            thread = nativeMcp
+                ? (await store.ObserveNativeBackingArtifactAsync(thread.Id, thread.Revision, turn, "runner", "late",
+                    CodexNativeArtifactStage.Completed, terminal, Ct)).Thread
+                : await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [call], Ct);
+        }
+        await Reobserve();
+        var after = Timeline(thread);
+        Assert.Equal(before.Select(item => item.ToJsonString()), after.Take(before.Length).Select(item => item.ToJsonString()));
+        var promotion = Assert.Single(after.Skip(before.Length));
+        Assert.Equal("bemItemPromoted", Type(promotion));
+        Assert.Equal("voice-2", (string?)promotion["realtimeSessionId"]);
+        Assert.Equal(turn.ToString(), (string?)promotion["turn_id"]);
+        Assert.Equal("late-item", (string?)promotion["item_id"]);
+        Assert.Equal(7, Guid.ParseExact(promotion["id"]!.GetValue<string>(), "D").Version);
+        await Reobserve();
+        thread = await store.ReadAsync(thread.Id, Ct);
+        Assert.Equal(after.Select(item => item.ToJsonString()), Timeline(thread).Select(item => item.ToJsonString()));
+        var dispatch = Assert.Single(thread.Turns.Single().Dispatches);
+        Assert.Equal("succeeded", dispatch.State);
+        Assert.True(JsonElement.DeepEquals(receipt, dispatch.Result!.Value));
+    }
+
     // Rust core/src/realtime_history_tests.rs:495-539. The legacy segment must
     // precede the sole successful codex_app promotion, even after cold replay.
     [Fact]
