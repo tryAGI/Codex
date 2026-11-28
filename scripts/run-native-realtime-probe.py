@@ -146,15 +146,33 @@ def assembly(out, project):
     return out / "artifacts" / "bin" / project / "release" / (project + ".dll")
 
 
-def inventory(out):
+def runtime_inventory(artifacts):
     result = {}
     for name in ("tryAGI.Codex.Tests", "tryAGI.Codex.Sample"):
-        entry = assembly(out, name)
-        require(entry.is_file(), "Expected exact release assembly is missing")
-        for path in sorted(entry.parent.rglob("*")):
+        directory = artifacts / "bin" / name / "release"
+        require((directory / (name + ".dll")).is_file(), "Expected exact release assembly is missing")
+        for path in sorted(directory.rglob("*")):
             require(not path.is_symlink(), "Unexpected symlink in execution inputs")
             if path.is_file():
-                result[path.relative_to(out).as_posix()] = digest(path)
+                result[path.relative_to(artifacts).as_posix()] = digest(path)
+    return result
+
+
+def snapshot_binaries(build_artifacts, private_artifacts):
+    # Respect the host's one admitted build-output binding. Copy only runtime outputs
+    # into the private execution envelope, and verify both sides before running tests.
+    before = runtime_inventory(build_artifacts)
+    if build_artifacts != private_artifacts:
+        private_artifacts.mkdir(mode=0o700, exist_ok=False)
+        for name in ("tryAGI.Codex.Tests", "tryAGI.Codex.Sample"):
+            relative = Path("bin") / name / "release"
+            shutil.copytree(build_artifacts / relative, private_artifacts / relative)
+    require(before == runtime_inventory(build_artifacts) == runtime_inventory(private_artifacts),
+            "Compiled runtime artifacts changed during private snapshot")
+
+
+def inventory(out):
+    result = {"artifacts/" + name: sha for name, sha in runtime_inventory(out / "artifacts").items()}
     for name in ("first.pcm", "followup.pcm"):
         result[name] = digest(out / name)
     return result
@@ -181,8 +199,11 @@ def prepare(args):
     out = private_output(args.output, create=True)
     prepare_clips(out, args.first, args.followup)
     artifacts = out / "artifacts"
-    admitted_build(TEST_PROJECT, artifacts)
-    admitted_build(SAMPLE_PROJECT, artifacts, ("-p:UseLocalProject=true",))
+    build_artifacts = Path(args.build_artifacts).resolve() if args.build_artifacts else artifacts
+    require(not build_artifacts.is_relative_to(ROOT.resolve()), "Build outputs must be outside source")
+    admitted_build(TEST_PROJECT, build_artifacts)
+    admitted_build(SAMPLE_PROJECT, build_artifacts, ("-p:UseLocalProject=true",))
+    snapshot_binaries(build_artifacts, artifacts)
     selector = "|".join("FullyQualifiedName~tryAGI.Codex.Tests." + cls + "." for cls in OFFLINE)
     before = inventory(out)
     trx = vstest(assembly(out, "tryAGI.Codex.Tests"), selector, out / "offline", safe_env(), 90)
@@ -310,6 +331,13 @@ def self_test():
                 pass
             else:
                 raise AssertionError("Invalid PCM accepted")
+        build = out / "build"
+        for name in ("tryAGI.Codex.Tests", "tryAGI.Codex.Sample"):
+            directory = build / "bin" / name / "release"
+            directory.mkdir(parents=True)
+            (directory / (name + ".dll")).write_bytes(name.encode())
+        snapshot_binaries(build, out / "artifacts")
+        require(runtime_inventory(build) == runtime_inventory(out / "artifacts"), "Runtime snapshot mismatch")
         marker = out / "attempt.json"
         write_json(marker, {"fixture": True})
         try:
@@ -335,6 +363,7 @@ def main():
     prep.add_argument("--model", required=True)
     prep.add_argument("--output", required=True)
     prep.add_argument("--local-ip")
+    prep.add_argument("--build-artifacts", help="Explicit host-admitted build output path; runtime binaries are copied to the private directory")
     prep.add_argument("--first")
     prep.add_argument("--followup")
     launch = commands.add_parser("run")

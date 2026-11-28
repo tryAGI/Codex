@@ -71,7 +71,7 @@ After the local media preflight and required offline acceptance, use the same ex
 
 ### Private single-login native runner (#51/#52)
 
-On the selected macOS development host, prepare one owner-only output directory outside the checkout. The runner checks clean immutable source, creates synthetic PCM locally (Samantha through `say` and `afconvert`, or two explicit raw PCM files), builds both the native test and the existing credential-only sample through host admission, executes the local native media and guard tests and hashes the actual release assemblies/dependencies. No credentials or provider requests are used during preparation.
+On the selected macOS development host, prepare one owner-only output directory outside the checkout. The runner checks clean immutable source, creates synthetic PCM locally (Samantha through `say` and `afconvert`, or two explicit raw PCM files), builds both the native test and the existing credential-only sample through host admission, executes the local native media and guard tests and hashes the actual release assemblies/dependencies. On a registered workspace slot, pass `--build-artifacts` with its exact host-admitted cache/artifacts path. Only the compiled runtime directories are copied into the private envelope and both source and copied hashes are checked. No credentials or provider requests are used during preparation.
 
 ```sh
 python3 -B scripts/run-native-realtime-probe.py prepare --route both --model <supported-model> --local-ip <selected-local-ipv4> --output <new-private-directory>
