@@ -53,6 +53,16 @@ The parity report workflow checks matrix consistency, executes the credential-fr
 
 Do not perform live tests automatically in this workflow. Run the opt-in native direct and WebRTC tests only after offline acceptance, using the specifically authorized provider/credential domain, bounded call count and usage budget. Store sanitized correlated test evidence, not credentials, raw customer media or arbitrary model text. A received PCM frame is not proof of playback. Preserve #25 open until all applicable scenarios, CI, provenance and the actual NuGet package are verified.
 
+### Credential-free WebRTC media preflight (#52)
+
+The test-only Chromium peer uses an isolated temporary profile, loopback DevTools, WebAudio and real ICE/DTLS/SRTP media. It does not receive SDK credentials, reuse an existing browser profile, contact the provider, or require a browser dependency in the shipped SDK. Set `CODEX_NATIVE_WEBRTC_BROWSER` to the absolute path of an explicitly approved installed Chromium executable and run only the local media test:
+
+```sh
+host-build-admission -- dotnet test src/tests/tryAGI.Codex.Tests/tryAGI.Codex.Tests.csproj --filter 'Category=OfflineWebRtcMedia'
+```
+
+Two local peers exchange SDP and synthetic PCM tones. The test requires actual inbound RTP packets, decoded sample-count growth excluding concealed samples, non-silent PCM measured by WebAudio callbacks after each synthetic tone, and negotiated Opus in both directions. Muted receiver energy is diagnostic only; these measurements are not physical playback evidence. The output sink is silent; physical playback and live provider behavior are not claimed. This is a prerequisite for the WebRTC sideband probe, not a live receipt or a replacement for native SDK signaling. Do not pass credentials to the browser or perform automatic paid fallback.
+
 ### Direct WebSocket probe (#51)
 
 The compiled opt-in test **NativeRealtimeLiveAcceptanceTests.DirectAudioDelegationToolFollowupAndHostInitiatedSpeech** uses the public direct WebSocket factory, an account-bound native thread/coordinator, one local effect-free tool and the native thread RPC. It has its own xUnit category, LiveRealtimeParity; the existing Category=Live workflow and the credential-free parity runner do not select it.
