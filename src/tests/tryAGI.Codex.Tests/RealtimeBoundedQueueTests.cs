@@ -38,4 +38,29 @@ public sealed class RealtimeBoundedQueueTests
         Assert.True(reasoning.Report.Abandoned >= 2);
         Assert.Equal(new CodexRealtimeQueueReport("audio", 1, 1, 0), audio.Report);
     }
+
+    [Fact]
+    public async Task ConsumerFaultClosesAdmissionAndAccountsEveryPendingItem()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var queue = new CodexRealtimeBoundedQueue<int>(3, 8, "reasoning");
+        queue.Write(1, 4);
+        queue.Write(2, 2);
+        queue.Write(3, 2);
+        var fault = new InvalidOperationException("Consumer fault");
+        var seen = new List<int>();
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => queue.RunAsync((item, _) =>
+        {
+            seen.Add(item);
+            return item == 1 ? Task.CompletedTask : Task.FromException(fault);
+        }, ct));
+
+        Assert.Same(fault, actual);
+        Assert.Equal([1, 2], seen);
+        Assert.Equal(new CodexRealtimeQueueReport("reasoning", 3, 1, 2), queue.Report);
+        Assert.False(queue.TryWrite(4, 0));
+        await queue.RunAsync((_, _) => throw new InvalidOperationException("Abandoned item was replayed"), ct);
+        Assert.Equal(new CodexRealtimeQueueReport("reasoning", 3, 1, 2), queue.Report);
+    }
 }
