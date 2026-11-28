@@ -141,7 +141,7 @@ public sealed partial class CodexThreadStore
             // the split boundary and physical append position, even if that session ended.
             var carrier = document.RealtimeSessions![^1];
             var history = carrier.History ?? EmptyRealtimeHistory();
-            var entry = new CodexStoredRealtimeHistoryEvent("promotion:" + Guid.NewGuid().ToString("N"), "promotion",
+            var entry = new CodexStoredRealtimeHistoryEvent(Guid.CreateVersion7().ToString("D"), "promotion",
                 NextRealtimeObservationTime(history), document.Turns.Length,
                 CommitRevision: checked(document.Revision + 1), Promotion: promotion);
             document = ReplaceRealtimeSession(document, carrier with { History = AppendRealtimeHistory(carrier, history, entry) });

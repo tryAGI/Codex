@@ -58,7 +58,7 @@ public sealed partial class CodexThreadStore
             var carrier = next.RealtimeSessions![^1];
             var history = carrier.History ?? EmptyRealtimeHistory();
             var promotion = new CodexStoredRealtimePromotion(session.SessionId, turnId, candidate.ItemId, kind, index, candidate.Preview);
-            var entry = new CodexStoredRealtimeHistoryEvent("promotion:" + Guid.NewGuid().ToString("N"), "promotion",
+            var entry = new CodexStoredRealtimeHistoryEvent(Guid.CreateVersion7().ToString("D"), "promotion",
                 NextRealtimeObservationTime(history), before.Turns.Length,
                 CommitRevision: checked(before.Revision + 1), Promotion: promotion);
             next = ReplaceRealtimeSession(next, carrier with { History = AppendRealtimeHistory(carrier, history, entry) });

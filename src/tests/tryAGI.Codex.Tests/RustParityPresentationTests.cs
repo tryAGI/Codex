@@ -124,6 +124,7 @@ public sealed class RustParityPresentationTests
         Assert.Equal(before.Select(i => i.ToJsonString()), after.Take(before.Length).Select(i => i.ToJsonString()));
         var item = Assert.Single(after.Skip(before.Length));
         Assert.Equal("bemItemPromoted", Type(item));
+        Assert.Equal(7, Guid.ParseExact(item["id"]!.GetValue<string>(), "D").Version);
         Assert.Equal("voice-1", (string?)item["realtimeSessionId"]);
         Assert.Equal(turn.ToString(), (string?)item["turn_id"]);
         Assert.Equal("late-item", (string?)item["item_id"]);

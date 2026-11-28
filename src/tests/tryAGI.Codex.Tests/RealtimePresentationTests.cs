@@ -86,6 +86,7 @@ public sealed class RealtimePresentationTests
         Assert.Equal(thread.Revision, replay.Revision);
         Assert.Empty(replay.Turns.Single().Output);
         var original = Assert.Single(Items(thread), x => Type(x) == "bemItemPromoted");
+        Assert.Equal(7, Guid.ParseExact(original["id"]!.GetValue<string>(), "D").Version);
         var extension = candidate with { Preview = candidate.Preview with { Text = candidate.Preview.Text + " more public text" } };
         thread = await store.RecordRealtimeArtifactPreviewAsync(thread.Id, thread.Revision, turn, "runner", extension, Ct);
         Assert.Equal(original.ToJsonString(), Assert.Single(Items(thread), x => Type(x) == "bemItemPromoted").ToJsonString());
@@ -143,6 +144,8 @@ public sealed class RealtimePresentationTests
         thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [notReady, markdown, visualizations], Ct);
         var items = Items(thread);
         Assert.Equal(4, items.Length);
+        Assert.All(items.Skip(1), item => Assert.Equal(7, Guid.ParseExact(item["id"]!.GetValue<string>(), "D").Version));
+        Assert.Equal(3, items.Skip(1).Select(item => item["id"]!.GetValue<string>()).Distinct().Count());
         Assert.Equal("inlineMarkdown", items[1]["presentation"]!["type"]!.GetValue<string>());
         Assert.Equal("markdown", items[1]["item_id"]!.GetValue<string>());
         Assert.All(items.Skip(2), item => Assert.Equal("inlineVisualization", item["presentation"]!["type"]!.GetValue<string>()));
@@ -152,6 +155,35 @@ public sealed class RealtimePresentationTests
         Assert.Equal(items.Select(x => x.ToJsonString()), Items(reloaded).Select(x => x.ToJsonString()));
         Assert.Equal(3, RealtimeHistoryTests.Session(reloaded).History!.Events.Count(e => e.Kind == "promotion"));
         await store.DetachRealtimeSessionAsync(thread.Id, thread.Revision, "session", "owner", attachment, Ct);
+    }
+
+    [Fact]
+    public async Task LegacyPromotionIdentitySurvivesReplayAndNewPromotion()
+    {
+        var (storage, store, thread, _) = await RealtimeHistoryTests.Setup();
+        var turn = Guid.NewGuid();
+        thread = await store.StartTurnAsync(thread.Id, thread.Revision, turn, "runner", [], cancellationToken: Ct);
+        var first = Message("first", "::codex-realtime-inline{}\nFirst");
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [first], Ct);
+        var generated = Assert.Single(Items(thread), item => Type(item) == "bemItemPromoted")["id"]!.GetValue<string>();
+        var legacy = "promotion:" + Guid.NewGuid().ToString("N");
+
+        // Simulate a persisted journal written by an SDK version using prefixed IDs.
+        var snapshot = (await storage.ReadAsync(thread.Id, Ct))!.Value.GetRawText();
+        Assert.Contains(generated, snapshot);
+        Assert.True(await storage.CompareExchangeAsync(thread.Id, thread.Revision,
+            Json(snapshot.Replace(generated, legacy, StringComparison.Ordinal)), Ct));
+
+        thread = await store.ReadAsync(thread.Id, Ct);
+        var before = Items(thread);
+        Assert.Equal(legacy, Assert.Single(before, item => Type(item) == "bemItemPromoted")["id"]!.GetValue<string>());
+        var second = Message("second", "::codex-realtime-inline{}\nSecond");
+        thread = await store.SynchronizeOutputAsync(thread.Id, thread.Revision, turn, "runner", [first, second], Ct);
+        var after = Items(await store.ReadAsync(thread.Id, Ct));
+        Assert.Equal(before.Select(x => x.ToJsonString()), after.Take(before.Length).Select(x => x.ToJsonString()));
+        var promotion = Assert.Single(after.Skip(before.Length));
+        Assert.Equal("bemItemPromoted", Type(promotion));
+        Assert.Equal(7, Guid.ParseExact(promotion["id"]!.GetValue<string>(), "D").Version);
     }
 
     [Fact]
@@ -176,6 +208,7 @@ public sealed class RealtimePresentationTests
         Assert.Equal(["realtimeSessionStarted", "frame", "bemItemPromoted"], projected.Select(Type).ToArray());
         Assert.Equal("Before tool. ", projected[1]["channels"]!["voice_transcript"]!["text"]!.GetValue<string>());
         Assert.Equal("successful-item", projected[2]["item_id"]!.GetValue<string>());
+        Assert.Equal(7, Guid.ParseExact(projected[2]["id"]!.GetValue<string>(), "D").Version);
         await Observe("delta-after", """{"type":"output_transcript.added","item":{"text":"After tool."}}""");
         await Observe("full-final", """{"type":"turn.done","turn":{"role":"assistant","transcript":"Before tool. After tool."}}""");
         thread = (await store.SealRealtimeHistoryAsync(thread.Id, thread.Revision, "session", "owner", attachment, "seal-after", "chunk", Ct)).Thread;
