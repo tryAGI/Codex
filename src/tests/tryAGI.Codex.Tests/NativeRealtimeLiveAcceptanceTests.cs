@@ -180,6 +180,7 @@ public sealed class NativeRealtimeLiveAcceptanceTests
     {
         Assert.SkipUnless(Environment.GetEnvironmentVariable("CODEX_NATIVE_REALTIME_LIVE") == "1",
             "Native realtime provider acceptance requires a separate explicit opt-in.");
+        LiveRealtimeLimits.ValidateRouteOptIn(direct: true, webRtc: Environment.GetEnvironmentVariable("CODEX_NATIVE_WEBRTC_LIVE") == "1");
         return RunProbeAsync(webRtc: false);
     }
 
@@ -189,6 +190,7 @@ public sealed class NativeRealtimeLiveAcceptanceTests
     {
         Assert.SkipUnless(Environment.GetEnvironmentVariable("CODEX_NATIVE_WEBRTC_LIVE") == "1",
             "Native WebRTC provider acceptance requires a separate explicit opt-in.");
+        LiveRealtimeLimits.ValidateRouteOptIn(direct: Environment.GetEnvironmentVariable("CODEX_NATIVE_REALTIME_LIVE") == "1", webRtc: true);
         return RunProbeAsync(webRtc: true);
     }
 
@@ -294,6 +296,8 @@ public sealed class NativeRealtimeLiveAcceptanceTests
         var endOperation = Guid.NewGuid();
         string step = "attach";
         var reattached = false;
+        Guid? firstAttachment = null, secondAttachment = null;
+        string? reattachedCallDigest = null;
         var mediaClosed = false;
         NativeRealtimeWebRtcMediaPeer.Snapshot? mediaBaseline = null;
 
@@ -409,7 +413,9 @@ public sealed class NativeRealtimeLiveAcceptanceTests
             {
                 step = "same-call sideband detach and reattach";
                 var before = one.RealtimeSessions!.Single();
-                Require(before.AttachmentId is not null, "first attachment identity");
+                Require(before.AttachmentId is not null && before.CallId is not null, "first attachment identity");
+                firstAttachment = before.AttachmentId;
+                Require(LiveRealtimeLimits.Digest(before.CallId!) == providerCallDigest, "original provider call identity");
                 Require(await coordinator.DetachAsync(ct) == CodexRealtimeLifecycleStatus.Detached, "sideband-only detach");
                 await pump.WaitAsync(ct);
                 Require(media.ReadSnapshot().State == "connected", "original media call remains open");
@@ -417,6 +423,8 @@ public sealed class NativeRealtimeLiveAcceptanceTests
                 var after = (await store.ReadAsync(thread.Id, ct)).RealtimeSessions!.Single();
                 Require(after.CallId == before.CallId && after.AttachmentId is not null &&
                     after.AttachmentId != before.AttachmentId, "same call and new attachment fence");
+                secondAttachment = after.AttachmentId;
+                reattachedCallDigest = LiveRealtimeLimits.Digest(after.CallId!);
                 pump = coordinator.RunAsync(observer: observation.Observe, ct: ct);
                 reattached = true;
             }
@@ -491,6 +499,9 @@ public sealed class NativeRealtimeLiveAcceptanceTests
             {
                 trace["providerCallDigest"] = providerCallDigest;
                 trace["mediaClosed"] = mediaClosed;
+                trace["attachmentBeforeId"] = firstAttachment?.ToString("D");
+                trace["attachmentAfterId"] = secondAttachment?.ToString("D");
+                trace["reattachedCallDigest"] = reattachedCallDigest;
             }
             await JsonSerializer.SerializeAsync(receipt, trace, cancellationToken: CancellationToken.None);
         }

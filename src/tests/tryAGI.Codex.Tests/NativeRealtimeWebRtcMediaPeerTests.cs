@@ -7,8 +7,10 @@ namespace tryAGI.Codex.Tests;
 [Trait("Category", "OfflineWebRtcMedia")]
 public sealed class NativeRealtimeWebRtcMediaPeerTests
 {
-    [Fact]
-    public async Task LocalPeersNegotiateAndDecodeBidirectionalSyntheticAudio()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LocalPeersNegotiateAndDecodeBidirectionalSyntheticAudio(bool peerInitiatedClose)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
@@ -54,7 +56,13 @@ public sealed class NativeRealtimeWebRtcMediaPeerTests
         }
         Assert.Equal(50, left.ReadSnapshot().PacketsSent);
         Assert.Equal(50, right.ReadSnapshot().PacketsSent);
-        await Task.WhenAll(left.CloseAsync(ct), right.CloseAsync(ct));
+        if (peerInitiatedClose)
+        {
+            await left.CloseAsync(ct);
+            await right.CloseAsync(ct);
+        }
+        else
+            await Task.WhenAll(left.CloseAsync(ct), right.CloseAsync(ct));
     }
 
     [Theory]

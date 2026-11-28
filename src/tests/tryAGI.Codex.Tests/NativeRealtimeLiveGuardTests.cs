@@ -8,6 +8,12 @@ internal static class LiveRealtimeLimits
 {
     internal const int MaxPcmBytes = 48_000 * 8;
 
+    internal static void ValidateRouteOptIn(bool direct, bool webRtc)
+    {
+        if (direct && webRtc)
+            throw new InvalidOperationException("Select exactly one authorized provider probe.");
+    }
+
     internal static string Digest(string value) => Digest(Encoding.UTF8.GetBytes(value));
     internal static string Digest(byte[] value) => Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant();
     internal static bool SafeModel(string? value) => value is { Length: > 0 and <= 128 } &&
@@ -85,6 +91,19 @@ internal static class LiveRealtimeLimits
 
 public sealed class NativeRealtimeLiveGuardTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void ProviderProbeFlagsCannotAuthorizeTwoRoutesTogether(bool direct, bool webRtc)
+    {
+        if (direct && webRtc)
+            Assert.Throws<InvalidOperationException>(() => LiveRealtimeLimits.ValidateRouteOptIn(direct, webRtc));
+        else
+            LiveRealtimeLimits.ValidateRouteOptIn(direct, webRtc);
+    }
+
     [Fact]
     public async Task ReasoningAdmissionIsBoundedAndUnknownUsageIsNotInvented()
     {

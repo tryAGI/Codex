@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect a sanitized direct V3 probe trace and its exact TRX without network I/O.
+"""Inspect a sanitized direct or WebRTC V3 probe trace and its exact TRX without network I/O.
 
 This is a diagnostic validator, not a live acceptance receipt issuer. A valid
 trace is not proof of execution, authorization, playback, or a provider-side
@@ -21,6 +21,10 @@ from realtime_parity_evidence import parse_trx, source_revision
 PROBE_CLASS = "NativeRealtimeLiveAcceptanceTests"
 PROBE_METHOD = ("tryAGI.Codex.Tests." + PROBE_CLASS
                 + ".DirectAudioDelegationToolFollowupAndHostInitiatedSpeech")
+DIRECT_ROUTE = "chatgpt-native-direct-websocket"
+WEBRTC_ROUTE = "chatgpt-native-webrtc-sideband"
+WEBRTC_PROBE_METHOD = ("tryAGI.Codex.Tests." + PROBE_CLASS
+                       + ".WebRtcAudioDelegationToolFollowupAndHostInitiatedSpeech")
 HEX40 = re.compile(r"[a-f0-9]{40}")
 HEX64 = re.compile(r"[a-f0-9]{64}")
 MODEL = re.compile(r"[A-Za-z0-9_.-]{1,128}")
@@ -37,6 +41,10 @@ STAGE_KEYS = {
     "AssistantTurnDone", "PhraseObserved", "DelegationDigests",
     "ProviderSessionDigest", "ObservedModel", "VoiceTokens", "BackingTurnId",
 }
+WEBRTC_TRACE_KEYS = {"providerCallDigest", "mediaClosed", "attachmentBeforeId",
+                     "attachmentAfterId", "reattachedCallDigest"}
+WEBRTC_MEDIA_KEYS = {"PacketsSent", "PacketsReceived", "BytesReceived", "DecodedSamples",
+                     "NonSilentSamples", "ConcealedSamples", "Codec"}
 TOKEN_KEYS = {
     "InputTokens", "CachedInputTokens", "CacheWriteInputTokens", "OutputTokens",
     "ReasoningTokens", "TotalTokens", "RolloutBudgetUnits",
@@ -109,19 +117,30 @@ def usage_tokens(value):
 
 def inspect_trace(trace, expected_commit):
     require(matches(HEX40, expected_commit), "An immutable C# commit is required")
-    exact_keys(trace, TRACE_KEYS, "Trace")
+    require(type(trace) is dict, "Invalid trace")
+    web_rtc = trace.get("route") == WEBRTC_ROUTE
+    exact_keys(trace, TRACE_KEYS | WEBRTC_TRACE_KEYS if web_rtc else TRACE_KEYS, "Trace")
     for key, expected in {
-        "schemaVersion": 1, "lane": "live", "route": "chatgpt-native-direct-websocket",
+        "schemaVersion": 1, "lane": "live", "route": WEBRTC_ROUTE if web_rtc else DIRECT_ROUTE,
         "protocol": "v3", "requestedReasoningTransport": "sse",
         "declaredCsharpCommit": expected_commit, "outcome": "passed",
         "step": "clean shutdown", "errorType": None, "cleanShutdown": True,
-        "media": "provider-pcm-received-not-played", "interruption": "not-run",
-        "reconnect": "not-run",
-        "coverage": "direct-connect-two-voice-turns-host-triggered-reasoning-speech-clean-end-only",
+        "media": "provider-webrtc-rtp-decoded-pcm-not-played" if web_rtc else "provider-pcm-received-not-played",
+        "interruption": "not-run",
+        "reconnect": "same-call-detach-reattach" if web_rtc else "not-run",
+        "coverage": ("webrtc-connect-two-voice-turns-same-call-reattach-host-speech-clean-end" if web_rtc
+                     else "direct-connect-two-voice-turns-host-triggered-reasoning-speech-clean-end-only"),
         "storage": "process-local-cas-fixture",
         "tokenOrCreditCeiling": "not-enforced-by-provider",
     }.items():
         require(type(trace[key]) is type(expected) and trace[key] == expected, "Invalid " + key)
+    if web_rtc:
+        require(matches(HEX64, trace["providerCallDigest"]) and
+                trace["reattachedCallDigest"] == trace["providerCallDigest"], "WebRTC call identity changed")
+        canonical_guid(trace["attachmentBeforeId"], "Original attachment")
+        canonical_guid(trace["attachmentAfterId"], "Successor attachment")
+        require(trace["attachmentBeforeId"] != trace["attachmentAfterId"], "Reused attachment fence")
+        require(trace["mediaClosed"] is True, "Missing media shutdown")
     for key in ("requestedVoiceModel", "requestedReasoningModel"):
         require(matches(MODEL, trace[key]), "Invalid bounded model identifier")
     canonical_guid(trace["threadId"], "Thread")
@@ -167,15 +186,33 @@ def inspect_trace(trace, expected_commit):
     turns, handoffs, sessions, models = set(), set(), set(), set()
     known_voice = 0
     received_pcm = 0
+    web_packets = web_bytes = web_samples = web_non_silent = 0
     for i, stage in enumerate(stages):
-        exact_keys(stage, STAGE_KEYS, "Voice stage")
+        exact_keys(stage, STAGE_KEYS | {"WebRtcMedia"} if web_rtc else STAGE_KEYS, "Voice stage")
         require(stage["Name"] == STAGES[i], "Unexpected stage order")
         bounded(stage["UserTranscriptEvents"], 1 if i < 2 else 0,
                 10000 if i < 2 else 0, "User transcript events")
         bounded(stage["AssistantTranscriptEvents"], 0, 10000, "Assistant transcript events")
-        bounded(stage["OutputPcmBytes"], 2, 48000 * 20, "Output PCM bytes")
+        bounded(stage["OutputPcmBytes"], 0 if web_rtc else 2, 48000 * 20, "Sideband PCM bytes")
         require(stage["OutputPcmBytes"] % 2 == 0, "Unaligned output PCM")
         received_pcm += stage["OutputPcmBytes"]
+        if web_rtc:
+            media = stage["WebRtcMedia"]
+            exact_keys(media, WEBRTC_MEDIA_KEYS, "Native WebRTC media")
+            sent = (clips[i]["bytes"] + 959) // 960 + 50 if i < 2 else 0
+            bounded(media["PacketsSent"], sent, sent, "Paced RTP sends")
+            bounded(media["PacketsReceived"], 1, 40000, "Authenticated RTP packets")
+            bounded(media["BytesReceived"], media["PacketsReceived"],
+                    1275 * media["PacketsReceived"], "Encoded Opus bytes")
+            bounded(media["DecodedSamples"], 1024,
+                    min(24000 * 90, 2880 * media["PacketsReceived"]), "Decoded PCM samples")
+            bounded(media["NonSilentSamples"], 1024, media["DecodedSamples"], "Non-silent PCM samples")
+            bounded(media["ConcealedSamples"], 0, 0, "Synthesized samples")
+            require(media["Codec"] == "audio/opus", "Unexpected WebRTC codec")
+            web_packets += media["PacketsReceived"]
+            web_bytes += media["BytesReceived"]
+            web_samples += media["DecodedSamples"]
+            web_non_silent += media["NonSilentSamples"]
         require(stage["AssistantTurnDone"] is True and stage["PhraseObserved"] is True,
                 "Missing terminal phrase receipt")
         canonical_guid(stage["BackingTurnId"], "Backing turn")
@@ -194,8 +231,10 @@ def inspect_trace(trace, expected_commit):
         for digest in delegation:
             require(matches(HEX64, digest) and digest not in handoffs, "Duplicate or invalid delegation")
             handoffs.add(digest)
-    require(len(sessions) == 1, "Provider session changed during direct probe")
-    require(len(models) <= 1, "Observed voice model changed during direct probe")
+    require(len(sessions) == 1, "Provider session changed during probe")
+    require(len(models) <= 1, "Observed voice model changed during probe")
+    if web_rtc:
+        bounded(web_samples, 3072, 24000 * 120, "Total decoded media samples")
     return {
         "diagnosticOnly": True,
         "eligibleForLiveAcceptance": False,
@@ -206,6 +245,11 @@ def inspect_trace(trace, expected_commit):
         "reasoningReceiptsWithReportedTotal": known_reasoning,
         "voiceSnapshotsWithReportedTotal": known_voice,
         "receivedPcmBytes": received_pcm,
+        "receivedWebRtcPackets": web_packets,
+        "receivedWebRtcOpusBytes": web_bytes,
+        "decodedWebRtcPcmSamples": web_samples,
+        "nonSilentWebRtcPcmSamples": web_non_silent,
+        "sameCallReattachmentReported": web_rtc,
         "playbackVerified": False,
         "interruptionVerified": False,
         "reconnectVerified": False,
@@ -215,13 +259,15 @@ def inspect_trace(trace, expected_commit):
     }
 
 
-def inspect_trx(raw):
+def inspect_trx(raw, route=DIRECT_ROUTE):
     require(len(raw) <= 4 * 1024 * 1024, "TRX exceeds the probe bound")
     # Reuse the exact case parser with a single explicit class, never the offline
     # receipt issuer. No mixed suite or skipped result may stand for this probe.
     cases = parse_trx(raw, offline_classes=(PROBE_CLASS,))
-    require(set(cases) == {PROBE_METHOD}
-            and cases[PROBE_METHOD] == {"method": PROBE_METHOD, "outcome": "Passed"},
+    require(route in (DIRECT_ROUTE, WEBRTC_ROUTE), "Unexpected probe route")
+    method = WEBRTC_PROBE_METHOD if route == WEBRTC_ROUTE else PROBE_METHOD
+    require(set(cases) == {method}
+            and cases[method] == {"method": method, "outcome": "Passed"},
             "TRX does not contain exactly the successful live probe")
 
 
@@ -236,7 +282,7 @@ def inspect_files(trace_path, trx_path, commit):
     raw = bounded_file(trace_path, 64 * 1024)
     trx = bounded_file(trx_path, 4 * 1024 * 1024)
     result = inspect_trace(load_trace(raw), commit)
-    inspect_trx(trx)
+    inspect_trx(trx, result["route"])
     resolved, tree = source_revision(commit)
     require(resolved == commit, "Expected exact immutable revision")
     # The caller's declaration is matched to a real commit, not an attestation
@@ -290,8 +336,8 @@ def self_test():
     assert not result["authorizationVerified"] and not result["playbackVerified"]
     assert not result["executionProvenanceVerified"]
 
-    def rejects(change):
-        bad = copy.deepcopy(trace)
+    def rejects(change, template=trace):
+        bad = copy.deepcopy(template)
         change(bad)
         try:
             inspect_trace(bad, "a" * 40)
@@ -321,6 +367,39 @@ def self_test():
     ):
         rejects(mutation)
 
+    web = copy.deepcopy(trace)
+    web.update(route=WEBRTC_ROUTE, media="provider-webrtc-rtp-decoded-pcm-not-played",
+               reconnect="same-call-detach-reattach",
+               coverage="webrtc-connect-two-voice-turns-same-call-reattach-host-speech-clean-end",
+               providerCallDigest="c" * 64, reattachedCallDigest="c" * 64, mediaClosed=True,
+               attachmentBeforeId=str(uuid.UUID(int=10)), attachmentAfterId=str(uuid.UUID(int=11)))
+    for i, stage in enumerate(web["stages"]):
+        stage["OutputPcmBytes"] = 0
+        stage["WebRtcMedia"] = {
+            "PacketsSent": (web["input"][i]["bytes"] + 959) // 960 + 50 if i < 2 else 0,
+            "PacketsReceived": 4, "BytesReceived": 320, "DecodedSamples": 1920,
+            "NonSilentSamples": 1600, "ConcealedSamples": 0, "Codec": "audio/opus",
+        }
+    web_result = inspect_trace(load_trace(json.dumps(web).encode()), "a" * 40)
+    assert web_result["sameCallReattachmentReported"] and not web_result["reconnectVerified"]
+    assert web_result["receivedPcmBytes"] == 0 and web_result["decodedWebRtcPcmSamples"] == 5760
+    assert not web_result["eligibleForLiveAcceptance"]
+    for mutation in (
+        lambda t: t.update(reattachedCallDigest="d" * 64),
+        lambda t: t.update(attachmentAfterId=t["attachmentBeforeId"]),
+        lambda t: t.update(mediaClosed=False),
+        lambda t: t.update(interruption="passed"),
+        lambda t: t["stages"][0].pop("WebRtcMedia"),
+        lambda t: t["stages"][0]["WebRtcMedia"].update(PacketsSent=0),
+        lambda t: t["stages"][2]["WebRtcMedia"].update(PacketsSent=1),
+        lambda t: t["stages"][0]["WebRtcMedia"].update(NonSilentSamples=0),
+        lambda t: t["stages"][0]["WebRtcMedia"].update(ConcealedSamples=1),
+        lambda t: t["stages"][0]["WebRtcMedia"].update(BytesReceived=6000),
+        lambda t: t["stages"][0]["WebRtcMedia"].update(Codec="audio/other"),
+        lambda t: t["stages"][0]["WebRtcMedia"].update(rawAudio="unexpected"),
+    ):
+        rejects(mutation, web)
+
     def trx(outcome="Passed", method=PROBE_METHOD):
         class_name, name = method.rsplit(".", 1)
         return (f'<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">'
@@ -331,6 +410,13 @@ def self_test():
                 '</ResultSummary></TestRun>').encode()
 
     inspect_trx(trx())
+    inspect_trx(trx(method=WEBRTC_PROBE_METHOD), WEBRTC_ROUTE)
+    for wrong_trx, route in ((trx(), WEBRTC_ROUTE), (trx(method=WEBRTC_PROBE_METHOD), DIRECT_ROUTE)):
+        try:
+            inspect_trx(wrong_trx, route)
+        except ValueError:
+            continue
+        raise AssertionError("Wrong route TRX accepted")
     for bad in (trx("NotExecuted"), trx("Failed"), trx(method="tryAGI.Codex.Tests.RustParityFixtureTests.Fixture")):
         try:
             inspect_trx(bad)

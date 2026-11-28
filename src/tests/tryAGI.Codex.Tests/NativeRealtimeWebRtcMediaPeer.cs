@@ -216,10 +216,28 @@ internal sealed class NativeRealtimeWebRtcMediaPeer : IAsyncDisposable
 
     internal async Task CloseAsync(CancellationToken ct)
     {
-        EnsureHealthy();
+        // Stop application reads before the SCTP owner disposes its channels.
+        // A remote graceful close may race this local shutdown.
+        await lifetime.CancelAsync();
         await peer.CloseAsync(ct);
-        if (await peer.Completion.WaitAsync(ct) is not null)
+        if (await peer.Completion.WaitAsync(ct) is not null || peer.GetDiagnostics().DroppedAudioPackets != 0)
             throw new IOException("Native WebRTC did not close cleanly.");
+        await JoinReadersAsync();
+    }
+
+    private Task JoinReadersAsync() => Task.WhenAll(ObserveReaderAsync(audioReader, dataChannel: false),
+        ObserveReaderAsync(eventReader, dataChannel: true));
+
+    private async Task ObserveReaderAsync(Task? reader, bool dataChannel)
+    {
+        if (reader is null) return;
+        try { await reader; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ObjectDisposedException error) when (dataChannel && error.ObjectName == "DataChannelAssociation" &&
+            lifetime.IsCancellationRequested && peer.Completion.IsCompletedSuccessfully && peer.Completion.Result is null)
+        {
+            // The known owner-close notification is benign only after verified graceful peer termination.
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -232,9 +250,8 @@ internal sealed class NativeRealtimeWebRtcMediaPeer : IAsyncDisposable
         {
             try
             {
-                await Task.WhenAll(audioReader ?? Task.CompletedTask, eventReader ?? Task.CompletedTask);
+                await JoinReadersAsync();
             }
-            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
             finally
             {
                 lifetime.Dispose();
