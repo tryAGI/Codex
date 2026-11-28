@@ -256,6 +256,12 @@ unchanged release produces nothing. After the review, one command records it:
 python3 scripts/check-upstream-protocol.py update --tag rust-vX.Y.Z
 ```
 
+The protocol drift checker's tag parser and report can be tested offline, without credentials or network access:
+
+```bash
+python3 scripts/check-upstream-protocol.py --self-test
+```
+
 ## Running the tests
 
 ```bash

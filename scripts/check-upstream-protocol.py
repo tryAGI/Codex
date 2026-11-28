@@ -46,6 +46,11 @@ def stable_tags() -> dict[str, str]:
     """Maps each stable rust-vX.Y.Z tag to its commit (annotated tags are peeled)."""
     output = subprocess.run(["git", "ls-remote", "--tags", REPOSITORY, "rust-v*"],
                             check=True, capture_output=True, text=True).stdout
+    return parse_stable_tags(output)
+
+
+def parse_stable_tags(output: str) -> dict[str, str]:
+    """Parse tag advertisement independently of transport for offline regression tests."""
     tags: dict[str, str] = {}
     for line in output.splitlines():
         commit, ref = line.split("\t")
@@ -181,6 +186,25 @@ def self_test() -> None:
         wire_symbols(source)
     assert newest({"rust-v0.9.0": "a", "rust-v0.10.0": "b", "rust-v0.165.0": "c"}) == "rust-v0.165.0"
     assert not STABLE_TAG.fullmatch("rust-v0.166.0-alpha.1")
+    refs = [
+        "tag-object\trefs/tags/rust-v1.2.0",
+        "commit-a\trefs/tags/rust-v1.2.0^{}",
+        "commit-b\trefs/tags/rust-v1.3.0^{}",
+        "tag-object\trefs/tags/rust-v1.3.0",
+        "commit-c\trefs/tags/rust-v1.4.0",
+        "preview\trefs/tags/rust-v2.0.0-alpha.1",
+    ]
+    expected_tags = {"rust-v1.2.0": "commit-a", "rust-v1.3.0": "commit-b", "rust-v1.4.0": "commit-c"}
+    assert parse_stable_tags("\n".join(refs)) == expected_tags
+    assert parse_stable_tags("\n".join(reversed(refs))) == expected_tags
+    # Empty or preview-only advertisements must never select an unreviewed release.
+    for advertisement in ("", refs[-1]):
+        try:
+            parse_stable_tags(advertisement)
+        except SystemExit as error:
+            assert "no stable rust-v* tags" in str(error)
+        else:
+            raise AssertionError("Expected no stable release")
     baseline = {"reviewedRelease": "rust-v1.0.0", "sourceFiles": {"a.rs": "", "b.rs": ""}}
     text = report(baseline, "rust-v1.1.0", "abc", [
         {"path": "a.rs", "missing": False, "added": ["session.new"], "removed": []},
