@@ -4,6 +4,15 @@ Reviewed upstream: OpenAI Codex `6ff1e1ca3b30fc8b914720681fcf5fe62e95f856` (`rus
 Every file listed below is fingerprinted in `ProtocolBaseline.json`, and a daily workflow opens a
 review issue when a newer stable release changes one of them.
 
+Before changing the drift checker, run its offline regression suite:
+
+```bash
+python3 scripts/check-upstream-protocol.py --self-test
+```
+
+This checks stable-tag selection and report generation without network access or changes to the
+reviewed protocol baseline. The regular check and update commands still require upstream access.
+
 Notes from the `rust-v0.166.0` review:
 
 - `apply_patch` removed its LF-normalizing update mode and always preserves line endings, so
